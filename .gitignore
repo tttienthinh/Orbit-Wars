@@ -1,0 +1,24 @@
+# Large generated / notebook output files
+00-replay.html
+00-setup.ipynb
+
+# Nested git repo — add as submodule if you want it tracked
+orbit-wars-lab/
+
+# Local Claude Code settings and workflows
+.claude/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+dist/
+build/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Misc
+.env
+*.log
