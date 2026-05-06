@@ -57,20 +57,18 @@
 
 ## Traceability
 
-*Filled by roadmapper*
-
-| REQ-ID | Phase |
-|--------|-------|
-| PHYS-01 | — |
-| PHYS-02 | — |
-| PHYS-03 | — |
-| PHYS-04 | — |
-| TARG-01 | — |
-| TARG-02 | — |
-| TARG-03 | — |
-| DEF-01 | — |
-| DEF-02 | — |
-| DEF-03 | — |
-| INFRA-01 | — |
-| INFRA-02 | — |
-| INFRA-03 | — |
+| REQ-ID | Phase | Status |
+|--------|-------|--------|
+| PHYS-01 | Phase 1 | Pending |
+| PHYS-02 | Phase 1 | Pending |
+| PHYS-03 | Phase 1 | Pending |
+| PHYS-04 | Phase 1 | Pending |
+| TARG-01 | Phase 2 | Pending |
+| TARG-02 | Phase 2 | Pending |
+| TARG-03 | Phase 2 | Pending |
+| DEF-01 | Phase 3 | Pending |
+| DEF-02 | Phase 3 | Pending |
+| DEF-03 | Phase 3 | Pending |
+| INFRA-01 | Phase 1 | Pending |
+| INFRA-02 | Phase 4 | Pending |
+| INFRA-03 | Phase 1 | Pending |
