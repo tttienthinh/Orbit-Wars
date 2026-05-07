@@ -1,37 +1,51 @@
 """
 Orbit Wars - Rule-Based Agent (07)
 
-Rules over 05 (nearest-planet sniper with orbital intercept):
+Strategy:
+  Early (t<40):  Hyper-aggressive expansion. Near-zero garrison.
+  Mid  (t40-150):Active defense + counter-attack weakened enemy planets.
+  Late (t>150):  Press or recover.
 
-  1. Garrison          - keep ships at home, only spend the surplus.
-  2. Target scoring    - rank by production / (cost * travel); prefer value.
-  3. Neutral preference- slight 1.2x bonus; does NOT block enemy attacks.
-  4. Production-adjust - enemy ships keep growing in transit; account for it.
-  5. Fleet tracking    - subtract friendly ships already en route so we don't
-                         over-send to the same planet across turns.
-  6. No dup targeting  - one attacker per target per turn.
-  7. Sun avoidance     - skip any path whose straight line crosses the sun.
-  8. Enemy fallback    - planets with no viable neutral target attack enemies.
+Key fixes over prior versions:
+  * intercept_time includes target.radius → finds hits for slow early fleets
+  * Two-pass intercept: compute travel time, then refine with actual fleet size
+  * Counter-attack: detect enemy planets that just dispatched fleets (from_planet_id)
+                    and score them higher (exposed garrison)
+  * Enemy fallback only sends if we can actually capture (no wasted ships)
+  * Surface-to-surface sun avoidance (much less restrictive than center-to-center)
 """
 
 import math
 from collections import defaultdict
 from kaggle_environments.envs.orbit_wars.orbit_wars import Planet
 
-CENTER_X = 50.0
-CENTER_Y = 50.0
-SUN_R    = 10.0
-SUN_SAFE = 1.5      # clearance margin around sun
+CENTER_X  = 50.0
+CENTER_Y  = 50.0
+SUN_R     = 10.0
+SUN_SAFE  = 0.5
 MAX_SPEED = 6.0
 
-GARRISON_RATIO  = 0.30
-GARRISON_MIN    = 8
-NEUTRAL_BONUS   = 1.20          # mild preference for neutral planets
-INTERCEPT_LIMIT = 100           # max turns searched for intercept
+NEUTRAL_BONUS       = 1.15
+EXPOSED_BONUS       = 2.0   # score multiplier for enemy planets that just sent fleets
+INTERCEPT_LIMIT     = 200   # wider search window for fast-orbiting planets
 
 
 # ---------------------------------------------------------------------------
-# Geometry / physics helpers
+# Garrison by phase
+# ---------------------------------------------------------------------------
+
+def garrison_for(step, ships):
+    if step < 30:
+        return max(2, int(ships * 0.05))
+    if step < 80:
+        return max(5, int(ships * 0.15))
+    if step < 200:
+        return max(8, int(ships * 0.25))
+    return max(10, int(ships * 0.30))
+
+
+# ---------------------------------------------------------------------------
+# Physics
 # ---------------------------------------------------------------------------
 
 def dist(x0, y0, x1, y1):
@@ -55,131 +69,217 @@ def fleet_speed(ships):
 
 
 def orbital_position(x, y, angular_velocity, t):
-    r = dist_to_center(x, y)
+    r     = dist_to_center(x, y)
     angle = math.atan2(y - CENTER_Y, x - CENTER_X) + angular_velocity * t
     return CENTER_X + r * math.cos(angle), CENTER_Y + r * math.sin(angle)
 
 
-def intercept_time(ox, oy, tx, ty, angular_velocity, ships):
+def intercept_time(ox, oy, tx, ty, angular_velocity, ships, target_radius=0.0):
+    """
+    Find the earliest turn t where a fleet of `ships` can reach the orbiting
+    planet.  Including target_radius is essential: the fleet hits the planet
+    surface, not its centre.
+    """
     speed = fleet_speed(ships)
     for t in range(1, INTERCEPT_LIMIT + 1):
         px, py = orbital_position(tx, ty, angular_velocity, t)
-        if dist(ox, oy, px, py) <= speed * t:
+        if dist(ox, oy, px, py) <= speed * t + target_radius:
             return t, px, py
     return None, None, None
 
 
-def _point_seg_dist(px, py, x1, y1, x2, y2):
+def _pt_seg_dist(px, py, x1, y1, x2, y2):
     dx, dy = x2 - x1, y2 - y1
-    len_sq = dx * dx + dy * dy
-    if len_sq < 1e-9:
+    lsq    = dx * dx + dy * dy
+    if lsq < 1e-9:
         return dist(px, py, x1, y1)
-    t = ((px - x1) * dx + (py - y1) * dy) / len_sq
-    t = max(0.0, min(1.0, t))
+    t = max(0.0, min(1.0, ((px - x1) * dx + (py - y1) * dy) / lsq))
     return dist(px, py, x1 + t * dx, y1 + t * dy)
 
 
-def path_hits_sun(x1, y1, x2, y2):
-    return _point_seg_dist(CENTER_X, CENTER_Y, x1, y1, x2, y2) < SUN_R + SUN_SAFE
+def path_hits_sun(mine, aim_x, aim_y, target_radius=0.0):
+    """Surface-to-surface segment check."""
+    d = dist(mine.x, mine.y, aim_x, aim_y)
+    if d < 1e-6:
+        return False
+    dx, dy = (aim_x - mine.x) / d, (aim_y - mine.y) / d
+    lx = mine.x + dx * mine.radius
+    ly = mine.y + dy * mine.radius
+    travel = max(0.0, d - mine.radius - target_radius)
+    ex = lx + dx * travel
+    ey = ly + dy * travel
+    return _pt_seg_dist(CENTER_X, CENTER_Y, lx, ly, ex, ey) < SUN_R + SUN_SAFE
 
 
 # ---------------------------------------------------------------------------
-# Fleet tracking — count friendly ships already heading to each planet
+# Fleet ledgers
 # ---------------------------------------------------------------------------
 
-def build_friendly_incoming(raw_fleets, planets, player):
-    """Returns {planet_id: ships_incoming} for our own in-flight fleets."""
-    incoming = defaultdict(int)
-    if not raw_fleets:
-        return incoming
-
-    Fleet = None  # lazy import of namedtuple shape via index
-    for raw in raw_fleets:
-        # raw = [id, owner, x, y, angle, from_planet_id, ships]
-        owner = raw[1]
-        if owner != player:
+def _fleet_target(raw, planets):
+    fx, fy, fangle, fships = raw[2], raw[3], raw[4], raw[6]
+    speed  = fleet_speed(fships)
+    dir_x  = math.cos(fangle)
+    dir_y  = math.sin(fangle)
+    best   = None
+    b_eta  = float("inf")
+    for p in planets:
+        dx    = p.x - fx
+        dy    = p.y - fy
+        along = dx * dir_x + dy * dir_y
+        if along <= 0:
             continue
-        fx, fy, fangle, fships = raw[2], raw[3], raw[4], raw[6]
-        speed = fleet_speed(fships)
-        dir_x = math.cos(fangle)
-        dir_y = math.sin(fangle)
-        best_planet_id = None
-        best_eta = float("inf")
-        for p in planets:
-            dx = p.x - fx
-            dy = p.y - fy
-            along = dx * dir_x + dy * dir_y
-            if along <= 0:
-                continue
-            d_sq = dx * dx + dy * dy
-            cross_sq = d_sq - along * along
-            if cross_sq < (p.radius + 1.0) ** 2:
-                eta = along / speed
-                if eta < best_eta:
-                    best_eta = eta
-                    best_planet_id = p.id
-        if best_planet_id is not None:
-            incoming[best_planet_id] += int(fships)
+        cross_sq = dx * dx + dy * dy - along * along
+        if cross_sq < (p.radius + 1.0) ** 2:
+            eta = along / speed
+            if eta < b_eta:
+                b_eta = eta
+                best  = p.id
+    return best, b_eta
 
-    return incoming
+
+def build_ledgers(raw_fleets, planets, my_player):
+    friendly_inc  = defaultdict(int)
+    enemy_inc     = defaultdict(int)
+    enemy_eta     = defaultdict(lambda: float("inf"))
+    exposed_ships = defaultdict(int)   # enemy ships sent away from each enemy planet
+
+    for raw in (raw_fleets or []):
+        pid, eta = _fleet_target(raw, planets)
+        ships    = int(raw[6])
+        owner    = raw[1]
+        from_pid = raw[5]    # from_planet_id
+
+        if pid is not None:
+            if owner == my_player:
+                friendly_inc[pid] += ships
+            else:
+                enemy_inc[pid] += ships
+                if eta < enemy_eta[pid]:
+                    enemy_eta[pid] = eta
+
+        if owner != my_player and from_pid is not None:
+            exposed_ships[from_pid] += ships   # enemy planet that dispatched fleet
+
+    return friendly_inc, enemy_inc, enemy_eta, exposed_ships
 
 
 # ---------------------------------------------------------------------------
-# Targeting helpers
+# Shot geometry — two-pass for accuracy
 # ---------------------------------------------------------------------------
 
-def ships_needed_for(mine, target, angular_velocity, is_neutral):
+def compute_shot(mine, target, angular_velocity, actual_ships=None):
     """
-    Ships required to capture target accounting for production during travel.
-    Returns (ships_needed, travel_turns, aim_angle).
-    Returns (None, None, None) if path is blocked by the sun.
+    Returns (base_garrison, travel_turns, aim_angle) or (None, None, None).
+    base_garrison = target.ships now; caller adds production during travel.
+    actual_ships: if known, use for fleet-speed computation (more accurate).
     """
+    speed_ships = actual_ships or max(target.ships + 1, 5)
+
     if is_orbiting(target):
-        guess = max(target.ships + 1, 10)
         t, px, py = intercept_time(mine.x, mine.y, target.x, target.y,
-                                   angular_velocity, guess)
+                                   angular_velocity, speed_ships,
+                                   target_radius=target.radius)
         if t is None:
             return None, None, None
-        if path_hits_sun(mine.x, mine.y, px, py):
+        if path_hits_sun(mine, px, py):
             return None, None, None
-        travel = t
-        angle = math.atan2(py - mine.y, px - mine.x)
+        return target.ships, t, math.atan2(py - mine.y, px - mine.x)
     else:
-        if path_hits_sun(mine.x, mine.y, target.x, target.y):
+        if path_hits_sun(mine, target.x, target.y, target_radius=target.radius):
             return None, None, None
         travel = max(1, int(dist(mine.x, mine.y, target.x, target.y) /
-                             fleet_speed(max(target.ships + 1, 10))))
-        angle = math.atan2(target.y - mine.y, target.x - mine.x)
-
-    if is_neutral:
-        needed = target.ships + 1
-    else:
-        # Enemy keeps producing during transit
-        needed = target.ships + travel * target.production + 1
-
-    return needed, travel, angle
+                             fleet_speed(speed_ships)))
+        return target.ships, travel, math.atan2(target.y - mine.y, target.x - mine.x)
 
 
-def score_target(mine, target, angular_velocity, is_neutral, already_incoming):
-    """
-    Score this (mine → target) pair. Higher = better.
-    Returns (score, ships_needed, travel, angle) or None if infeasible.
-    """
-    needed, travel, angle = ships_needed_for(mine, target, angular_velocity, is_neutral)
-    if needed is None:
+# ---------------------------------------------------------------------------
+# Defense
+# ---------------------------------------------------------------------------
+
+def plan_defense(my_planets, enemy_inc, enemy_eta, friendly_inc,
+                 angular_velocity, step, reserved):
+    defense_moves = []
+    used          = set()
+
+    threats = []
+    for mp in my_planets:
+        einc   = enemy_inc.get(mp.id, 0)
+        finc   = friendly_inc.get(mp.id, 0)
+        margin = mp.ships + finc - einc
+        if margin < 0:
+            threats.append((enemy_eta.get(mp.id, float("inf")), -margin + 1, mp))
+    threats.sort()
+
+    for eta, needed, threatened in threats:
+        best_src  = None
+        best_dist = float("inf")
+        for src in my_planets:
+            if src.id == threatened.id or src.id in used:
+                continue
+            garrison = garrison_for(step, src.ships)
+            sendable = src.ships - garrison - reserved[src.id]
+            if sendable < needed:
+                continue
+            travel = dist(src.x, src.y, threatened.x, threatened.y) / fleet_speed(needed)
+            if travel > eta + 2:
+                continue
+            d = dist(src.x, src.y, threatened.x, threatened.y)
+            if d < best_dist:
+                best_dist = d
+                best_src  = src
+
+        if best_src is None:
+            continue
+        if path_hits_sun(best_src, threatened.x, threatened.y, threatened.radius):
+            continue
+        angle = math.atan2(threatened.y - best_src.y, threatened.x - best_src.x)
+        defense_moves.append([best_src.id, angle, needed])
+        reserved[best_src.id] += needed
+        used.add(best_src.id)
+
+    return defense_moves, used
+
+
+# ---------------------------------------------------------------------------
+# Offense scoring
+# ---------------------------------------------------------------------------
+
+def score_attack(mine, target, angular_velocity, is_neutral,
+                 friendly_inc, sendable, exposed_ships):
+    # First pass: rough travel estimate
+    base, travel, angle = compute_shot(mine, target, angular_velocity)
+    if base is None:
         return None
 
-    # Discount by friendly ships already heading there
-    effective_needed = max(0, needed - already_incoming.get(target.id, 0))
+    if is_neutral:
+        needed = base + 1
+    else:
+        needed = base + travel * target.production + 1
 
-    if effective_needed == 0:
-        return None  # already covered by in-flight fleets
+    effective = max(0, needed - friendly_inc.get(target.id, 0))
+    if effective == 0 or effective > sendable:
+        return None
 
-    score = (target.production + 1) / (effective_needed * (travel + 1))
+    # Second pass: refine aim with actual fleet size (matters for orbiting)
+    if is_orbiting(target):
+        base2, travel, angle = compute_shot(mine, target, angular_velocity,
+                                            actual_ships=effective)
+        if base2 is None:
+            return None
+        if not is_neutral:
+            needed = base2 + travel * target.production + 1
+            effective = max(0, needed - friendly_inc.get(target.id, 0))
+            if effective == 0 or effective > sendable:
+                return None
+
+    score = (target.production + 1) / (effective * (travel + 1))
     if is_neutral:
         score *= NEUTRAL_BONUS
+    # Counter-attack bonus: enemy planet whose fleet just left is exposed
+    if not is_neutral and exposed_ships.get(target.id, 0) > 0:
+        score *= EXPOSED_BONUS
 
-    return score, effective_needed, travel, angle
+    return score, effective, angle
 
 
 # ---------------------------------------------------------------------------
@@ -189,7 +289,8 @@ def score_target(mine, target, angular_velocity, is_neutral, already_incoming):
 def agent(obs):
     moves = []
 
-    player  = obs.get("player", 0) if isinstance(obs, dict) else obs.player
+    player  = obs.get("player", 0)  if isinstance(obs, dict) else obs.player
+    step    = obs.get("step",   0)  if isinstance(obs, dict) else obs.step
     raw_p   = obs.get("planets", []) if isinstance(obs, dict) else obs.planets
     raw_f   = obs.get("fleets",  []) if isinstance(obs, dict) else obs.fleets
     ang_vel = obs.get("angular_velocity", 0) if isinstance(obs, dict) else obs.angular_velocity
@@ -203,66 +304,76 @@ def agent(obs):
     if not neutrals and not enemies:
         return moves
 
-    friendly_incoming = build_friendly_incoming(raw_f, planets, player)
+    friendly_inc, enemy_inc, enemy_eta, exposed_ships = build_ledgers(
+        raw_f, planets, player
+    )
 
-    # Build scored candidate list: (score, mine, target, ships_needed, travel, angle)
+    reserved = defaultdict(int)
+
+    # 1. Defense
+    defense_moves, defense_sources = plan_defense(
+        my_planets, enemy_inc, enemy_eta, friendly_inc, ang_vel, step, reserved
+    )
+    moves.extend(defense_moves)
+
+    # 2. Offense
     candidates = []
     for mine in my_planets:
-        garrison  = max(GARRISON_MIN, int(mine.ships * GARRISON_RATIO))
-        sendable  = mine.ships - garrison
+        if mine.id in defense_sources:
+            continue
+        garrison = garrison_for(step, mine.ships)
+        sendable = mine.ships - garrison - reserved[mine.id]
         if sendable <= 0:
             continue
-
         for target in neutrals + enemies:
             is_neutral = (target.owner == -1)
-            result = score_target(mine, target, ang_vel, is_neutral, friendly_incoming)
+            result = score_attack(mine, target, ang_vel, is_neutral,
+                                  friendly_inc, sendable, exposed_ships)
             if result is None:
                 continue
-            score, needed, travel, angle = result
-            if needed <= sendable:
-                candidates.append((score, mine, target, needed, travel, angle))
+            score, needed, angle = result
+            candidates.append((score, mine, target, needed, angle))
 
     candidates.sort(key=lambda c: c[0], reverse=True)
 
-    used_sources  = set()  # one move per source planet per turn
-    claimed       = set()  # one attacker per target per turn
+    used_sources = set(defense_sources)
+    claimed      = set()
 
-    for score, mine, target, needed, travel, angle in candidates:
-        if mine.id in used_sources:
-            continue
-        if target.id in claimed:
+    for score, mine, target, needed, angle in candidates:
+        if mine.id in used_sources or target.id in claimed:
             continue
         moves.append([mine.id, angle, needed])
         used_sources.add(mine.id)
         claimed.add(target.id)
 
-    # Enemy fallback: source planets that got no move, attack weakest reachable enemy
+    # 3. Enemy fallback — only send if we can actually capture
     for mine in my_planets:
         if mine.id in used_sources:
             continue
-        garrison = max(GARRISON_MIN, int(mine.ships * GARRISON_RATIO))
-        sendable = mine.ships - garrison
+        garrison = garrison_for(step, mine.ships)
+        sendable = mine.ships - garrison - reserved[mine.id]
         if sendable <= 0:
             continue
 
         best = None
-        for enemy in enemies:
+        for enemy in sorted(enemies, key=lambda e: e.ships):
             if enemy.id in claimed:
                 continue
-            needed, travel, angle = ships_needed_for(mine, enemy, ang_vel, False)
-            if needed is None:
+            _, travel, angle = compute_shot(mine, enemy, ang_vel)
+            if travel is None:
                 continue
-            # Send whatever we can — even a weakening attack is useful
-            send = min(sendable, needed)
-            if send <= 0:
+            needed = enemy.ships + travel * enemy.production + 1
+            if needed > sendable:
                 continue
-            score = (enemy.production + 1) / (enemy.ships + 1) / (travel + 1)
+            score = (enemy.production + 1) / (needed * (travel + 1))
+            if exposed_ships.get(enemy.id, 0) > 0:
+                score *= EXPOSED_BONUS
             if best is None or score > best[0]:
-                best = (score, angle, send, enemy.id)
+                best = (score, angle, needed, enemy.id)
 
         if best is not None:
-            _, angle, send, eid = best
-            moves.append([mine.id, angle, send])
+            _, angle, needed, eid = best
+            moves.append([mine.id, angle, needed])
             used_sources.add(mine.id)
             claimed.add(eid)
 
