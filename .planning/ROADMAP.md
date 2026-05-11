@@ -34,7 +34,10 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. Orbital position prediction for any planet matches the game engine's position at turn 60+ with zero visible drift (cumulative formula, not iterative steps)
   4. The agent never sends a fleet that leaves a garrison below `max(production × 2, 5)` ships — confirmed across 10+ backtested games
   5. `agent/` package (`state.py`, `physics.py`, `scorer.py`, `planner.py`, `defense.py`) exists and `main.py` imports cleanly; a time-budget guard truncates evaluation above 0.8 s
-**Plans**: TBD
+**Plans**: 3 plans
+- [ ] 01-01-PLAN.md — Package skeleton (agent/__init__.py, agent/state.py, agent/scorer.py, agent/defense.py) + pytest scaffold (pytest.ini, tests/test_physics.py, tests/test_planner.py with red scaffolds for PHYS-01/02/03/04 and INFRA-03)
+- [ ] 01-02-PLAN.md — agent/physics.py: constants + fleet_speed/is_orbiting/orbital_position/_pt_seg_dist/path_hits_sun (PHYS-02, PHYS-03) and intercept_from_spawn + aim() (PHYS-01, D-04)
+- [ ] 01-03-PLAN.md — agent/planner.py with garrison floor (PHYS-04) and 0.8s time-budget guard (INFRA-03); main.py thin wrapper; agent/__init__.py direct import (INFRA-01 complete)
 
 ### Phase 2: Targeting & Offense
 **Goal**: The agent selects targets by future production value, accounts for in-flight enemy fleets, and prioritises high-production planets
@@ -76,7 +79,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Physics & Infrastructure | 0/TBD | Not started | - |
+| 1. Physics & Infrastructure | 0/3 | Not started | - |
 | 2. Targeting & Offense | 0/TBD | Not started | - |
 | 3. Defense & Counter-Attack | 0/TBD | Not started | - |
 | 4. Submission & Benchmark | 0/TBD | Not started | - |
