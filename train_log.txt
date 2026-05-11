@@ -1,0 +1,370 @@
+OpenSpiel exception: Unknown game 'universal_poker'. Available games are:
+2048
+add_noise
+amazons
+amazons_proxy
+antichess
+backgammon
+banqi
+bargaining
+battleship
+blackjack
+blotto
+breakthrough
+bridge
+bridge_uncontested_bidding
+cached_tree
+catch
+chat_game
+checkers
+chess
+chinese_checkers
+cliff_walking
+clobber
+coin_game
+colored_trails
+connect_four
+connect_four_proxy
+coop_box_pushing
+coop_to_1p
+coordinated_mp
+crazy_eights
+crazyhouse
+cribbage
+cursor_go
+dark_chess
+dark_hex
+dark_hex_ir
+dark_hex_proxy
+deep_sea
+dots_and_boxes
+dou_dizhu
+efg_game
+einstein_wurfelt_nicht
+euchre
+first_sealed_auction
+gin_rummy
+gin_rummy_proxy
+go
+go_proxy
+gomoku
+goofspiel
+havannah
+hearts
+hex
+hive
+kriegspiel
+kuhn_poker
+laser_tag
+latent_ttt
+leduc_poker
+lewis_signaling
+liars_dice
+liars_dice_ir
+lines_of_action
+maedn
+mancala
+markov_soccer
+matching_pennies_3p
+matrix_bos
+matrix_brps
+matrix_cd
+matrix_coordination
+matrix_mp
+matrix_pd
+matrix_rps
+matrix_rpsw
+matrix_sh
+matrix_shapleys_game
+mfg_crowd_modelling
+mfg_crowd_modelling_2d
+mfg_dynamic_routing
+mfg_garnet
+misere
+mnk
+morpion_solitaire
+negotiation
+nfg_game
+nim
+nine_mens_morris
+normal_form_extensive_game
+oh_hell
+oshi_zumo
+othello
+oware
+pathfinding
+pentago
+phantom_go
+phantom_ttt
+phantom_ttt_ir
+pig
+python_ant_foraging
+python_block_dominoes
+python_dynamic_routing
+python_hangman
+python_iterated_prisoners_dilemma
+python_kuhn_poker
+python_liars_poker
+python_pokerkit_wrapper
+python_pokerkit_wrapper_acpc_style
+python_repeated_pokerkit
+python_team_dominoes
+python_tic_tac_toe
+quoridor
+rbc
+repeated_game
+repeated_leduc_poker
+restricted_nash_response
+sheriff
+shogi
+skat
+snake
+solitaire
+spades
+start_at
+stones_and_gems
+tarok
+tic_tac_toe
+tiny_bridge_2p
+tiny_bridge_4p
+tiny_hanabi
+trade_comm
+turn_based_simultaneous_game
+twixt
+ultimate_tic_tac_toe
+xiangqi
+y
+y_proxy
+yacht
+zerosum
+OpenSpiel exception: Unknown game 'repeated_poker'. Available games are:
+2048
+add_noise
+amazons
+amazons_proxy
+antichess
+backgammon
+banqi
+bargaining
+battleship
+blackjack
+blotto
+breakthrough
+bridge
+bridge_uncontested_bidding
+cached_tree
+catch
+chat_game
+checkers
+chess
+chinese_checkers
+cliff_walking
+clobber
+coin_game
+colored_trails
+connect_four
+connect_four_proxy
+coop_box_pushing
+coop_to_1p
+coordinated_mp
+crazy_eights
+crazyhouse
+cribbage
+cursor_go
+dark_chess
+dark_hex
+dark_hex_ir
+dark_hex_proxy
+deep_sea
+dots_and_boxes
+dou_dizhu
+efg_game
+einstein_wurfelt_nicht
+euchre
+first_sealed_auction
+gin_rummy
+gin_rummy_proxy
+go
+go_proxy
+gomoku
+goofspiel
+havannah
+hearts
+hex
+hive
+kriegspiel
+kuhn_poker
+laser_tag
+latent_ttt
+leduc_poker
+lewis_signaling
+liars_dice
+liars_dice_ir
+lines_of_action
+maedn
+mancala
+markov_soccer
+matching_pennies_3p
+matrix_bos
+matrix_brps
+matrix_cd
+matrix_coordination
+matrix_mp
+matrix_pd
+matrix_rps
+matrix_rpsw
+matrix_sh
+matrix_shapleys_game
+mfg_crowd_modelling
+mfg_crowd_modelling_2d
+mfg_dynamic_routing
+mfg_garnet
+misere
+mnk
+morpion_solitaire
+negotiation
+nfg_game
+nim
+nine_mens_morris
+normal_form_extensive_game
+oh_hell
+oshi_zumo
+othello
+oware
+pathfinding
+pentago
+phantom_go
+phantom_ttt
+phantom_ttt_ir
+pig
+python_ant_foraging
+python_block_dominoes
+python_dynamic_routing
+python_hangman
+python_iterated_prisoners_dilemma
+python_kuhn_poker
+python_liars_poker
+python_pokerkit_wrapper
+python_pokerkit_wrapper_acpc_style
+python_repeated_pokerkit
+python_team_dominoes
+python_tic_tac_toe
+quoridor
+rbc
+repeated_game
+repeated_leduc_poker
+restricted_nash_response
+sheriff
+shogi
+skat
+snake
+solitaire
+spades
+start_at
+stones_and_gems
+tarok
+tic_tac_toe
+tiny_bridge_2p
+tiny_bridge_4p
+tiny_hanabi
+trade_comm
+turn_based_simultaneous_game
+twixt
+ultimate_tic_tac_toe
+xiangqi
+y
+y_proxy
+yacht
+zerosum
+[kaggle_environments.envs.open_spiel_env.open_spiel_env] INFO: Successfully loaded OpenSpiel environments: 17.
+[kaggle_environments.envs.open_spiel_env.open_spiel_env] INFO:    open_spiel_amazons
+[kaggle_environments.envs.open_spiel_env.open_spiel_env] INFO:    open_spiel_backgammon
+[kaggle_environments.envs.open_spiel_env.open_spiel_env] INFO:    open_spiel_checkers
+[kaggle_environments.envs.open_spiel_env.open_spiel_env] INFO:    open_spiel_chess
+[kaggle_environments.envs.open_spiel_env.open_spiel_env] INFO:    open_spiel_connect_four
+[kaggle_environments.envs.open_spiel_env.open_spiel_env] INFO:    open_spiel_dark_hex
+[kaggle_environments.envs.open_spiel_env.open_spiel_env] INFO:    open_spiel_gin_rummy
+[kaggle_environments.envs.open_spiel_env.open_spiel_env] INFO:    open_spiel_go
+[kaggle_environments.envs.open_spiel_env.open_spiel_env] INFO:    open_spiel_goofspiel
+[kaggle_environments.envs.open_spiel_env.open_spiel_env] INFO:    open_spiel_hearts
+[kaggle_environments.envs.open_spiel_env.open_spiel_env] INFO:    open_spiel_hex
+[kaggle_environments.envs.open_spiel_env.open_spiel_env] INFO:    open_spiel_matching_pennies_3p
+[kaggle_environments.envs.open_spiel_env.open_spiel_env] INFO:    open_spiel_othello
+[kaggle_environments.envs.open_spiel_env.open_spiel_env] INFO:    open_spiel_repeated_game
+[kaggle_environments.envs.open_spiel_env.open_spiel_env] INFO:    open_spiel_tic_tac_toe
+[kaggle_environments.envs.open_spiel_env.open_spiel_env] INFO:    open_spiel_y
+[kaggle_environments.envs.open_spiel_env.open_spiel_env] INFO:    open_spiel_python_repeated_pokerkit
+[kaggle_environments.envs.open_spiel_env.open_spiel_env] INFO: OpenSpiel games skipped: 3.
+[kaggle_environments.envs.open_spiel_env.open_spiel_env] INFO:    snake
+[kaggle_environments.envs.open_spiel_env.open_spiel_env] INFO:    universal_poker(betting=nolimit,bettingAbstraction=fullgame,blind=2 1,firstPlayer=2 1 1 1,numBoardCards=0 3 1 1,numHoleCards=2,numPlayers=2,numRanks=13,numRounds=4,numSuits=4,stack=200 200,calcOddsNumSims=1000000)
+[kaggle_environments.envs.open_spiel_env.open_spiel_env] INFO:    repeated_poker(max_num_hands=100,reset_stacks=True,rotate_dealer=True,universal_poker_game_string=universal_poker(betting=nolimit,bettingAbstraction=fullgame,blind=2 1,firstPlayer=2 1 1 1,numBoardCards=0 3 1 1,numHoleCards=2,numPlayers=2,numRanks=13,numRounds=4,numSuits=4,stack=200 200,calcOddsNumSims=1000000))
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+=== Orbit Wars — MaskablePPO POC ===
+  obs_size   : 320  (40 planets × 8 features)
+  action     : MultiDiscrete([40] × 10)
+  opponent   : random agent
+  timesteps  : 500,000
+
+[step   10,000]  mean_ep_reward= 2515.00  episodes=34
+[step   20,000]  mean_ep_reward= 2171.10  episodes=69
+[step   30,000]  mean_ep_reward= 2192.64  episodes=103
+[step   40,000]  mean_ep_reward= 2220.16  episodes=137
+[step   50,000]  mean_ep_reward= 2281.60  episodes=172
+[step   60,000]  mean_ep_reward= 2211.54  episodes=206
+[step   70,000]  mean_ep_reward= 2192.68  episodes=241
+[step   80,000]  mean_ep_reward= 2166.48  episodes=275
+[step   90,000]  mean_ep_reward= 1546.96  episodes=309
+[step  100,000]  mean_ep_reward= 1426.82  episodes=344
+[step  110,000]  mean_ep_reward= 2321.90  episodes=379
+[step  120,000]  mean_ep_reward= 2554.66  episodes=413
+[step  130,000]  mean_ep_reward= 2539.56  episodes=448
+[step  140,000]  mean_ep_reward= 2206.34  episodes=483
+[step  150,000]  mean_ep_reward= 2120.08  episodes=517
+[step  160,000]  mean_ep_reward= 2415.00  episodes=553
+[step  170,000]  mean_ep_reward= 1918.76  episodes=588
+[step  180,000]  mean_ep_reward= 2052.68  episodes=622
+[step  190,000]  mean_ep_reward= 2080.22  episodes=657
+[step  200,000]  mean_ep_reward= 2184.14  episodes=692
+[step  210,000]  mean_ep_reward= 2352.76  episodes=726
+[step  220,000]  mean_ep_reward= 1983.14  episodes=761
+[step  230,000]  mean_ep_reward= 2204.60  episodes=796
+[step  240,000]  mean_ep_reward= 2448.54  episodes=831
+[step  250,000]  mean_ep_reward= 2426.68  episodes=865
+[step  260,000]  mean_ep_reward= 2121.46  episodes=900
+[step  270,000]  mean_ep_reward= 1821.90  episodes=935
+[step  280,000]  mean_ep_reward= 2188.70  episodes=969
+[step  290,000]  mean_ep_reward= 2446.54  episodes=1004
+[step  300,000]  mean_ep_reward= 2149.64  episodes=1038
+[step  310,000]  mean_ep_reward= 2060.26  episodes=1072
+[step  320,000]  mean_ep_reward= 2008.22  episodes=1107
+[step  330,000]  mean_ep_reward= 1923.30  episodes=1141
+[step  340,000]  mean_ep_reward= 2579.48  episodes=1175
+[step  350,000]  mean_ep_reward= 2393.70  episodes=1209
+[step  360,000]  mean_ep_reward= 2309.36  episodes=1244
+[step  370,000]  mean_ep_reward= 2218.98  episodes=1278
+[step  380,000]  mean_ep_reward= 2314.36  episodes=1312
+[step  390,000]  mean_ep_reward= 2502.84  episodes=1346
+[step  400,000]  mean_ep_reward= 2296.60  episodes=1380
+[step  410,000]  mean_ep_reward= 2216.64  episodes=1415
+[step  420,000]  mean_ep_reward= 2459.44  episodes=1449
+[step  430,000]  mean_ep_reward= 2433.46  episodes=1483
+[step  440,000]  mean_ep_reward= 2264.20  episodes=1518
+[step  450,000]  mean_ep_reward= 2200.24  episodes=1552
+[step  460,000]  mean_ep_reward= 1989.34  episodes=1587
+[step  470,000]  mean_ep_reward= 2275.94  episodes=1621
+[step  480,000]  mean_ep_reward= 2155.62  episodes=1655
+[step  490,000]  mean_ep_reward= 2307.70  episodes=1690
+[step  500,000]  mean_ep_reward= 2364.06  episodes=1725
+Traceback (most recent call last):
+  File "C:\Users\trant\Documents\Programmation\Orbit Wars\08-StableBaseline_POC.py", line 437, in <module>
+    model = train(total_timesteps=500_000, save_path="orbit_wars_ppo")
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\trant\Documents\Programmation\Orbit Wars\08-StableBaseline_POC.py", line 394, in train
+    print(f"\nModel saved \u2192 {save_path}.zip")
+  File "C:\Users\trant\miniforge3\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\u2192' in position 14: character maps to <undefined>
