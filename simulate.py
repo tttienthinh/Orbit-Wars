@@ -10,11 +10,13 @@ Prints diagnostics on losses and a final win-rate table.
 
 import argparse
 import importlib.util
+import logging
 import os
 import sys
 import traceback
 import warnings
 warnings.filterwarnings("ignore")
+logging.getLogger("kaggle_environments").setLevel(logging.ERROR)
 
 import kaggle_environments as ke
 
@@ -24,9 +26,34 @@ MY_AGENT_PATH = os.path.join(os.path.dirname(__file__), "07-claude_code.py")
 
 
 def load_agent(path):
+    with open(path, encoding="utf-8") as f:
+        lines = f.readlines()
+
+    # Handle Jupyter %%writefile notebooks: write the agent code to the target
+    # file (needed for agents that open it during validation) and strip the
+    # validation block so it doesn't crash on file-open or assert.
+    if lines and lines[0].startswith("%%writefile"):
+        target_name = lines[0].split()[1]  # e.g. "submission.py"
+        agent_dir   = os.path.dirname(path)
+        target_path = os.path.join(agent_dir, target_name)
+        # Find where the validation block begins (look for "# Validation" or
+        # the __all__ sentinel followed by non-agent code).
+        content_lines = lines[1:]  # skip the %%writefile line
+        cutoff = len(content_lines)
+        for i, l in enumerate(content_lines):
+            if l.strip().startswith("# Validation"):
+                cutoff = i
+                break
+        agent_src = "".join(content_lines[:cutoff])
+        with open(target_path, "w", encoding="utf-8") as f:
+            f.write(agent_src)
+        src = agent_src
+    else:
+        src = "".join(lines)
+
     spec = importlib.util.spec_from_file_location("agent_mod", path)
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
+    mod  = importlib.util.module_from_spec(spec)
+    exec(compile(src, path, "exec"), mod.__dict__)
     return mod.agent
 
 

@@ -27,28 +27,37 @@ SUN_R     = 10.0
 SUN_SAFE  = 0.5
 MAX_SPEED = 6.0
 
-NEUTRAL_BONUS   = 1.15
-EXPOSED_BONUS   = 2.0
-INTERCEPT_LIMIT = 200
+NEUTRAL_BONUS      = 1.15
+EXPOSED_BONUS      = 3.0    # enemy just launched fleet — planet is exposed
+BUILDUP_BONUS      = 1.5    # enemy has large buildup — preemptively disrupt
+BUILDUP_THRESHOLD  = 60     # ships threshold to trigger BUILDUP_BONUS
+INTERCEPT_LIMIT    = 200
 
 
 # ---------------------------------------------------------------------------
 # Garrison — lower when we're behind
 # ---------------------------------------------------------------------------
 
-def garrison_for(step, ships, planet_ratio=1.0):
+def garrison_for(step, ships, planet_ratio=1.0, net_threat=0):
     """
     planet_ratio = my_planets / total_planets (lower = more desperate).
-    When below 0.35, we're in desperation mode: very low garrison.
+    net_threat   = max(0, enemy_ships_incoming - friendly_ships_incoming).
+    Reactive: keep enough to survive incoming threat.
     """
     desperate = planet_ratio < 0.35
-    if step < 30 or desperate:
-        return max(2, int(ships * 0.05))
-    if step < 80:
-        return max(5, int(ships * 0.15))
-    if step < 200:
-        return max(8, int(ships * 0.22))
-    return max(10, int(ships * 0.28))
+    if step < 10:
+        base = 1
+    elif step < 30 or desperate:
+        base = max(2, int(ships * 0.05))
+    elif step < 80:
+        base = max(5, int(ships * 0.15))
+    elif step < 200:
+        base = max(8, int(ships * 0.22))
+    else:
+        base = max(10, int(ships * 0.28))
+    if net_threat > 0:
+        base = max(base, net_threat + 1)
+    return base
 
 
 # ---------------------------------------------------------------------------
@@ -183,6 +192,7 @@ def compute_shot(mine, target, angular_velocity, actual_ships=None):
 
 def plan_defense(my_planets, enemy_inc, enemy_eta, friendly_inc,
                  angular_velocity, step, planet_ratio, reserved):
+    """Multi-source defense: pool ships from several planets to repel large waves."""
     defense_moves = []
     used          = set()
     threats = []
@@ -194,28 +204,34 @@ def plan_defense(my_planets, enemy_inc, enemy_eta, friendly_inc,
             threats.append((enemy_eta.get(mp.id, float("inf")), -margin + 1, mp))
     threats.sort()
     for eta, needed, threatened in threats:
-        best_src, best_d = None, float("inf")
-        for src in my_planets:
-            if src.id == threatened.id or src.id in used:
+        remaining = needed
+        # Sort sources by proximity so closest ships arrive first
+        sources = sorted(
+            [s for s in my_planets if s.id != threatened.id and s.id not in used],
+            key=lambda s: dist(s.x, s.y, threatened.x, threatened.y)
+        )
+        for src in sources:
+            if remaining <= 0:
+                break
+            src_einc   = enemy_inc.get(src.id, 0)
+            src_finc   = friendly_inc.get(src.id, 0)
+            src_threat = max(0, src_einc - src_finc)
+            garrison   = garrison_for(step, src.ships, planet_ratio,
+                                      net_threat=src_threat)
+            sendable   = src.ships - garrison - reserved[src.id]
+            if sendable <= 0:
                 continue
-            garrison = garrison_for(step, src.ships, planet_ratio)
-            sendable = src.ships - garrison - reserved[src.id]
-            if sendable < needed:
-                continue
-            travel = dist(src.x, src.y, threatened.x, threatened.y) / fleet_speed(needed)
+            travel = dist(src.x, src.y, threatened.x, threatened.y) / fleet_speed(sendable)
             if travel > eta + 2:
                 continue
-            d = dist(src.x, src.y, threatened.x, threatened.y)
-            if d < best_d:
-                best_d = d; best_src = src
-        if best_src is None:
-            continue
-        if path_hits_sun(best_src, threatened.x, threatened.y, threatened.radius):
-            continue
-        angle = math.atan2(threatened.y - best_src.y, threatened.x - best_src.x)
-        defense_moves.append([best_src.id, angle, needed])
-        reserved[best_src.id] += needed
-        used.add(best_src.id)
+            if path_hits_sun(src, threatened.x, threatened.y, threatened.radius):
+                continue
+            send = min(sendable, remaining)
+            angle = math.atan2(threatened.y - src.y, threatened.x - src.x)
+            defense_moves.append([src.id, angle, send])
+            reserved[src.id] += send
+            used.add(src.id)
+            remaining -= send
     return defense_moves, used
 
 
@@ -256,30 +272,36 @@ def score_attack(mine, target, angular_velocity, is_neutral,
 # ---------------------------------------------------------------------------
 
 def coordinated_attacks(my_planets, enemies, angular_velocity, step,
-                        planet_ratio, friendly_inc, exposed_ships,
+                        planet_ratio, friendly_inc, enemy_inc, exposed_ships,
                         used_sources, reserved):
     """
     For free planets that have no single-planet valid attack, try to coordinate
     2+ sequential fleet arrivals to soften-then-capture a strong enemy planet.
     Returns (list of move triples, set of claimed enemy planet ids).
     """
-    new_moves  = []
-    claimed    = set()
-    free       = [p for p in my_planets if p.id not in used_sources]
+    new_moves    = []
+    claimed      = set()
+    coord_used   = set()  # internal: planets committed in this coordination pass
+    # All planets can join coordinated attacks — reserved tracks committed ships
+    free         = list(my_planets)
     if len(free) < 2:
         return new_moves, claimed
 
-    # Try each enemy from weakest to strongest
+    # Try each enemy from weakest to strongest — easier plans succeed first
     for enemy in sorted(enemies, key=lambda e: e.ships):
         if enemy.id in claimed:
             continue
 
         shooters = []
         for src in free:
-            if src.id in used_sources:
+            if src.id in coord_used:  # blocked only if already committed THIS pass
                 continue
-            garrison = garrison_for(step, src.ships, planet_ratio)
-            sendable = src.ships - garrison - reserved[src.id]
+            src_einc2  = enemy_inc.get(src.id, 0)
+            src_finc2  = friendly_inc.get(src.id, 0)
+            src_threat = max(0, src_einc2 - src_finc2)
+            garrison   = garrison_for(step, src.ships, planet_ratio,
+                                      net_threat=src_threat)
+            sendable   = src.ships - garrison - reserved[src.id]
             if sendable < 3:
                 continue
             _, travel, angle = compute_shot(src, enemy, angular_velocity)
@@ -298,7 +320,7 @@ def coordinated_attacks(my_planets, enemies, angular_velocity, step,
         already_inc = friendly_inc.get(enemy.id, 0)
 
         for travel, sendable, src, angle in shooters:
-            if src.id in used_sources:
+            if src.id in coord_used:
                 continue
             garrison    = max(0, garrison - already_inc) + \
                           (travel - prev_travel) * enemy.production
@@ -318,12 +340,68 @@ def coordinated_attacks(my_planets, enemies, angular_velocity, step,
         if garrison <= 0 and len(attack_plan) >= 2:
             for src_id, angle, send in attack_plan:
                 new_moves.append([src_id, angle, send])
+                coord_used.add(src_id)
                 used_sources.add(src_id)
                 reserved[src_id] += send
             claimed.add(enemy.id)
-            free = [p for p in free if p.id not in used_sources]
+            free = [p for p in free if p.id not in coord_used]
 
     return new_moves, claimed
+
+
+# ---------------------------------------------------------------------------
+# Frontier reinforcement
+# ---------------------------------------------------------------------------
+
+def plan_reinforcement(my_planets, enemies, reserved, step, planet_ratio,
+                       enemy_inc, friendly_inc):
+    """
+    Push ships from rear planets to frontier planets so frontline has
+    more ships to absorb incoming waves and stage counter-attacks.
+    Only runs mid/late game (step > 40) to avoid disrupting early expansion.
+    """
+    if step < 40 or not enemies:
+        return []
+
+    # Frontier = our planet closest to any enemy
+    def min_enemy_dist(p):
+        return min(dist(p.x, p.y, e.x, e.y) for e in enemies)
+
+    sorted_by_enemy = sorted(my_planets, key=min_enemy_dist)
+    n = len(sorted_by_enemy)
+    if n < 2:
+        return []
+
+    # Bottom half by enemy proximity = frontier; top half = rear
+    frontier = sorted_by_enemy[:max(1, n // 2)]
+    rear     = sorted_by_enemy[max(1, n // 2):]
+
+    # Only reinforce if frontier is significantly weaker than rear
+    frontier_avg = sum(p.ships for p in frontier) / len(frontier)
+    rear_avg     = sum(p.ships for p in rear) / len(rear)
+    if rear_avg < frontier_avg * 1.4:
+        return []
+
+    moves = []
+    virtual_ships = {p.id: p.ships for p in frontier}  # track expected ship count after reinforcement
+    for src in rear:
+        src_threat = max(0, enemy_inc.get(src.id, 0) - friendly_inc.get(src.id, 0))
+        garrison   = garrison_for(step, src.ships, planet_ratio, net_threat=src_threat)
+        sendable   = src.ships - garrison - reserved[src.id]
+        if sendable < 15:
+            continue
+        send = int(sendable * 0.45)
+        if send < 10:
+            continue
+        # Pick the frontier planet with fewest expected ships (distribute evenly)
+        dest = min(frontier, key=lambda p: virtual_ships[p.id])
+        if path_hits_sun(src, dest.x, dest.y, dest.radius):
+            continue
+        angle = math.atan2(dest.y - src.y, dest.x - src.x)
+        moves.append([src.id, angle, send])
+        reserved[src.id] += send
+        virtual_ships[dest.id] += send
+    return moves
 
 
 # ---------------------------------------------------------------------------
@@ -363,72 +441,80 @@ def agent(obs):
     )
     moves.extend(defense_moves)
 
-    # 2. Single-planet offense
+    # 2. Single-planet offense — multi-fleet allowed per planet via reserved tracking
+    # Steeper travel penalty early game to maximize close-range expansion speed.
+    travel_exp = 1.5 if step < 40 else 1.0
+
     candidates = []
     for mine in my_planets:
-        if mine.id in defense_sources:
-            continue
-        garrison = garrison_for(step, mine.ships, planet_ratio)
-        sendable = mine.ships - garrison - reserved[mine.id]
+        einc       = enemy_inc.get(mine.id, 0)
+        finc       = friendly_inc.get(mine.id, 0)
+        net_threat = max(0, einc - finc)
+        garrison   = garrison_for(step, mine.ships, planet_ratio, net_threat=net_threat)
+        sendable   = mine.ships - garrison - reserved[mine.id]
         if sendable <= 0:
             continue
         for target in neutrals + enemies:
             is_neutral = (target.owner == -1)
-            result = score_attack(mine, target, ang_vel, is_neutral,
-                                  friendly_inc, sendable, exposed_ships,
-                                  planet_ratio)
-            if result is None:
+            base, travel, angle = compute_shot(mine, target, ang_vel)
+            if base is None:
                 continue
-            score, needed, angle = result
-            candidates.append((score, mine, target, needed, angle))
+            needed = base + 1 if is_neutral else base + travel * target.production + 1
+            effective = max(0, needed - friendly_inc.get(target.id, 0))
+            if effective == 0 or effective > sendable:
+                continue
+            # Two-pass: refine angle for orbiting targets
+            if is_orbiting(target):
+                base2, travel, angle = compute_shot(mine, target, ang_vel,
+                                                    actual_ships=effective)
+                if base2 is None:
+                    continue
+                if not is_neutral:
+                    needed = base2 + travel * target.production + 1
+                    effective = max(0, needed - friendly_inc.get(target.id, 0))
+                    if effective == 0 or effective > sendable:
+                        continue
+            score = (target.production + 1) / (effective * (travel + 1) ** travel_exp)
+            if is_neutral:
+                score *= NEUTRAL_BONUS
+            if not is_neutral:
+                if exposed_ships.get(target.id, 0) > 0:
+                    score *= EXPOSED_BONUS
+                elif target.ships >= BUILDUP_THRESHOLD:
+                    score *= BUILDUP_BONUS
+            candidates.append((score, mine.id, target.id, effective, angle))
 
     candidates.sort(key=lambda c: c[0], reverse=True)
 
-    used_sources = set(defense_sources)
+    # Build lookup maps for dynamic re-checks
+    planet_by_id = {p.id: p for p in my_planets}
     claimed      = set()
+    used_sources = set()  # track for coordinated_attacks only
 
-    for score, mine, target, needed, angle in candidates:
-        if mine.id in used_sources or target.id in claimed:
+    for score, src_id, tgt_id, needed, angle in candidates:
+        if tgt_id in claimed:
             continue
-        moves.append([mine.id, angle, needed])
-        used_sources.add(mine.id)
-        claimed.add(target.id)
+        mine = planet_by_id.get(src_id)
+        if mine is None:
+            continue
+        einc2      = enemy_inc.get(src_id, 0)
+        finc2      = friendly_inc.get(src_id, 0)
+        net_threat = max(0, einc2 - finc2)
+        garrison   = garrison_for(step, mine.ships, planet_ratio, net_threat=net_threat)
+        still_sendable = mine.ships - garrison - reserved[src_id]
+        if needed > still_sendable:
+            continue
+        moves.append([src_id, angle, needed])
+        reserved[src_id] += needed
+        claimed.add(tgt_id)
+        used_sources.add(src_id)
 
     # 3. Multi-fleet coordination (attack enemies that need > single-planet force)
     coord_moves, coord_claimed = coordinated_attacks(
         my_planets, enemies, ang_vel, step, planet_ratio,
-        friendly_inc, exposed_ships, used_sources, reserved
+        friendly_inc, enemy_inc, exposed_ships, used_sources, reserved
     )
     moves.extend(coord_moves)
     claimed |= coord_claimed
-
-    # 4. Enemy fallback — only if we can solo-capture
-    for mine in my_planets:
-        if mine.id in used_sources:
-            continue
-        garrison = garrison_for(step, mine.ships, planet_ratio)
-        sendable = mine.ships - garrison - reserved[mine.id]
-        if sendable <= 0:
-            continue
-        best = None
-        for enemy in sorted(enemies, key=lambda e: e.ships):
-            if enemy.id in claimed:
-                continue
-            _, travel, angle = compute_shot(mine, enemy, ang_vel)
-            if travel is None:
-                continue
-            needed = enemy.ships + travel * enemy.production + 1
-            if needed > sendable:
-                continue
-            score = (enemy.production + 1) / (needed * (travel + 1))
-            if exposed_ships.get(enemy.id, 0) > 0:
-                score *= EXPOSED_BONUS
-            if best is None or score > best[0]:
-                best = (score, angle, needed, enemy.id)
-        if best is not None:
-            _, angle, needed, eid = best
-            moves.append([mine.id, angle, needed])
-            used_sources.add(mine.id)
-            claimed.add(eid)
 
     return moves
