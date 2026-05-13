@@ -36,9 +36,13 @@ def simulate_futures(obs, done_set, nb_future_step=NB_FUTURE_STEP):
     env.step([game_done_set, []])
 
     snapshots = []
+    last_planets = copy.deepcopy(list(env.state[0].observation.get("planets", [])))
     for _ in range(nb_future_step):
+        if env.done:
+            # Game ended early — repeat last known planet state to pad to nb_future_step
+            snapshots.append(last_planets)
+            continue
         env.step([[], []])
-        snapshots.append(
-            copy.deepcopy(list(env.state[0].observation.get("planets", [])))
-        )
+        last_planets = copy.deepcopy(list(env.state[0].observation.get("planets", [])))
+        snapshots.append(last_planets)
     return snapshots
