@@ -40,6 +40,10 @@ def extract_features(future_planets, non_comet_ids, comet_ids, version=1):
     version=1 -> 2200 features: 44 * NB_FUTURE_STEP * {owner,ships,x,y,production}
     version=2 -> 1540 features: 44 * NB_FUTURE_STEP * {owner,ships,production}
                               + 11 * NB_FUTURE_STEP * {x,y}  (slots 0-10)
+
+    V2 note: comet positions (slots 40-43) are NOT included in the position block.
+             Only static top-left quadrant planets (slots 0-10) have x,y features.
+             This is intentional per the cadran-based feature design.
     """
     if version == 1:
         feat = np.zeros((NB_FUTURE_STEP, NB_PLANETS, 5), dtype=np.float32)

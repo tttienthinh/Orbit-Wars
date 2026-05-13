@@ -52,6 +52,7 @@ def main():
         # Remap labels to contiguous range (not all slots appear in data)
         y_from_int = y_from.astype(int)
         y_from_remap, from_classes = remap_labels(y_from_int)
+        assert 44 in from_classes, "Stop class (44) not seen in training data — agent can never stop"
         n_from_classes = len(from_classes)
         print(f"from: {n_from_classes} classes observed (out of 45)")
 

@@ -18,9 +18,9 @@ RANDOM_STATE    = 42
 
 
 def make_loaders(X, y_from, y_to, y_ships, batch_size, seed):
-    # mask_ns: rows where y_from is a real non-stop move (not stop=44 and not invalid=-1)
-    # and y_to is valid (not NaN and not -1)
-    mask_ns  = (y_from != 44) & (y_from != -1) & (~np.isnan(y_to)) & (y_to != -1)
+    # mask_ns: rows where y_from is a non-stop move (not stop=44)
+    # and y_to is valid (not NaN)
+    mask_ns  = (y_from != 44) & (~np.isnan(y_to))
     X_t      = torch.tensor(X, dtype=torch.float32)
     yf_t     = torch.tensor(y_from, dtype=torch.long)
     yt_t     = torch.tensor(np.nan_to_num(y_to,    nan=0.0), dtype=torch.long)
@@ -45,11 +45,8 @@ def eval_epoch(model, loader):
     with torch.no_grad():
         for xb, yf, yt, ys, mk in loader:
             lf, lt, ps = model(xb)
-            # Only count valid y_from labels (not -1)
-            valid_f = yf != -1
-            if valid_f.any():
-                acc_f += (lf[valid_f].argmax(1) == yf[valid_f]).float().mean().item()
-                n += 1
+            acc_f += (lf.argmax(1) == yf).float().mean().item()
+            n += 1
             if mk.any():
                 acc_t += (lt[mk].argmax(1) == yt[mk]).float().mean().item()
                 mae_s += (ps[mk] - ys[mk]).abs().mean().item()
@@ -66,8 +63,8 @@ def main():
 
     model     = OrbitMLP(input_dim=X.shape[1])
     optimizer = optim.Adam(model.parameters(), lr=LR)
-    ce_from   = nn.CrossEntropyLoss(ignore_index=-1)
-    ce_to     = nn.CrossEntropyLoss(ignore_index=-1)
+    ce_from   = nn.CrossEntropyLoss()
+    ce_to     = nn.CrossEntropyLoss()
 
     mlflow.set_experiment("orbit-wars-mlp")
     with mlflow.start_run():
