@@ -10,10 +10,9 @@ class OrbitMLP(nn.Module):
         super().__init__()
         self.encoder = nn.Sequential(
             nn.BatchNorm1d(input_dim),
-            nn.Linear(input_dim, 512),
-            nn.ReLU(),
-            nn.Linear(512, 256),
-            nn.ReLU(),
+            nn.Linear(input_dim, 1024), nn.ReLU(), nn.Dropout(0.2),
+            nn.Linear(1024, 512),       nn.ReLU(), nn.Dropout(0.2),
+            nn.Linear(512, 256),        nn.ReLU(),
         )
         self.head_from  = nn.Linear(256, 45)
         self.head_to    = nn.Linear(256, 44)
