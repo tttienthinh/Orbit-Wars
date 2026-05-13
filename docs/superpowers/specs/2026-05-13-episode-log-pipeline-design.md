@@ -155,7 +155,16 @@ input: flattened feature vector
   02-augment/        existing (step 2)
   03-combinations/   new (step 3)
   04-simulate/       new (step 4)
+
+17-Train_XGBoost.py  build feature table (step 5, V1 or V2) + train Option A models + log to MLFlow
+17-Play_XGBoost.py   load trained XGBoost models and run inference
+18-Train_ML.py       build feature table (step 5, V1 or V2) + train Option B MLP + log to MLFlow
+18-Play_ML.py        load trained MLP and run inference
 ```
 
-Step 5 produces a parquet/CSV file; path TBD.
-ML model lives in a separate `.py` file using the step 5 table as input.
+### MLFlow Logging
+
+Both training scripts log to MLFlow:
+- **Parameters:** `NB_FUTURE_STEP`, feature version (V1/V2), model hyperparameters
+- **Metrics:** per-head accuracy / loss (train + val), `nb_ships` MAE
+- **Artifacts:** saved model files, feature importance (XGBoost), confusion matrices for `from`/`to` heads
