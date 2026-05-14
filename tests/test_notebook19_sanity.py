@@ -8,9 +8,16 @@ import json, copy, math, warnings, sys
 from pathlib import Path
 import numpy as np
 import pandas as pd
+import pytest
 from itertools import combinations as _combinations
 
 warnings.filterwarnings("ignore")
+
+DATA_DIR = Path("11-download_logs")
+pytestmark = pytest.mark.skipif(
+    not (DATA_DIR / "00-raw/episode-76319029.json").exists(),
+    reason="Local episode data not available",
+)
 
 # Constants (same as notebook Cell 1)
 MAX_SPEED = 6.0
@@ -105,25 +112,37 @@ def generate_combinations(obs):
 # ── Tests ─────────────────────────────────────────────────────────────────────
 root = Path("11-download_logs")
 
-# Test 1: augment_data produces correct dest planet
-with open(root / "00-raw/episode-76319029.json") as f:
-    raw = json.load(f)
-winner = get_winner_data(raw)
-augmented = augment_data(winner)
-step_41 = next(o for o in augmented if o["step"] == 41)
-assert step_41["action"] == [[0, 5.199833393096924, 70, 8]], \
-    f"augment_data broken: {step_41['action']}"
-print("[PASS] augment_data: dest planet 8 confirmed for step 41")
 
-# Test 2: generate_combinations count matches existing 03-combinations
-rows = []
-for obs in augmented:
-    if obs.get("action"):
-        rows.extend(copy.deepcopy(generate_combinations(obs)))
-with open(root / "03-combinations/episode-76319029.json") as f:
-    expected_rows = json.load(f)
-assert len(rows) == len(expected_rows), \
-    f"generate_combinations count mismatch: {len(rows)} vs {len(expected_rows)}"
-print(f"[PASS] generate_combinations: {len(rows)} rows matches existing 03-combinations")
+def test_augment_data_dest_planet():
+    """augment_data produces correct dest planet for step 41."""
+    with open(root / "00-raw/episode-76319029.json") as f:
+        raw = json.load(f)
+    winner = get_winner_data(raw)
+    augmented = augment_data(winner)
+    step_41 = next(o for o in augmented if o["step"] == 41)
+    assert step_41["action"] == [[0, 5.199833393096924, 70, 8]], \
+        f"augment_data broken: {step_41['action']}"
 
-print("\nAll sanity checks passed.")
+
+def test_generate_combinations_count():
+    """generate_combinations count matches existing 03-combinations output."""
+    with open(root / "00-raw/episode-76319029.json") as f:
+        raw = json.load(f)
+    winner = get_winner_data(raw)
+    augmented = augment_data(winner)
+    rows = []
+    for obs in augmented:
+        if obs.get("action"):
+            rows.extend(copy.deepcopy(generate_combinations(obs)))
+    with open(root / "03-combinations/episode-76319029.json") as f:
+        expected_rows = json.load(f)
+    assert len(rows) == len(expected_rows), \
+        f"generate_combinations count mismatch: {len(rows)} vs {len(expected_rows)}"
+
+
+if __name__ == "__main__":
+    test_augment_data_dest_planet()
+    print("[PASS] augment_data: dest planet 8 confirmed for step 41")
+    test_generate_combinations_count()
+    print("[PASS] generate_combinations count matches existing 03-combinations")
+    print("\nAll sanity checks passed.")
