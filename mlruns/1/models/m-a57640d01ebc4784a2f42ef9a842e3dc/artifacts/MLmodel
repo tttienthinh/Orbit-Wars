@@ -1,0 +1,22 @@
+artifact_path: file:C:/Users/trant/Documents/Programmation/Orbit Wars/mlruns/1/models/m-a57640d01ebc4784a2f42ef9a842e3dc/artifacts
+flavors:
+  python_function:
+    data: model.ubj
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.xgboost
+    python_version: 3.12.12
+  xgboost:
+    code: null
+    data: model.ubj
+    model_class: xgboost.sklearn.XGBRegressor
+    model_format: ubj
+    xgb_version: 2.1.2
+mlflow_version: 3.12.0
+model_id: m-a57640d01ebc4784a2f42ef9a842e3dc
+model_size_bytes: 570956
+model_uuid: m-a57640d01ebc4784a2f42ef9a842e3dc
+prompts: null
+run_id: 4da8af1a5295425190a486ea640fc8bb
+utc_time_created: '2026-05-13 16:37:31.209140'
