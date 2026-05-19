@@ -157,6 +157,34 @@ class OrbitWarsSimulator:
 
         self.fleets = [f for f in self.fleets if id(f) not in fleets_to_remove]
 
+        # Phase 6: combat resolution
+        for pid, arriving in combat_lists.items():
+            if not arriving:
+                continue
+            planet = next((p for p in self.planets if p[0] == pid), None)
+            if not planet:
+                continue
+            per_player = {}
+            for fleet in arriving:
+                per_player[fleet[1]] = per_player.get(fleet[1], 0) + fleet[6]
+            ranked = sorted(per_player.items(), key=lambda kv: kv[1], reverse=True)
+            top_owner, top_ships = ranked[0]
+            if len(ranked) > 1:
+                second = ranked[1][1]
+                survivors = top_ships - second
+                winner = top_owner if survivors > 0 else -1
+            else:
+                survivors = top_ships
+                winner = top_owner
+            if survivors > 0:
+                if planet[1] == winner:
+                    planet[5] += survivors
+                else:
+                    planet[5] -= survivors
+                    if planet[5] < 0:
+                        planet[1] = winner
+                        planet[5] = abs(planet[5])
+
         return [
             {"id": p[0], "owner": p[1], "x": p[2], "y": p[3],
              "radius": p[4], "ships": p[5], "production": p[6]}
@@ -188,7 +216,7 @@ class OrbitWarsSimulator:
         self.comets = [g for g in self.comets if g["planet_ids"]]
 
     def run(self, n):
-        raise NotImplementedError
+        return [self.step() for _ in range(n)]
 
 
 class Planet:

@@ -134,14 +134,14 @@ def test_fleet_removed_when_crossing_sun():
     assert len(sim.fleets) == 0
 
 
-@pytest.mark.xfail(reason="combat resolution stubbed until Task 5", strict=True)
 def test_fleet_hits_static_planet_after_8_steps():
-    # Planet at (60, 50) radius=3. Fleet at (50, 50) angle=0, 1 ship (speed=1.0).
+    # Planet at (60, 20) radius=3. Fleet at (50, 20) angle=0, 1 ship (speed=1.0).
     # Distance to surface: (60-3) - 50 = 7 → hits when fleet x ≥ 57.
-    # After 8 steps: fleet x=58, seg (57→58), pt_seg_dist((60,50),(57,50),(58,50))=2<3 ✓
-    planet = [0, 1, 60.0, 50.0, 3.0, 20, 2]   # owner=1, ships=20, prod=2
-    fleet  = [0, 0, 50.0, 50.0, 0.0, -1, 1]   # 1 ship, speed=1.0
-    obs = make_obs([planet], fleets=[fleet])
+    # After 8 steps: fleet x=58, seg (57→58), pt_seg_dist((60,20),(57,20),(58,20))=2<3 ✓
+    # y=20 keeps the fleet well away from the sun at (50,50).
+    planet = [0, 1, 60.0, 20.0, 3.0, 20, 2]   # owner=1, ships=20, prod=2
+    fleet  = [0, 0, 50.0, 20.0, 0.0, -1, 1]   # 1 ship, speed=1.0
+    obs = make_obs([planet], fleets=[fleet], angular_velocity=0)
     sim = OrbitWarsSimulator(obs)
     for _ in range(8):
         snap = sim.step()
@@ -233,3 +233,67 @@ def test_comet_pre_expiry_cleans_already_expired():
     sim = OrbitWarsSimulator(obs)
     snap = sim.step()
     assert all(s['id'] != 100 for s in snap)
+
+
+# --- Combat ---
+
+def test_combat_fleet_reduces_defending_planet():
+    # Attacker fleet (1 ship, owner 0) heading toward planet (20 ships, owner 1, radius 3).
+    # Same setup as test_fleet_hits_static_planet_after_8_steps but checking combat result.
+    # y=20 keeps the fleet well away from the sun at (50,50).
+    planet = [0, 1, 60.0, 20.0, 3.0, 20, 2]
+    fleet  = [0, 0, 50.0, 20.0, 0.0, -1, 1]
+    obs = make_obs([planet], fleets=[fleet], angular_velocity=0)
+    sim = OrbitWarsSimulator(obs)
+    for _ in range(8):
+        snap = sim.step()
+    p = next(s for s in snap if s['id'] == 0)
+    assert p['owner'] == 1
+    assert p['ships'] == 35   # 20 + 8*2 - 1
+
+
+def test_combat_attacker_captures_neutral():
+    # Two fleets arrive simultaneously at neutral planet (0 ships).
+    # Fleet 0: 10 ships. Fleet 1: 5 ships. Winner: fleet 0 with 5 survivors.
+    # Neutral planet has 0 ships → planet flips to owner 0 with 5 ships.
+    planet = [0, -1, 60.0, 50.0, 2.0, 0, 1]
+    # Both fleets close enough to hit in step 1
+    fleet0 = [0, 0, 57.0, 50.0, 0.0,       -1, 10]   # speed≈1.962 → arrives in 1 step
+    fleet1 = [1, 1, 63.0, 50.0, math.pi,   -1,  5]   # speed≈1.442 → arrives in 1 step
+    obs = make_obs([planet], fleets=[fleet0, fleet1])
+    sim = OrbitWarsSimulator(obs)
+    snap = sim.step()
+    p = next(s for s in snap if s['id'] == 0)
+    assert p['owner'] == 0
+    assert p['ships'] == 5
+
+
+def test_combat_tie_leaves_planet_neutral():
+    planet = [0, -1, 60.0, 50.0, 2.0, 0, 1]
+    fleet0 = [0, 0, 57.0, 50.0, 0.0,     -1, 10]
+    fleet1 = [1, 1, 63.0, 50.0, math.pi, -1, 10]
+    obs = make_obs([planet], fleets=[fleet0, fleet1])
+    sim = OrbitWarsSimulator(obs)
+    snap = sim.step()
+    p = next(s for s in snap if s['id'] == 0)
+    assert p['owner'] == -1
+    assert p['ships'] == 0
+
+
+# --- run(n) ---
+
+def test_run_returns_n_snapshots():
+    planet = [0, 0, 60.0, 50.0, 3.0, 10, 2]
+    obs = make_obs([planet])
+    sim = OrbitWarsSimulator(obs)
+    snaps = sim.run(5)
+    assert len(snaps) == 5
+
+
+def test_run_production_accumulates():
+    planet = [0, 0, 60.0, 50.0, 3.0, 10, 2]  # prod=2
+    obs = make_obs([planet])
+    sim = OrbitWarsSimulator(obs)
+    snaps = sim.run(5)
+    ships = [next(p['ships'] for p in s if p['id'] == 0) for s in snaps]
+    assert ships == [12, 14, 16, 18, 20]
