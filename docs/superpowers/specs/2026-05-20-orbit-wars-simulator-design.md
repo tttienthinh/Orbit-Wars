@@ -8,15 +8,14 @@ File: `27-Board_new_env.py`
 ## Problem
 
 `Board._run_simulation` uses `ke.make` to run a 20-step forward sim from the current game state.
-The kaggle_environments framework has a step-counter bug: after each `env.step()` call,
-`__loop_through_interpreter` sets `obs.step = len(self.steps)` AFTER the interpreter returns,
-but `self.steps` isn't appended until after `__run_interpreter` exits. This means consecutive
-sim steps see the same `step` value, so the orbital rotation formula
-`θ = initial_angle + ω * step` produces the same angle twice — planets appear frozen after
-step 1.
+The approach tries to inject the live game state by overwriting `env.state[i].observation.*`
+fields (planets, fleets, initial_planets, etc.) after `env.reset()`. This does not work:
+`env.step()` calls `__loop_through_interpreter` which runs `structify(action_state)` internally,
+rebuilding the state from the framework's own copy rather than the user-modified attributes.
+Every `env.step()` call therefore runs the interpreter against the randomly-generated game
+created at `env.reset()` time — the injected state is silently discarded.
 
-Removing ke.make from the simulation path also eliminates ~100ms of framework overhead per
-agent turn.
+Removing ke.make from the simulation path also eliminates framework overhead per agent turn.
 
 ---
 
