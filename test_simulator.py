@@ -75,3 +75,15 @@ def test_init_sim_step_zero():
     obs = make_obs([[0, -1, 60.0, 50.0, 2.0, 5, 1]])
     sim = OrbitWarsSimulator(obs)
     assert sim.sim_step == 0
+
+
+def test_init_deep_copies_comet_paths():
+    path0 = [[10.0, 20.0], [11.0, 21.0]]
+    path1 = [[30.0, 40.0], [31.0, 41.0]]
+    group = {"planet_ids": [100, 101], "paths": [path0, path1], "path_index": 0}
+    planet0 = [100, -1, 10.0, 20.0, 1.0, 5, 1]
+    planet1 = [101, -1, 30.0, 40.0, 1.0, 5, 1]
+    obs = make_obs([planet0, planet1], comet_planet_ids=[100, 101], comets=[group])
+    sim = OrbitWarsSimulator(obs)
+    obs.comets[0]["paths"][0].append([99.0, 99.0])   # mutate original
+    assert len(sim.comets[0]["paths"][0]) == 2        # sim unaffected

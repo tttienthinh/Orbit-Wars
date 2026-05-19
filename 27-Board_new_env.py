@@ -46,7 +46,7 @@ class OrbitWarsSimulator:
         self.comets = [
             {
                 "planet_ids": list(g["planet_ids"]),
-                "paths": g["paths"],
+                "paths": [[list(pos) for pos in path] for path in g["paths"]],
                 "path_index": g["path_index"],
             }
             for g in _get("comets", [])
