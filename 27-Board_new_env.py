@@ -68,7 +68,86 @@ class OrbitWarsSimulator:
         return math.hypot(p[0] - proj_x, p[1] - proj_y)
 
     def step(self):
-        raise NotImplementedError
+        self.sim_step += 1
+
+        # Phase 1: comet pre-expiry (remove any comets already past their path end)
+        pre_expired = {
+            pid
+            for g in self.comets
+            for i, pid in enumerate(g["planet_ids"])
+            if g["path_index"] >= len(g["paths"][i])
+        }
+        self._expire_comets(pre_expired)
+
+        # Phase 2: production
+        for planet in self.planets:
+            if planet[1] != -1:
+                planet[5] += planet[6]
+
+        # Phase 3: fleet movement + continuous collision
+        fleets_to_remove = set()
+        combat_lists = {p[0]: [] for p in self.planets}
+
+        for fleet in self.fleets:
+            angle = fleet[4]
+            ships = fleet[6]
+            speed = _fleet_speed(ships)
+            old_pos = (fleet[2], fleet[3])
+            fleet[2] += math.cos(angle) * speed
+            fleet[3] += math.sin(angle) * speed
+            new_pos = (fleet[2], fleet[3])
+
+            hit = False
+            for planet in self.planets:
+                if self._pt_seg_dist((planet[2], planet[3]), old_pos, new_pos) < planet[4]:
+                    combat_lists[planet[0]].append(fleet)
+                    fleets_to_remove.add(id(fleet))
+                    hit = True
+                    break
+            if hit:
+                continue
+
+            if not (0 <= fleet[2] <= self.BOARD_SIZE and 0 <= fleet[3] <= self.BOARD_SIZE):
+                fleets_to_remove.add(id(fleet))
+                continue
+
+            if self._pt_seg_dist(
+                (self.CENTER, self.CENTER), old_pos, new_pos
+            ) < self.SUN_RADIUS:
+                fleets_to_remove.add(id(fleet))
+
+        # Phases 4–6 stubbed until next tasks
+        self.fleets = [f for f in self.fleets if id(f) not in fleets_to_remove]
+
+        return [
+            {"id": p[0], "owner": p[1], "x": p[2], "y": p[3],
+             "radius": p[4], "ships": p[5], "production": p[6]}
+            for p in self.planets
+        ]
+
+    def _sweep(self, planet, old_pos, new_pos, fleets_to_remove, combat_lists):
+        if old_pos == new_pos:
+            return
+        for fleet in self.fleets:
+            if id(fleet) not in fleets_to_remove:
+                if self._pt_seg_dist(
+                    (fleet[2], fleet[3]), old_pos, new_pos
+                ) < planet[4]:
+                    combat_lists[planet[0]].append(fleet)
+                    fleets_to_remove.add(id(fleet))
+
+    def _expire_comets(self, expired_pids):
+        if not expired_pids:
+            return
+        self.planets = [p for p in self.planets if p[0] not in expired_pids]
+        self.initial_by_id = {
+            pid: p for pid, p in self.initial_by_id.items()
+            if pid not in expired_pids
+        }
+        self.comet_pid_set -= expired_pids
+        for g in self.comets:
+            g["planet_ids"] = [pid for pid in g["planet_ids"] if pid not in expired_pids]
+        self.comets = [g for g in self.comets if g["planet_ids"]]
 
     def run(self, n):
         raise NotImplementedError

@@ -87,3 +87,66 @@ def test_init_deep_copies_comet_paths():
     sim = OrbitWarsSimulator(obs)
     obs.comets[0]["paths"][0].append([99.0, 99.0])   # mutate original
     assert len(sim.comets[0]["paths"][0]) == 2        # sim unaffected
+
+
+# --- Production ---
+
+def test_production_adds_ships_to_owned_planet():
+    planet = [0, 0, 60.0, 50.0, 2.0, 10, 3]   # owner=0, ships=10, prod=3
+    obs = make_obs([planet])
+    sim = OrbitWarsSimulator(obs)
+    snap = sim.step()
+    p = next(s for s in snap if s['id'] == 0)
+    assert p['ships'] == 13
+
+
+def test_production_skips_neutral_planet():
+    planet = [0, -1, 60.0, 50.0, 2.0, 10, 3]  # owner=-1
+    obs = make_obs([planet])
+    sim = OrbitWarsSimulator(obs)
+    snap = sim.step()
+    p = next(s for s in snap if s['id'] == 0)
+    assert p['ships'] == 10
+
+
+# --- Fleet movement ---
+
+def test_fleet_removed_when_out_of_bounds():
+    planet = [0, -1, 60.0, 50.0, 2.0, 5, 1]
+    # Fleet aimed at angle π/2 (+y direction) from near the bottom edge.
+    # 1 ship → speed=1.0; y=99.5+1=100.5 > 100 → out of bounds after 1 step.
+    fleet = [0, 0, 50.0, 99.5, math.pi / 2, -1, 1]
+    obs = make_obs([planet], fleets=[fleet])
+    sim = OrbitWarsSimulator(obs)
+    sim.step()
+    assert len(sim.fleets) == 0
+
+
+def test_fleet_removed_when_crossing_sun():
+    planet = [0, -1, 80.0, 50.0, 2.0, 5, 1]
+    # Fleet aimed directly at sun center (50, 50) from (50, 63).
+    # 100 ships → speed≈3.72; segment (50,63)→(50,59.28); dist to (50,50)=9.28<10 ✓
+    fleet = [0, 0, 50.0, 63.0, -math.pi / 2, -1, 100]  # 100 ships → fast
+    obs = make_obs([planet], fleets=[fleet])
+    sim = OrbitWarsSimulator(obs)
+    sim.step()
+    assert len(sim.fleets) == 0
+
+
+def test_fleet_hits_static_planet_after_8_steps():
+    # Planet at (60, 50) radius=3. Fleet at (50, 50) angle=0, 1 ship (speed=1.0).
+    # Distance to surface: (60-3) - 50 = 7 → hits when fleet x ≥ 57.
+    # After 8 steps: fleet x=58, seg (57→58), pt_seg_dist((60,50),(57,50),(58,50))=2<3 ✓
+    planet = [0, 1, 60.0, 50.0, 3.0, 20, 2]   # owner=1, ships=20, prod=2
+    fleet  = [0, 0, 50.0, 50.0, 0.0, -1, 1]   # 1 ship, speed=1.0
+    obs = make_obs([planet], fleets=[fleet])
+    sim = OrbitWarsSimulator(obs)
+    for _ in range(8):
+        snap = sim.step()
+    assert len(sim.fleets) == 0
+    p = next(s for s in snap if s['id'] == 0)
+    # Production: +2/step × 8 steps = +16 → 36 ships on planet at moment of combat.
+    # Fleet 1 ship (owner 0) vs planet owner 1: survivor_ships=1, tries to take planet.
+    # planet[5] -= 1 → 35, planet keeps owner 1.
+    assert p['owner'] == 1
+    assert p['ships'] == 35
