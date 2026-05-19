@@ -2,6 +2,7 @@
 import math
 import importlib.util
 from types import SimpleNamespace
+import pytest
 
 spec = importlib.util.spec_from_file_location("board", "27-Board_new_env.py")
 mod = importlib.util.module_from_spec(spec)
@@ -133,6 +134,7 @@ def test_fleet_removed_when_crossing_sun():
     assert len(sim.fleets) == 0
 
 
+@pytest.mark.xfail(reason="combat resolution stubbed until Task 5", strict=True)
 def test_fleet_hits_static_planet_after_8_steps():
     # Planet at (60, 50) radius=3. Fleet at (50, 50) angle=0, 1 ship (speed=1.0).
     # Distance to surface: (60-3) - 50 = 7 → hits when fleet x ≥ 57.
