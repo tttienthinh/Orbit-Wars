@@ -134,6 +134,27 @@ class OrbitWarsSimulator:
                 planet[3] = self.CENTER + r * math.sin(theta)
             self._sweep(planet, old_pos, (planet[2], planet[3]), fleets_to_remove, combat_lists)
 
+        # Phase 5: comet movement + expiry
+        newly_expired = set()
+        for group in self.comets:
+            group["path_index"] += 1
+            idx = group["path_index"]
+            for i, pid in enumerate(group["planet_ids"]):
+                planet = next((p for p in self.planets if p[0] == pid), None)
+                if planet is None:
+                    continue
+                p_path = group["paths"][i]
+                if idx >= len(p_path):
+                    newly_expired.add(pid)
+                else:
+                    old_pos = (planet[2], planet[3])
+                    planet[2] = p_path[idx][0]
+                    planet[3] = p_path[idx][1]
+                    if old_pos[0] >= 0:   # skip sweep on first off-board placement
+                        self._sweep(planet, old_pos, (planet[2], planet[3]),
+                                    fleets_to_remove, combat_lists)
+        self._expire_comets(newly_expired)
+
         self.fleets = [f for f in self.fleets if id(f) not in fleets_to_remove]
 
         return [

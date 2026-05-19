@@ -196,3 +196,40 @@ def test_orbiting_planet_sweeps_fleet():
     sim = OrbitWarsSimulator(obs)
     sim.step()
     assert len(sim.fleets) == 0  # fleet was swept
+
+
+# --- Comet movement ---
+
+def test_comet_advances_along_path():
+    path = [[10.0, 20.0], [11.0, 21.0], [12.0, 22.0]]
+    planet = [100, -1, 10.0, 20.0, 1.0, 5, 1]   # starts at path[0]
+    group = {"planet_ids": [100], "paths": [path], "path_index": 0}
+    obs = make_obs([planet], comet_planet_ids=[100], comets=[group])
+    sim = OrbitWarsSimulator(obs)
+    snap = sim.step()   # path_index → 1
+    p = next(s for s in snap if s['id'] == 100)
+    assert abs(p['x'] - 11.0) < 1e-9
+    assert abs(p['y'] - 21.0) < 1e-9
+
+
+def test_comet_expires_when_path_exhausted():
+    path = [[10.0, 20.0]]   # only one position → expires after one advance
+    planet = [100, -1, 10.0, 20.0, 1.0, 5, 1]
+    group = {"planet_ids": [100], "paths": [path], "path_index": 0}
+    obs = make_obs([planet], comet_planet_ids=[100], comets=[group])
+    sim = OrbitWarsSimulator(obs)
+    snap = sim.step()   # path_index → 1 ≥ len(path)=1 → expire
+    assert all(s['id'] != 100 for s in snap)
+    assert 100 not in sim.comet_pid_set
+    assert len(sim.comets) == 0
+
+
+def test_comet_pre_expiry_cleans_already_expired():
+    # path_index already at len(path) before step starts
+    path = [[10.0, 20.0]]
+    planet = [100, -1, 10.0, 20.0, 1.0, 5, 1]
+    group = {"planet_ids": [100], "paths": [path], "path_index": 1}  # already expired
+    obs = make_obs([planet], comet_planet_ids=[100], comets=[group])
+    sim = OrbitWarsSimulator(obs)
+    snap = sim.step()
+    assert all(s['id'] != 100 for s in snap)
