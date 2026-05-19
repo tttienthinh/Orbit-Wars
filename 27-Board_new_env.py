@@ -116,7 +116,24 @@ class OrbitWarsSimulator:
             ) < self.SUN_RADIUS:
                 fleets_to_remove.add(id(fleet))
 
-        # Phases 4–6 stubbed until next tasks
+        # Phase 4: planet rotation + sweep
+        comet_pid_set = self.comet_pid_set
+        for planet in self.planets:
+            if planet[0] in comet_pid_set:
+                continue
+            init_p = self.initial_by_id.get(planet[0])
+            if not init_p:
+                continue
+            dx = init_p[2] - self.CENTER
+            dy = init_p[3] - self.CENTER
+            r = math.hypot(dx, dy)
+            old_pos = (planet[2], planet[3])
+            if r + planet[4] < self.ROTATION_RADIUS_LIMIT:
+                theta = math.atan2(dy, dx) + self.angular_velocity * self.sim_step
+                planet[2] = self.CENTER + r * math.cos(theta)
+                planet[3] = self.CENTER + r * math.sin(theta)
+            self._sweep(planet, old_pos, (planet[2], planet[3]), fleets_to_remove, combat_lists)
+
         self.fleets = [f for f in self.fleets if id(f) not in fleets_to_remove]
 
         return [

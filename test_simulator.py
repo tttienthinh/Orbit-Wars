@@ -152,3 +152,47 @@ def test_fleet_hits_static_planet_after_8_steps():
     # planet[5] -= 1 → 35, planet keeps owner 1.
     assert p['owner'] == 1
     assert p['ships'] == 35
+
+
+# --- Planet rotation ---
+
+def test_orbiting_planet_rotates_by_omega():
+    omega = 0.05
+    # Planet at (60, 50): orbital radius=10, radius=1 → 10+1=11 < 50 → orbiting
+    planet = [0, -1, 60.0, 50.0, 1.0, 5, 1]
+    obs = make_obs([planet], angular_velocity=omega)
+    sim = OrbitWarsSimulator(obs)
+    snap = sim.step()  # sim_step=1
+    p = next(s for s in snap if s['id'] == 0)
+    initial_angle = math.atan2(50.0 - 50.0, 60.0 - 50.0)  # atan2(0, 10) = 0
+    expected_x = 50.0 + 10.0 * math.cos(initial_angle + omega)
+    expected_y = 50.0 + 10.0 * math.sin(initial_angle + omega)
+    assert abs(p['x'] - expected_x) < 1e-9
+    assert abs(p['y'] - expected_y) < 1e-9
+
+
+def test_static_planet_does_not_rotate():
+    # Planet at (90, 50): orbital radius=40, radius=15 → 40+15=55 ≥ 50 → static
+    planet = [0, -1, 90.0, 50.0, 15.0, 5, 1]
+    obs = make_obs([planet], angular_velocity=0.05)
+    sim = OrbitWarsSimulator(obs)
+    snap = sim.step()
+    p = next(s for s in snap if s['id'] == 0)
+    assert p['x'] == 90.0
+    assert p['y'] == 50.0
+
+
+def test_orbiting_planet_sweeps_fleet():
+    omega = 0.1
+    # Planet at (60, 50), radius=3, orbiting.
+    # Place a fleet right where the planet will be after 1 rotation step.
+    r = 10.0
+    angle_after = math.atan2(0, r) + omega  # initial angle 0 → rotates to omega
+    fleet_x = 50.0 + r * math.cos(angle_after)
+    fleet_y = 50.0 + r * math.sin(angle_after)
+    planet = [0, 0, 60.0, 50.0, 3.0, 5, 1]
+    fleet  = [0, 1, fleet_x, fleet_y, 0.0, -1, 1]  # stationary-ish fleet at sweep target
+    obs = make_obs([planet], fleets=[fleet], angular_velocity=omega)
+    sim = OrbitWarsSimulator(obs)
+    sim.step()
+    assert len(sim.fleets) == 0  # fleet was swept
