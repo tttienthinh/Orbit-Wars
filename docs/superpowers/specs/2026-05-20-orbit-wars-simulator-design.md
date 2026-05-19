@@ -165,3 +165,27 @@ def _run_simulation(self, obs):
 | `27-Board_new_env.py` | Add `OrbitWarsSimulator` class above `Board`; replace `Board._run_simulation` with 4-line wrapper |
 
 No new files. No changes to `Planet`, `Board`, or decision logic.
+
+---
+
+## Reference — Physics Source
+
+The canonical physics implementation lives in:
+
+```
+C:\Users\trant\miniforge3\Lib\site-packages\kaggle_environments\envs\orbit_wars\orbit_wars.py
+```
+
+The following functions/sections are ported directly into `OrbitWarsSimulator`:
+
+| Source location | Ported as |
+|---|---|
+| `point_to_segment_distance` (line 34) | `OrbitWarsSimulator._pt_seg_dist` (static method) |
+| Production block (line 491) | `step()` phase 2 |
+| Fleet movement block (lines 501–533) | `step()` phase 3 |
+| Planet rotation block (lines 555–572) | `step()` phase 4 |
+| `sweep_fleets` inner function (lines 541–552) | `_sweep_fleets` helper method |
+| Comet movement block (lines 575–608) | `step()` phase 5 |
+| Combat resolution block (lines 613–651) | `step()` phase 6 |
+
+When orbit_wars.py is updated by Kaggle, cross-check these line ranges to keep the sim in sync.
