@@ -6,7 +6,6 @@ Identical logic to 24-Rules_Target_big_prod.py, restructured:
 - Board: owns game state, simulation, and move generation
 """
 import math
-import kaggle_environments as ke
 
 CENTER_X = 50.0
 CENTER_Y = 50.0
@@ -337,35 +336,11 @@ class Board:
                 p.assign_nature()
 
     def _run_simulation(self, obs):
-        max_planet_id = max(p.id for p in self.planets)
-        num_agents = 2 if max_planet_id <= 1 else 4
-
-        env = ke.make("orbit_wars", debug=True)
-        env.reset(num_agents)
-        for i in range(num_agents):
-            env.state[i].action = []
-            env.state[i].reward = 0
-            env.state[i].observation.remainingOverageTime = obs.remainingOverageTime
-            env.state[i].observation.player = i
-            env.state[i].observation.angular_velocity = obs.angular_velocity
-            env.state[i].observation.next_fleet_id = obs.next_fleet_id
-            env.state[i].observation.comet_planet_ids = obs.comet_planet_ids.copy()
-            env.state[i].observation.planets = [planet.copy() for planet in obs.planets]
-            env.state[i].observation.fleets = [fleet.copy() for fleet in obs.fleets]
-            # Use current positions as the sim's "initial" so orbiting angles are correct.
-            # The rotation formula is: angle = atan2(initial_y, initial_x) + ω*step
-            # If we keep game-start initial_planets, step=1 in the sim gives the wrong angle.
-            env.state[i].observation.initial_planets = [planet.copy() for planet in obs.planets]
-
-        for step in range(NB_FORECAST_STEPS):
-            step_observation = env.step([[]] * num_agents)
-            next_obs = step_observation[self.player].observation
-            for id, owner, x, y, radius, ships, production in next_obs.planets:
-                self.planets_dico[id].nexts.append({
-                    "id": id, "owner": owner,
-                    "x": x, "y": y,
-                    "radius": radius, "ships": ships, "production": production,
-                })
+        for snap in OrbitWarsSimulator(obs).run(NB_FORECAST_STEPS):
+            for planet_state in snap:
+                pid = planet_state["id"]
+                if pid in self.planets_dico:
+                    self.planets_dico[pid].nexts.append(planet_state)
 
     def get_moves(self):
         if not self.targets:

@@ -297,3 +297,21 @@ def test_run_production_accumulates():
     snaps = sim.run(5)
     ships = [next(p['ships'] for p in s if p['id'] == 0) for s in snaps]
     assert ships == [12, 14, 16, 18, 20]
+
+
+def test_board_simulation_populates_nexts():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("board", "27-Board_new_env.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+
+    import kaggle_environments as ke
+    env = ke.make("orbit_wars", debug=True)
+    env.reset(2)
+    obs = env.state[0].observation
+
+    board = mod.Board(obs)
+    for planet in board.my_planets:
+        assert len(planet.nexts) == mod.NB_FORECAST_STEPS, (
+            f"Planet {planet.id} has {len(planet.nexts)} nexts, expected {mod.NB_FORECAST_STEPS}"
+        )
