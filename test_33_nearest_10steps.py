@@ -174,3 +174,17 @@ def test_agent_no_crash_10_steps():
         moves = m.nearest_planet_sniper(obs, gb)
         assert isinstance(moves, list)
         env.step([moves, []])
+
+def test_agent_no_move_when_current_ships_insufficient():
+    """No move when current ships < ships_needed, even if simulation min covers it."""
+    # source: 3 ships (current), production=5 → sim step1 ships=8
+    # target: 3 ships, production=0 → stays 3 all 10 steps
+    # ships_needed = 3 + 1 = 4. Current ships 3 < 4 → no move should be emitted.
+    planets = [
+        [0, 0,  3, 50, 5, 3, 5],
+        [1, 1, 97, 50, 5, 3, 0],
+    ]
+    obs = MockObs(planets)
+    gb = _fresh_board()
+    moves = m.nearest_planet_sniper(obs, gb)
+    assert moves == [], f"Expected no moves (current ships=3 < ships_needed=4), got {moves}"

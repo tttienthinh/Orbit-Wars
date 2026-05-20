@@ -383,7 +383,7 @@ def nearest_planet_sniper(obs, global_board=global_board):
         ) + 1
         min_ships = df.query(f"id == {pid}")["ships"].min()
 
-        if min_ships >= ships_needed:
+        if ships >= ships_needed and min_ships >= ships_needed:
             angle = _aim_angle(x, y, radius, best_tgt, angular_velocity, ships_needed)
             moves.append([pid, angle, int(ships_needed)])
 
