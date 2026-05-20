@@ -133,7 +133,8 @@ current = {p[0]: p for p in obs.planets}
 for each source planet (owner == player, id in consistently_mine_ids):
     best_target = argmin _eta over target_ids_at_final ∩ current
     ships_needed = df.query("id == @tid and step == @final_step")["ships"].iloc[0] + 1
-    if source.ships >= ships_needed:
+    min_ships = df.query(f"id == {source[0]}")["ships"].min()
+    if min_ships >= ships_needed:
         angle = _aim_angle(...)
         moves.append([source.id, angle, ships_needed])
 
@@ -145,7 +146,9 @@ return moves
 
 ## Key Constraints
 
-- No minimum ship floor — fire whenever `source.ships >= ships_needed`
+- Fire condition: `df.query(f"id == {source_id}")["ships"].min() >= ships_needed` — uses the
+  minimum ships the source planet holds across all 10 simulated steps, not just current ships.
+  Guards against firing when the planet may lose ships to combat mid-window.
 - One action per source planet (nearest target only)
 - No cross-planet coordination (each planet decides independently)
 - Comets are never source planets (they won't be consistently mine); they appear in df_planets

@@ -34,10 +34,19 @@ class OrbitWarsSimulator:
 
         self.angular_velocity = _get("angular_velocity", 0.0)
         self.comet_pid_set = set(_get("comet_planet_ids", []))
+        # Real ke env uses obs.step as the step index in its absolute rotation formula:
+        #   theta = initial_angle + omega * obs.step
+        # We replicate this by tracking the starting step offset.
+        self.initial_step = _get("step", 0)
 
         raw_planets = _get("planets", [])
         self.planets = [list(p) for p in raw_planets]
-        self.initial_planets = [list(p) for p in raw_planets]
+        # Use obs.initial_planets (game-start positions) as the orbit reference so the
+        # rotation formula matches the real interpreter exactly.  Fall back to current
+        # planets when initial_planets is not supplied (e.g. synthetic test dicts).
+        raw_initial = _get("initial_planets", None)
+        raw_init_src = raw_initial if raw_initial else raw_planets
+        self.initial_planets = [list(p) for p in raw_init_src]
         self.initial_by_id = {p[0]: p for p in self.initial_planets}
 
         self.fleets = [list(f) for f in _get("fleets", [])]
@@ -128,7 +137,9 @@ class OrbitWarsSimulator:
             r = math.hypot(dx, dy)
             old_pos = (planet[2], planet[3])
             if r + planet[4] < self.ROTATION_RADIUS_LIMIT:
-                theta = math.atan2(dy, dx) + self.angular_velocity * self.sim_step
+                # Mirrors the real ke env formula: theta = initial_angle + omega * obs0.step
+                # where obs0.step is the incoming step number (initial_step + sim_step - 1).
+                theta = math.atan2(dy, dx) + self.angular_velocity * (self.initial_step + self.sim_step - 1)
                 planet[2] = self.CENTER + r * math.cos(theta)
                 planet[3] = self.CENTER + r * math.sin(theta)
             self._sweep(planet, old_pos, (planet[2], planet[3]), fleets_to_remove, combat_lists)

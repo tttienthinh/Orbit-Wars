@@ -155,7 +155,10 @@ class Board:
             env.state[i].observation.comet_planet_ids = obs.comet_planet_ids.copy()
             env.state[i].observation.planets = [planet.copy() for planet in obs.planets]
             env.state[i].observation.fleets = [fleet.copy() for fleet in obs.fleets]
-            env.state[i].observation.initial_planets = [initial_planet.copy() for initial_planet in obs.initial_planets]
+            # Use current positions as the sim's "initial" so orbiting angles are correct.
+            # The rotation formula is: angle = atan2(initial_y, initial_x) + ω*step
+            # If we keep game-start initial_planets, step=1 in the sim gives the wrong angle.
+            env.state[i].observation.initial_planets = [planet.copy() for planet in obs.planets]
 
         for step in range(NB_FORECAST_STEPS):
             step_observation = env.step([[]] * num_agents)

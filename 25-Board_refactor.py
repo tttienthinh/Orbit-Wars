@@ -11,6 +11,7 @@ import kaggle_environments as ke
 CENTER_X = 50.0
 CENTER_Y = 50.0
 MAX_SPEED = 6.0
+NB_FORECAST_STEPS = 20
 
 
 def _fleet_speed(nb_ships):
@@ -155,7 +156,7 @@ class Board:
             env.state[i].observation.fleets = [fleet.copy() for fleet in obs.fleets]
             env.state[i].observation.initial_planets = [initial_planet.copy() for initial_planet in obs.initial_planets]
 
-        for step in range(10):
+        for step in range(NB_FORECAST_STEPS):
             step_observation = env.step([[]] * num_agents)
             next_obs = step_observation[self.player].observation
             for id, owner, x, y, radius, ships, production in next_obs.planets:
@@ -199,7 +200,7 @@ class Board:
 
         elif planet.nature == "Supplier":
             for target in planet.nearby_planets[:planet.NB_NEARBY_OUT_OF]:
-                if planet.ships > target.ships * 2:
+                if target.nexts[NB_FORECAST_STEPS - 1]['owner'] != planet.owner or planet.ships > target.nexts[NB_FORECAST_STEPS - 1]['ships'] * 2:
                     action = self._create_one_action(planet, target, planet.ships // 4)
                     if action != []:
                         actions += action
@@ -207,7 +208,7 @@ class Board:
 
         elif planet.nature == "Explorer":
             for target in planet.nearby_planets[:planet.NB_NEARBY_OUT_OF]:
-                if target.nexts[9]['owner'] != planet.owner:
+                if target.nexts[NB_FORECAST_STEPS - 1]['owner'] != planet.owner:
                     action = self._create_one_action(planet, target)
                     if action != []:
                         actions += action
@@ -215,13 +216,13 @@ class Board:
 
         elif planet.nature == "Conqueror":
             for target in planet.nearby_planets[:planet.NB_NEARBY_OUT_OF]:
-                if target.nexts[9]['owner'] == -1 and planet.ships > target.nexts[9]['ships'] * 2:
+                if target.nexts[NB_FORECAST_STEPS - 1]['owner'] == -1 and planet.ships > target.nexts[NB_FORECAST_STEPS - 1]['ships'] * 2:
                     action = self._create_one_action(planet, target, planet.ships // 2)
                     if action != []:
                         actions += action
                         return actions
             for target in planet.nearby_planets[:planet.NB_NEARBY_OUT_OF]:
-                if target.nexts[9]['owner'] != planet.owner and planet.ships > target.nexts[9]['ships'] * 2:
+                if target.nexts[NB_FORECAST_STEPS - 1]['owner'] != planet.owner and planet.ships > target.nexts[NB_FORECAST_STEPS - 1]['ships'] * 2:
                     action = self._create_one_action(planet, target, planet.ships // 2)
                     if action != []:
                         actions += action

@@ -330,6 +330,7 @@ global_board = {"step": 0, "num_agents": None}
 def nearest_planet_sniper(obs, global_board=global_board):
     player = obs.player if hasattr(obs, "player") else obs["player"]
     s = global_board["step"]
+    print(f"Step {s}, Player {player}:")
 
     if s == 0 or global_board["num_agents"] is None:
         initial = (
