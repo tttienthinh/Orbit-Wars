@@ -287,3 +287,36 @@ def _simulate(obs, global_step, num_agents, n_steps=NB_STEPS_SIM):
                 "nature": nature,
             })
     return pd.DataFrame(rows)
+
+
+def _eta(src_x, src_y, src_r, tgt, angular_velocity, ships=1):
+    """ETA in steps for a fleet of `ships` to reach tgt from (src_x, src_y)."""
+    tx, ty, tr = tgt[2], tgt[3], tgt[4]
+    speed = _fleet_speed(ships)
+    if math.hypot(tx - CENTER, ty - CENTER) + tr >= ROTATION_RADIUS_LIMIT:
+        dist = max(0.0, math.hypot(tx - src_x, ty - src_y) - src_r - tr)
+        return max(1, math.ceil(dist / speed))
+    base_angle = math.atan2(ty - CENTER, tx - CENTER)
+    r = math.hypot(tx - CENTER, ty - CENTER)
+    for t in range(1, 101):
+        fx = CENTER + r * math.cos(base_angle + angular_velocity * t)
+        fy = CENTER + r * math.sin(base_angle + angular_velocity * t)
+        if math.hypot(fx - src_x, fy - src_y) - t * speed < src_r + tr:
+            return t
+    return 9999
+
+
+def _aim_angle(src_x, src_y, src_r, tgt, angular_velocity, ships):
+    """Angle to fire at tgt, accounting for orbital intercept."""
+    tx, ty, tr = tgt[2], tgt[3], tgt[4]
+    speed = _fleet_speed(ships)
+    if math.hypot(tx - CENTER, ty - CENTER) + tr >= ROTATION_RADIUS_LIMIT:
+        return math.atan2(ty - src_y, tx - src_x)
+    base_angle = math.atan2(ty - CENTER, tx - CENTER)
+    r = math.hypot(tx - CENTER, ty - CENTER)
+    for t in range(1, 101):
+        fx = CENTER + r * math.cos(base_angle + angular_velocity * t)
+        fy = CENTER + r * math.sin(base_angle + angular_velocity * t)
+        if math.hypot(fx - src_x, fy - src_y) - t * speed < src_r + tr:
+            return math.atan2(fy - src_y, fx - src_x)
+    return math.atan2(ty - src_y, tx - src_x)
