@@ -247,3 +247,43 @@ def interpreter(obs, actions, step, num_agents=2):
         terminated = True
 
     return obs1
+
+
+# ── Physics helpers ───────────────────────────────────────────────────────────
+
+def _fleet_speed(ships):
+    if ships <= 1:
+        return 1.0
+    ratio = math.log(ships) / math.log(1000.0)
+    return 1.0 + (MAX_SPEED - 1.0) * max(0.0, min(1.0, ratio)) ** 1.5
+
+
+def _simulate(obs, global_step, num_agents, n_steps=NB_STEPS_SIM):
+    sim = copy.deepcopy(obs)
+    no_actions = [[] for _ in range(num_agents)]
+    rows = []
+    for i in range(n_steps):
+        interpreter(sim, no_actions, global_step + i, num_agents)
+        for p in sim.planets:
+            pid, owner, x, y, radius, ships, production = (
+                p[0], p[1], p[2], p[3], p[4], p[5], p[6]
+            )
+            r = math.hypot(x - CENTER, y - CENTER)
+            if pid in sim.comet_planet_ids:
+                nature = "comet"
+            elif r + radius < ROTATION_RADIUS_LIMIT:
+                nature = "moving"
+            else:
+                nature = "fix"
+            rows.append({
+                "step": global_step + i + 1,
+                "id": pid,
+                "x": x,
+                "y": y,
+                "radius": radius,
+                "ships": ships,
+                "production": production,
+                "owner": owner,
+                "nature": nature,
+            })
+    return pd.DataFrame(rows)
