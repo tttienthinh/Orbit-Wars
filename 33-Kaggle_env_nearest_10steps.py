@@ -320,3 +320,76 @@ def _aim_angle(src_x, src_y, src_r, tgt, angular_velocity, ships):
         if math.hypot(fx - src_x, fy - src_y) - t * speed < src_r + tr:
             return math.atan2(fy - src_y, fx - src_x)
     return math.atan2(ty - src_y, tx - src_x)
+
+
+# ── Agent ─────────────────────────────────────────────────────────────────────
+
+global_board = {"step": 0, "num_agents": None}
+
+
+def nearest_planet_sniper(obs, global_board=global_board):
+    player = obs.player if hasattr(obs, "player") else obs["player"]
+    s = global_board["step"]
+
+    if s == 0:
+        initial = (
+            obs.initial_planets if hasattr(obs, "initial_planets")
+            else obs["initial_planets"]
+        )
+        owners = {p[1] for p in initial if p[1] != -1}
+        global_board["num_agents"] = 4 if len(owners) > 2 else 2
+
+    num_agents = global_board["num_agents"]
+    final_step = s + NB_STEPS_SIM
+
+    df = _simulate(obs, s, num_agents)
+
+    consistently_mine_ids = set(
+        df.query("owner == @player")
+          .groupby("id")
+          .filter(lambda g: len(g) == NB_STEPS_SIM)["id"]
+    )
+
+    target_ids_at_final = set(
+        df.query("step == @final_step and owner != @player")["id"]
+    )
+
+    planets_raw = obs.planets if hasattr(obs, "planets") else obs["planets"]
+    current = {p[0]: p for p in planets_raw}
+    angular_velocity = (
+        obs.angular_velocity if hasattr(obs, "angular_velocity")
+        else obs.get("angular_velocity", 0.0)
+    )
+
+    moves = []
+    for p in planets_raw:
+        pid, owner, x, y, radius, ships = p[0], p[1], p[2], p[3], p[4], p[5]
+        if owner != player or pid not in consistently_mine_ids:
+            continue
+
+        best_tgt, best_eta = None, 9999
+        for tid in target_ids_at_final:
+            if tid not in current:
+                continue
+            eta = _eta(x, y, radius, current[tid], angular_velocity)
+            if eta < best_eta:
+                best_eta, best_tgt = eta, current[tid]
+
+        if best_tgt is None:
+            continue
+
+        tid = best_tgt[0]
+        ships_needed = int(
+            df.query("id == @tid and step == @final_step")["ships"].iloc[0]
+        ) + 1
+        min_ships = df.query(f"id == {pid}")["ships"].min()
+
+        if min_ships >= ships_needed:
+            angle = _aim_angle(x, y, radius, best_tgt, angular_velocity, ships_needed)
+            moves.append([pid, angle, int(ships_needed)])
+
+    global_board["step"] += 1
+    return moves
+
+
+agent = nearest_planet_sniper

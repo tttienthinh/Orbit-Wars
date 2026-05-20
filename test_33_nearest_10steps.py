@@ -115,3 +115,64 @@ def test_aim_angle_static_vertical():
     tgt = [2, 1, 50.0, 97.0, 5.0, 10, 3]
     angle = m._aim_angle(*src, tgt, angular_velocity=0.0, ships=1)
     assert math.isclose(angle, math.pi / 2, abs_tol=1e-9)
+
+
+# ── nearest_planet_sniper integration ─────────────────────────────────────────
+
+def _fresh_board():
+    """Return a fresh global_board dict (avoids shared state between tests)."""
+    return {"step": 0, "num_agents": None}
+
+def test_agent_returns_list():
+    import kaggle_environments as ke
+    env = ke.make("orbit_wars", debug=False)
+    env.reset(2)
+    obs = env.state[0].observation
+    gb = _fresh_board()
+    result = m.nearest_planet_sniper(obs, gb)
+    assert isinstance(result, list)
+
+def test_agent_move_format():
+    """Every move must be [planet_id, angle, ships] with ships >= 1."""
+    import kaggle_environments as ke
+    env = ke.make("orbit_wars", debug=False)
+    env.reset(2)
+    obs = env.state[0].observation
+    gb = _fresh_board()
+    moves = m.nearest_planet_sniper(obs, gb)
+    for move in moves:
+        assert len(move) == 3
+        pid, angle, ships = move
+        assert isinstance(pid, int)
+        assert -math.pi <= angle <= math.pi
+        assert ships >= 1
+
+def test_agent_increments_step():
+    import kaggle_environments as ke
+    env = ke.make("orbit_wars", debug=False)
+    env.reset(2)
+    obs = env.state[0].observation
+    gb = _fresh_board()
+    m.nearest_planet_sniper(obs, gb)
+    assert gb["step"] == 1
+
+def test_agent_detects_num_agents_2p():
+    import kaggle_environments as ke
+    env = ke.make("orbit_wars", debug=False)
+    env.reset(2)
+    obs = env.state[0].observation
+    gb = _fresh_board()
+    m.nearest_planet_sniper(obs, gb)
+    assert gb["num_agents"] == 2
+
+def test_agent_no_crash_10_steps():
+    """Run 10 full turns without exception."""
+    import kaggle_environments as ke
+    env = ke.make("orbit_wars", debug=False)
+    env.reset(2)
+    gb = _fresh_board()
+    for _ in range(10):
+        obs = env.state[0].observation
+        moves = m.nearest_planet_sniper(obs, gb)
+        assert isinstance(moves, list)
+        env.step([moves, []])
