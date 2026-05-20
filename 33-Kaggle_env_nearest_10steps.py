@@ -331,7 +331,7 @@ def nearest_planet_sniper(obs, global_board=global_board):
     player = obs.player if hasattr(obs, "player") else obs["player"]
     s = global_board["step"]
 
-    if s == 0:
+    if s == 0 or global_board["num_agents"] is None:
         initial = (
             obs.initial_planets if hasattr(obs, "initial_planets")
             else obs["initial_planets"]
@@ -345,9 +345,8 @@ def nearest_planet_sniper(obs, global_board=global_board):
     df = _simulate(obs, s, num_agents)
 
     consistently_mine_ids = set(
-        df.query("owner == @player")
-          .groupby("id")
-          .filter(lambda g: len(g) == NB_STEPS_SIM)["id"]
+        df.groupby("id")
+          .filter(lambda g: (g["owner"] == player).all())["id"]
     )
 
     target_ids_at_final = set(
