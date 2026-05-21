@@ -7,7 +7,8 @@ CENTER = 50.0
 SUN_RADIUS = 10.0
 ROTATION_RADIUS_LIMIT = 50.0
 MAX_SPEED = 6.0
-NB_STEPS_SIM = 10
+NB_STEPS_SIM = 50
+PLANET_MARGIN = 0.1
 
 # ── Interpreter (verbatim from 32-board_from_kaggle.ipynb cell 0) ─────────────
 from collections import namedtuple
@@ -262,8 +263,7 @@ def _simulate(obs, global_step, num_agents, n_steps=NB_STEPS_SIM):
     sim = copy.deepcopy(obs)
     no_actions = [[] for _ in range(num_agents)]
     rows = []
-    for i in range(n_steps):
-        interpreter(sim, no_actions, global_step + i, num_agents)
+    for i in range(n_steps+1):
         for p in sim.planets:
             pid, owner, x, y, radius, ships, production = (
                 p[0], p[1], p[2], p[3], p[4], p[5], p[6]
@@ -276,7 +276,7 @@ def _simulate(obs, global_step, num_agents, n_steps=NB_STEPS_SIM):
             else:
                 nature = "fix"
             rows.append({
-                "step": global_step + i + 1,
+                "step": global_step + i,
                 "id": pid,
                 "x": x,
                 "y": y,
@@ -286,6 +286,7 @@ def _simulate(obs, global_step, num_agents, n_steps=NB_STEPS_SIM):
                 "owner": owner,
                 "nature": nature,
             })
+        interpreter(sim, no_actions, global_step + i, num_agents)
     return pd.DataFrame(rows)
 
 
@@ -321,75 +322,102 @@ def _aim_angle(src_x, src_y, src_r, tgt, angular_velocity, ships):
             return math.atan2(fy - src_y, fx - src_x)
     return math.atan2(ty - src_y, tx - src_x)
 
+import numpy as np
 
+def take_action(df, player_id, nb_steps_sim=NB_STEPS_SIM):
+    mine_across_sim = (
+        df
+        .query("owner == @player_id")
+        .groupby("id")
+        .agg(
+            step_src=("step", "first"),
+            x_src=("x", "first"),
+            y_src=("y", "first"),
+            radius_src=("radius", "first"),
+            ships_min=("ships", "min"),
+            production_src=("production", "first"),
+            nature_src=("nature", "first"),
+            row_count=("ships", "size"),
+        )
+        .query("row_count >= @nb_steps_sim + 1 and ships_min > 0")
+        .reset_index(drop=False)
+        .rename(columns={"id": "id_src"})
+    )
+
+    df_src_tgt = (
+        mine_across_sim
+        .merge(
+            df,
+            how="cross"
+        )
+        .query("step > step_src and id != id_src and @player_id != owner")
+    )
+
+    possible_attacks = (
+        df_src_tgt
+        .assign(
+            dist_tgt_src=lambda d: ((d["x"] - d["x_src"]) ** 2 + (d["y"] - d["y_src"]) ** 2) ** 0.5 - d["radius_src"] - d["radius"] - PLANET_MARGIN,
+            step_diff=lambda d: d["step"] - d["step_src"] + 1, # For a one ship fleet, the speed is 1 unit per step
+            ships_needed=lambda d: d["ships"] + 1, # Need at least one more ship than the target to win
+            fleet_speed=lambda d: 1.0 + (MAX_SPEED - 1.0) * ((np.log(d["ships_needed"])) / math.log(1000)) ** 1.5,
+            possible_attack=lambda d: (d["dist_tgt_src"] / d["fleet_speed"] <= d["step_diff"]),
+        )
+        .query("possible_attack and ships_needed <= ships_min") # Only consider attacks we can win with the ships we have at the source during the sim
+        .assign(
+            crossing_sun=lambda d: d.apply(
+                lambda row: point_to_segment_distance(
+                    (CENTER, CENTER),
+                    (row["x_src"], row["y_src"]),
+                    (row["x"], row["y"]),
+                ) < SUN_RADIUS + PLANET_MARGIN,
+                axis=1,
+            )
+        )
+        .query("not crossing_sun")
+        .sort_values(["step_src", "id_src", "step", "id"], ascending=[True, True, True, True])
+        .groupby(["step_src", "id_src", "id"], as_index=False)
+        .first()
+        .assign(
+            angle=lambda d: np.arctan2(d["y"] - d["y_src"], d["x"] - d["x_src"]),
+        )
+        .sort_values("step", ascending=True)
+    )
+    for row in possible_attacks.itertuples():
+        print(f"From {row.id_src}, To {row.id} at step {row.step} with {row.ships_needed} ships (target has min {row.ships_min})")
+    moves = (
+        possible_attacks
+        [["id_src", "angle", "ships_needed"]]
+        .values
+        .tolist()
+    )
+    return moves
 # ── Agent ─────────────────────────────────────────────────────────────────────
 
-global_board = {"step": 0, "num_agents": None}
+step = 0
+num_agents = None
+player_id = None
 
+def nearest_planet_sniper(obs):
+    global step
+    global num_agents
+    global player_id
 
-def nearest_planet_sniper(obs, global_board=global_board):
-    player = obs.player if hasattr(obs, "player") else obs["player"]
-    global_board = {"step": 0, "num_agents": None}
-    s = global_board["step"]
-    print("Agent called")
-
-    if s == 0 or global_board["num_agents"] is None:
+    print(f"Agent called step: {step} remainingOverageTime: {obs.get('remainingOverageTime', 0)}")
+    if num_agents is None:
         initial = (
             obs.initial_planets if hasattr(obs, "initial_planets")
             else obs["initial_planets"]
         )
         owners = {p[1] for p in initial if p[1] != -1}
-        global_board["num_agents"] = 4 if len(owners) > 2 else 2
+        num_agents = 4 if len(owners) > 2 else 2
+    if player_id is None:
+        player_id = obs.get("player", 0) if isinstance(obs, dict) else obs.player
 
-    num_agents = global_board["num_agents"]
-    final_step = s + NB_STEPS_SIM
+    df = _simulate(obs, step, num_agents, n_steps=NB_STEPS_SIM)
+    moves = take_action(df, player_id=player_id, nb_steps_sim=NB_STEPS_SIM)
 
-    df = _simulate(obs, s, num_agents)
 
-    consistently_mine_ids = set(
-        df.groupby("id")
-          .filter(lambda g: (g["owner"] == player).all())["id"]
-    )
-
-    target_ids_at_final = set(
-        df.query("step == @final_step and owner != @player")["id"]
-    )
-
-    planets_raw = obs.planets if hasattr(obs, "planets") else obs["planets"]
-    current = {p[0]: p for p in planets_raw}
-    angular_velocity = (
-        obs.angular_velocity if hasattr(obs, "angular_velocity")
-        else obs.get("angular_velocity", 0.0)
-    )
-
-    moves = []
-    for p in planets_raw:
-        pid, owner, x, y, radius, ships = p[0], p[1], p[2], p[3], p[4], p[5]
-        if owner != player or pid not in consistently_mine_ids:
-            continue
-
-        best_tgt, best_eta = None, 9999
-        for tid in target_ids_at_final:
-            if tid not in current:
-                continue
-            eta = _eta(x, y, radius, current[tid], angular_velocity)
-            if eta < best_eta:
-                best_eta, best_tgt = eta, current[tid]
-
-        if best_tgt is None:
-            continue
-
-        tid = best_tgt[0]
-        ships_needed = int(
-            df.query("id == @tid and step == @final_step")["ships"].iloc[0]
-        ) + 1
-        min_ships = df.query(f"id == {pid}")["ships"].min()
-
-        if ships >= ships_needed and min_ships >= ships_needed:
-            angle = _aim_angle(x, y, radius, best_tgt, angular_velocity, ships_needed)
-            moves.append([pid, angle, int(ships_needed)])
-
-    global_board["step"] += 1
+    step += 1
     return moves
 
 
