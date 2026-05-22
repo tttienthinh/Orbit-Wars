@@ -7,7 +7,7 @@ CENTER = 50.0
 SUN_RADIUS = 10.0
 ROTATION_RADIUS_LIMIT = 50.0
 MAX_SPEED = 6.0
-NB_STEPS_SIM = 50
+NB_STEPS_SIM = 20
 PLANET_MARGIN = 0.1
 
 # ── Interpreter (verbatim from 32-board_from_kaggle.ipynb cell 0) ─────────────
@@ -631,7 +631,7 @@ def take_action(df, player_id, nb_steps_sim=NB_STEPS_SIM):
         .query("id in @planet_top_5")  # Only consider attacking planets that are in the top 5 of at least one of our attack options
         .query("ships_sent <= ships_min")  # Ensure we have enough ships to attack
         .query("ships_sent >= ships + 1")  # Ensure we are looking at future steps CAN BE LATER REMOVED TO CONSIDER PAIR ATTACKS
-        .sort_values(["step", "ships_sent"], ascending=True)
+        .sort_values("ships_sent", ascending=True)
         .groupby(["id_src", "id"], as_index=False)
         .first()
         .assign(
