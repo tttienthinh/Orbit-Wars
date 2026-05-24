@@ -323,7 +323,6 @@ def _aim_angle(src_x, src_y, src_r, tgt, angular_velocity, ships):
             return math.atan2(fy - src_y, fx - src_x)
     return math.atan2(ty - src_y, tx - src_x)
 
-import numpy as np
 import polars as pl
 
 
