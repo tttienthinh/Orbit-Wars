@@ -451,7 +451,10 @@ def take_action(df, player_id, nb_steps_sim=NB_STEPS_SIM, return_df=False):
                 pl.col("angle_t1") + pl.col("angle_radius_t1"),
                 pl.col("angle_t2") + pl.col("angle_radius_t2"),
             ).mod(2 * math.pi).alias("angle_max"),
-            ((pl.col("angle_t1") + pl.col("angle_t2")) / 2.0).alias("angle"),
+            pl.arctan2(
+                (pl.col("angle_t1").sin() + pl.col("angle_t2").sin()),
+                (pl.col("angle_t1").cos() + pl.col("angle_t2").cos()),
+            ).alias("angle"),
         ])
         .sort("step")
     )

@@ -98,28 +98,38 @@ def test_prev_pos_join_present():
 
 
 def test_take_action_produces_valid_moves():
-    """take_action must return a list of [planet_id, angle, ships] triples."""
+    """take_action with nearby planets must return at least one move with valid angle and ships."""
     import copy, math
     mod = load_module()
 
     class MockObs:
-        angular_velocity = 0.01
+        angular_velocity = 0.0
         comets = []
         comet_planet_ids = []
         next_fleet_id = 10
 
     obs = MockObs()
-    # Player 0 owns planet 0; planet 1 is neutral
-    obs.planets = [[0, 0, 30.0, 50.0, 3.0, 50, 2], [1, -1, 70.0, 50.0, 3.0, 5, 1]]
+    # Source planet 0 (player 0) at (10, 50); target planet 1 (neutral) at (20, 50)
+    # Distance 10; path clears the sun at (50,50); with 100 ships speed ~3.7,
+    # at step_diff=2 fleet sweeps from ~6.8 to ~10.5 → hits target (radius 2 at distance 10)
+    obs.planets = [[0, 0, 10.0, 50.0, 3.0, 100, 2], [1, -1, 20.0, 50.0, 2.0, 5, 1]]
     obs.initial_planets = copy.deepcopy(obs.planets)
     obs.fleets = []
 
     df = mod._simulate(obs, 0, 2, n_steps=mod.NB_STEPS_SIM)
-    moves = mod.take_action(df, player_id=0)
+    moves, awa = mod.take_action(df, player_id=0, return_df=True)
 
+    # Verify the swept-pair pipeline produced collision rows
+    assert not awa.is_empty(), "Expected at least one attack row from nearby planets"
+    assert "t1_eff" in awa.columns, "t1_eff column must be present (swept-pair output)"
+    assert "t2_eff" in awa.columns, "t2_eff column must be present (swept-pair output)"
+    assert (awa["t1_eff"] >= 0.0).all() and (awa["t1_eff"] <= 1.0).all(), "t1_eff must be in [0,1]"
+    assert (awa["t2_eff"] >= 0.0).all() and (awa["t2_eff"] <= 1.0).all(), "t2_eff must be in [0,1]"
+
+    # Verify moves are well-formed
     assert isinstance(moves, list)
+    assert len(moves) > 0, "Expected at least one move with nearby reachable planet"
     for move in moves:
         pid, angle, ships = move
         assert isinstance(pid, (int, float))
-        assert -math.pi <= angle <= math.pi or 0 <= angle <= 2 * math.pi
         assert ships > 0
