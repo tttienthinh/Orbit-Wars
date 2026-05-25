@@ -316,6 +316,11 @@ def _simulate(obs, global_step, num_agents, n_steps=NB_STEPS_SIM):
 def take_action(df, player_id, nb_steps_sim=NB_STEPS_SIM, return_df=False):
     # ── Section 1: entry ───────────────────────────────────────────────────────
     df_lf = pl.from_pandas(df).sort("step").lazy()
+    prev_pos_lf = (
+        df_lf.select(["id", "step", "x", "y"])
+        .rename({"x": "x_prev", "y": "y_prev"})
+        .with_columns((pl.col("step") + 1).alias("step"))
+    )
 
     # ── Section 2: mine analysis + ships_sent expansion ────────────────────────
     mine_lf = (
@@ -378,6 +383,7 @@ def take_action(df, player_id, nb_steps_sim=NB_STEPS_SIM, return_df=False):
     pa_lf = (
         mine_lf
         .join(df_lf, how="cross")
+        .join(prev_pos_lf, on=["id", "step"], how="left")
         .filter((pl.col("step") > pl.col("step_src")) & (pl.col("id") != pl.col("id_src")))
         .with_columns([
             dist_tgt_src.alias("dist_tgt_src"),

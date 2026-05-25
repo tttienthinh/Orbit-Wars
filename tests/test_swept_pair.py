@@ -71,3 +71,27 @@ def test_interpreter_rotating_planet_sweeps_fleet():
     obs = make_obs([planet], [fleet], [planet], angular_velocity=math.pi / 2)
     result = mod.interpreter(obs, [[], []], 1, 2)
     assert len(result["fleets"]) == 0, "Fleet on planet sweep path must be caught"
+
+
+def test_prev_pos_join_present():
+    """After the prev-pos join, pa_lf intermediate should have x_prev/y_prev."""
+    import polars as pl, pandas as pd
+    mod = load_module()
+    # Minimal df: two steps of one planet
+    rows = [
+        {"step": 0, "id": 1, "x": 50.0, "y": 40.0, "radius": 2.0,
+         "ships": 10, "production": 1, "owner": 0, "nature": "moving"},
+        {"step": 1, "id": 1, "x": 51.0, "y": 41.0, "radius": 2.0,
+         "ships": 11, "production": 1, "owner": 0, "nature": "moving"},
+    ]
+    df = pd.DataFrame(rows)
+    df_lf = pl.from_pandas(df).sort("step").lazy()
+    prev_pos_lf = (
+        df_lf.select(["id", "step", "x", "y"])
+        .rename({"x": "x_prev", "y": "y_prev"})
+        .with_columns((pl.col("step") + 1).alias("step"))
+    )
+    joined = df_lf.join(prev_pos_lf, on=["id", "step"], how="left").collect()
+    row_step1 = joined.filter(pl.col("step") == 1)
+    assert row_step1["x_prev"][0] == 50.0
+    assert row_step1["y_prev"][0] == 40.0
