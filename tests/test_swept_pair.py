@@ -95,3 +95,31 @@ def test_prev_pos_join_present():
     row_step1 = joined.filter(pl.col("step") == 1)
     assert row_step1["x_prev"][0] == 50.0
     assert row_step1["y_prev"][0] == 40.0
+
+
+def test_take_action_produces_valid_moves():
+    """take_action must return a list of [planet_id, angle, ships] triples."""
+    import copy, math
+    mod = load_module()
+
+    class MockObs:
+        angular_velocity = 0.01
+        comets = []
+        comet_planet_ids = []
+        next_fleet_id = 10
+
+    obs = MockObs()
+    # Player 0 owns planet 0; planet 1 is neutral
+    obs.planets = [[0, 0, 30.0, 50.0, 3.0, 50, 2], [1, -1, 70.0, 50.0, 3.0, 5, 1]]
+    obs.initial_planets = copy.deepcopy(obs.planets)
+    obs.fleets = []
+
+    df = mod._simulate(obs, 0, 2, n_steps=mod.NB_STEPS_SIM)
+    moves = mod.take_action(df, player_id=0)
+
+    assert isinstance(moves, list)
+    for move in moves:
+        pid, angle, ships = move
+        assert isinstance(pid, (int, float))
+        assert -math.pi <= angle <= math.pi or 0 <= angle <= 2 * math.pi
+        assert ships > 0

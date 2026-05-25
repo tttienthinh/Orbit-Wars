@@ -355,22 +355,20 @@ def take_action(df, player_id, nb_steps_sim=NB_STEPS_SIM, return_df=False):
         .explode("ships_sent")
     )
 
-    # ── Section 3: cross-join + collision + sun (all lazy, all inlined) ────────
+    # ── Section 3: cross-join + swept-pair collision + sun (all lazy) ────────
     dx = pl.col("x") - pl.col("x_src")
     dy = pl.col("y") - pl.col("y_src")
     l2 = dx.pow(2) + dy.pow(2)
     dist_tgt_src = l2.sqrt()
-    step_diff   = pl.col("step") - pl.col("step_src")
+    safe_dist = pl.when(dist_tgt_src < 1e-9).then(pl.lit(1.0)).otherwise(dist_tgt_src)
+    step_diff = pl.col("step") - pl.col("step_src")
     fleet_speed = 1.0 + (MAX_SPEED - 1.0) * (
         pl.col("ships_sent").cast(pl.Float64).log(base=math.e) / math.log(1000.0)
     ).pow(1.5)
     dist_min = step_diff * fleet_speed + PLANET_MARGIN + pl.col("radius_src")
-    dist_max = (step_diff + 1) * fleet_speed + PLANET_MARGIN + pl.col("radius_src")
-    collision = (
-        ((dist_tgt_src - pl.col("radius") < dist_min) & (dist_min < dist_tgt_src + pl.col("radius"))) |
-        ((dist_tgt_src - pl.col("radius") < dist_max) & (dist_max < dist_tgt_src + pl.col("radius")))
-    )
-    dot   = (CENTER - pl.col("x_src")) * dx + (CENTER - pl.col("y_src")) * dy
+    dist_prev = dist_min - fleet_speed   # fleet distance from source at t=0 (start of tick)
+
+    dot = (CENTER - pl.col("x_src")) * dx + (CENTER - pl.col("y_src")) * dy
     t_sun = (dot / pl.when(l2 == 0).then(pl.lit(1.0)).otherwise(l2)).clip(0.0, 1.0)
     proj_dist_sun = (
         (CENTER - pl.col("x_src") - t_sun * dx).pow(2) +
@@ -379,6 +377,27 @@ def take_action(df, player_id, nb_steps_sim=NB_STEPS_SIM, return_df=False):
     crossing_sun = pl.when(l2 == 0).then(
         ((CENTER - pl.col("x_src")).pow(2) + (CENTER - pl.col("y_src")).pow(2)).sqrt()
     ).otherwise(proj_dist_sun) < (SUN_RADIUS + PLANET_MARGIN)
+
+    unit_x = dx / safe_dist
+    unit_y = dy / safe_dist
+    fleet_x0  = pl.col("x_src") + unit_x * dist_prev
+    fleet_y0  = pl.col("y_src") + unit_y * dist_prev
+    planet_vx = pl.col("x") - pl.col("x_prev")
+    planet_vy = pl.col("y") - pl.col("y_prev")
+    dvx_sp = unit_x * fleet_speed - planet_vx
+    dvy_sp = unit_y * fleet_speed - planet_vy
+    d0x_sp = fleet_x0 - pl.col("x_prev")
+    d0y_sp = fleet_y0 - pl.col("y_prev")
+    a_sp   = dvx_sp.pow(2) + dvy_sp.pow(2)
+    b_sp   = 2.0 * (d0x_sp * dvx_sp + d0y_sp * dvy_sp)
+    c_sp   = d0x_sp.pow(2) + d0y_sp.pow(2) - pl.col("radius").pow(2)
+    disc_sp = b_sp.pow(2) - 4.0 * a_sp * c_sp
+    sq_sp  = disc_sp.clip(lower_bound=0.0).sqrt()
+    t1_expr = pl.when(a_sp < 1e-12).then(pl.lit(0.0)).otherwise((-b_sp - sq_sp) / (2.0 * a_sp))
+    t2_expr = pl.when(a_sp < 1e-12).then(pl.lit(1.0)).otherwise((-b_sp + sq_sp) / (2.0 * a_sp))
+    collision = pl.when(a_sp < 1e-12).then(c_sp <= 0.0).otherwise(
+        (disc_sp >= 0.0) & (t2_expr >= 0.0) & (t1_expr <= 1.0)
+    )
 
     pa_lf = (
         mine_lf
@@ -389,24 +408,50 @@ def take_action(df, player_id, nb_steps_sim=NB_STEPS_SIM, return_df=False):
             dist_tgt_src.alias("dist_tgt_src"),
             step_diff.alias("step_diff"),
             fleet_speed.alias("fleet_speed"),
-            dist_min.alias("dist_fleet_src_min"),
-            dist_max.alias("dist_fleet_src_max"),
+            dist_min.alias("dist_min"),
+            dist_prev.alias("dist_prev"),
+            t1_expr.alias("t1"),
+            t2_expr.alias("t2"),
             collision.alias("collision"),
         ])
         .filter(pl.col("collision"))
         .filter(~crossing_sun)
-        .with_columns(pl.arctan2(dy, dx).alias("angle"))
-        .with_columns(
-            pl.max_horizontal(
-                ((pl.col("dist_tgt_src").pow(2) + pl.col("dist_fleet_src_min").pow(2) - pl.col("radius").pow(2))
-                 / (2 * pl.col("dist_tgt_src") * pl.col("dist_fleet_src_min"))).clip(-1.0, 1.0).arccos(),
-                ((pl.col("dist_tgt_src").pow(2) + pl.col("dist_fleet_src_max").pow(2) - pl.col("radius").pow(2))
-                 / (2 * pl.col("dist_tgt_src") * pl.col("dist_fleet_src_max"))).clip(-1.0, 1.0).arccos(),
-            ).alias("radius_angle")
-        )
         .with_columns([
-            ((pl.col("angle") - pl.col("radius_angle")) % (2 * math.pi)).alias("angle_min"),
-            ((pl.col("angle") + pl.col("radius_angle")) % (2 * math.pi)).alias("angle_max"),
+            pl.col("t1").clip(0.0, 1.0).alias("t1_eff"),
+            pl.col("t2").clip(0.0, 1.0).alias("t2_eff"),
+        ])
+        .with_columns([
+            (pl.col("x_prev") + pl.col("t1_eff") * (pl.col("x") - pl.col("x_prev"))).alias("p_t1_x"),
+            (pl.col("y_prev") + pl.col("t1_eff") * (pl.col("y") - pl.col("y_prev"))).alias("p_t1_y"),
+            (pl.col("x_prev") + pl.col("t2_eff") * (pl.col("x") - pl.col("x_prev"))).alias("p_t2_x"),
+            (pl.col("y_prev") + pl.col("t2_eff") * (pl.col("y") - pl.col("y_prev"))).alias("p_t2_y"),
+        ])
+        .with_columns([
+            pl.arctan2(pl.col("p_t1_y") - pl.col("y_src"), pl.col("p_t1_x") - pl.col("x_src")).alias("angle_t1"),
+            pl.arctan2(pl.col("p_t2_y") - pl.col("y_src"), pl.col("p_t2_x") - pl.col("x_src")).alias("angle_t2"),
+            ((pl.col("p_t1_x") - pl.col("x_src")).pow(2) + (pl.col("p_t1_y") - pl.col("y_src")).pow(2)).sqrt().alias("d_s_t1"),
+            ((pl.col("p_t2_x") - pl.col("x_src")).pow(2) + (pl.col("p_t2_y") - pl.col("y_src")).pow(2)).sqrt().alias("d_s_t2"),
+        ])
+        .with_columns([
+            (pl.col("dist_prev") + pl.col("t1_eff") * pl.col("fleet_speed")).alias("d_f_t1"),
+            (pl.col("dist_prev") + pl.col("t2_eff") * pl.col("fleet_speed")).alias("d_f_t2"),
+        ])
+        .with_columns([
+            ((pl.col("d_s_t1").pow(2) + pl.col("d_f_t1").pow(2) - pl.col("radius").pow(2))
+             / (2.0 * pl.col("d_s_t1") * pl.col("d_f_t1"))).clip(-1.0, 1.0).arccos().alias("angle_radius_t1"),
+            ((pl.col("d_s_t2").pow(2) + pl.col("d_f_t2").pow(2) - pl.col("radius").pow(2))
+             / (2.0 * pl.col("d_s_t2") * pl.col("d_f_t2"))).clip(-1.0, 1.0).arccos().alias("angle_radius_t2"),
+        ])
+        .with_columns([
+            pl.min_horizontal(
+                pl.col("angle_t1") - pl.col("angle_radius_t1"),
+                pl.col("angle_t2") - pl.col("angle_radius_t2"),
+            ).mod(2 * math.pi).alias("angle_min"),
+            pl.max_horizontal(
+                pl.col("angle_t1") + pl.col("angle_radius_t1"),
+                pl.col("angle_t2") + pl.col("angle_radius_t2"),
+            ).mod(2 * math.pi).alias("angle_max"),
+            ((pl.col("angle_t1") + pl.col("angle_t2")) / 2.0).alias("angle"),
         ])
         .sort("step")
     )
