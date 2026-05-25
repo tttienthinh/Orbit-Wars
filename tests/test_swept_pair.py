@@ -33,3 +33,40 @@ def test_swept_pair_tunneling_detected():
     # Confirm old static check would miss
     assert mod.point_to_segment_distance(P0, A, B) > r
     assert mod.point_to_segment_distance(P1, A, B) > r
+
+
+def make_obs(planets, fleets, initial_planets, angular_velocity=0.0):
+    class Obs:
+        comets = []
+        comet_planet_ids = []
+        next_fleet_id = 100
+    obs = Obs()
+    obs.planets = [list(p) for p in planets]
+    obs.fleets = [list(f) for f in fleets]
+    obs.initial_planets = [list(p) for p in initial_planets]
+    obs.angular_velocity = angular_velocity
+    return obs
+
+def test_interpreter_fleet_hits_static_planet():
+    """Basic sanity: fleet aimed at static planet is caught."""
+    mod = load_module()
+    # Planet id=0, owner=1, at (56,50), radius=2 — outside orbit radius (dist=6 < 48 ✓)
+    planet = [0, 1, 56.0, 50.0, 2.0, 10, 1]
+    # Fleet aimed east at speed ~6 (100 ships), starting just west of planet
+    fleet = [0, 0, 49.0, 50.0, 0.0, -1, 100]
+    obs = make_obs([planet], [fleet], [planet], angular_velocity=0.0)
+    result = mod.interpreter(obs, [[], []], 1, 2)
+    assert len(result["fleets"]) == 0, "Fleet must be removed after hitting planet"
+
+def test_interpreter_rotating_planet_sweeps_fleet():
+    """Rotating planet sweeps through a stationary fleet — must be caught."""
+    mod = load_module()
+    # Planet orbits at radius 10 from sun (50,50), starts at (50,40)
+    # angular_velocity = pi/2 → moves to (60,50) after 1 tick
+    # Fleet sits at (55, 45) — on the chord from (50,40) to (60,50)
+    planet = [0, 1, 50.0, 40.0, 2.0, 10, 1]
+    # Fleet with 1 ship → speed=1, barely moves; place it on the planet's chord
+    fleet = [0, 0, 55.0, 45.0, 0.0, -1, 1]
+    obs = make_obs([planet], [fleet], [planet], angular_velocity=math.pi / 2)
+    result = mod.interpreter(obs, [[], []], 1, 2)
+    assert len(result["fleets"]) == 0, "Fleet on planet sweep path must be caught"
