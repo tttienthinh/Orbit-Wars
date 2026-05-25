@@ -37,10 +37,11 @@ def test_swept_pair_tunneling_detected():
 
 def make_obs(planets, fleets, initial_planets, angular_velocity=0.0):
     class Obs:
-        comets = []
-        comet_planet_ids = []
-        next_fleet_id = 100
+        pass
     obs = Obs()
+    obs.comets = []
+    obs.comet_planet_ids = []
+    obs.next_fleet_id = 100
     obs.planets = [list(p) for p in planets]
     obs.fleets = [list(f) for f in fleets]
     obs.initial_planets = [list(p) for p in initial_planets]
@@ -53,7 +54,7 @@ def test_interpreter_fleet_hits_static_planet():
     # Planet id=0, owner=1, at (56,50), radius=2 — outside orbit radius (dist=6 < 48 ✓)
     planet = [0, 1, 56.0, 50.0, 2.0, 10, 1]
     # Fleet aimed east at speed ~6 (100 ships), starting just west of planet
-    fleet = [0, 0, 49.0, 50.0, 0.0, -1, 100]
+    fleet = [0, 0, 53.5, 50.0, 0.0, -1, 100]
     obs = make_obs([planet], [fleet], [planet], angular_velocity=0.0)
     result = mod.interpreter(obs, [[], []], 1, 2)
     assert len(result["fleets"]) == 0, "Fleet must be removed after hitting planet"
