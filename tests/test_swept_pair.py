@@ -133,3 +133,106 @@ def test_take_action_produces_valid_moves():
         pid, angle, ships = move
         assert isinstance(pid, (int, float))
         assert ships > 0
+
+
+# ── Tests for 70-Polars_filter.py ─────────────────────────────────────────────
+
+def load_module70():
+    path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "70-Polars_filter.py"))
+    spec = importlib.util.spec_from_file_location("agent70", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_planet_disp_lf_static():
+    """Static planet (same position every step) must have planet_disp == 0."""
+    import polars as pl
+    df_lf = pl.DataFrame({
+        "id": [1, 1],
+        "step": [0, 1],
+        "x": [20.0, 20.0],
+        "y": [50.0, 50.0],
+    }).lazy()
+    prev_pos_lf = (
+        df_lf.select(["id", "step", "x", "y"])
+        .rename({"x": "x_prev", "y": "y_prev"})
+        .with_columns((pl.col("step") + 1).alias("step"))
+    )
+    planet_disp = (
+        df_lf.select(["id", "step", "x", "y"])
+        .join(prev_pos_lf, on=["id", "step"], how="left")
+        .with_columns(
+            ((pl.col("x") - pl.col("x_prev").fill_null(pl.col("x"))).pow(2) +
+             (pl.col("y") - pl.col("y_prev").fill_null(pl.col("y"))).pow(2)
+            ).sqrt().alias("planet_disp")
+        )
+        .select("planet_disp")
+        .collect()["planet_disp"]
+        .to_list()
+    )
+    assert planet_disp == [0.0, 0.0]
+
+
+def test_planet_disp_lf_moving():
+    """Planet that moves 3 units right must have planet_disp == 3.0 at step 1."""
+    import polars as pl
+    df_lf = pl.DataFrame({
+        "id": [1, 1],
+        "step": [0, 1],
+        "x": [20.0, 23.0],
+        "y": [50.0, 50.0],
+    }).lazy()
+    prev_pos_lf = (
+        df_lf.select(["id", "step", "x", "y"])
+        .rename({"x": "x_prev", "y": "y_prev"})
+        .with_columns((pl.col("step") + 1).alias("step"))
+    )
+    planet_disp_lf = (
+        df_lf.select(["id", "step", "x", "y"])
+        .join(prev_pos_lf, on=["id", "step"], how="left")
+        .with_columns(
+            ((pl.col("x") - pl.col("x_prev").fill_null(pl.col("x"))).pow(2) +
+             (pl.col("y") - pl.col("y_prev").fill_null(pl.col("y"))).pow(2)
+            ).sqrt().alias("planet_disp")
+        )
+        .select(["id", "step", "planet_disp"])
+        .collect()
+    )
+    disp_step1 = planet_disp_lf.filter(pl.col("step") == 1)["planet_disp"][0]
+    assert abs(disp_step1 - 3.0) < 1e-6
+
+
+def test_agent70_same_moves_as_agent68():
+    """Agent 70 (deferred ships_sent) produces same moves as Agent 68 on identical state."""
+    import copy, importlib.util, os
+    mod70 = load_module70()
+
+    class MockObs:
+        angular_velocity = 0.0
+        comets = []
+        comet_planet_ids = []
+        next_fleet_id = 10
+
+    obs68 = MockObs()
+    obs68.planets = [[0, 0, 10.0, 50.0, 3.0, 100, 2], [1, -1, 20.0, 50.0, 2.0, 5, 1]]
+    obs68.initial_planets = copy.deepcopy(obs68.planets)
+    obs68.fleets = []
+
+    obs70 = MockObs()
+    obs70.planets = [[0, 0, 10.0, 50.0, 3.0, 100, 2], [1, -1, 20.0, 50.0, 2.0, 5, 1]]
+    obs70.initial_planets = copy.deepcopy(obs70.planets)
+    obs70.fleets = []
+
+    path68 = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "68-Polars_optimised.py"))
+    spec68 = importlib.util.spec_from_file_location("agent68", path68)
+    m68 = importlib.util.module_from_spec(spec68)
+    spec68.loader.exec_module(m68)
+
+    df68 = m68._simulate(obs68, 0, 2, n_steps=m68.NB_STEPS_SIM)
+    df70 = mod70._simulate(obs70, 0, 2, n_steps=mod70.NB_STEPS_SIM)
+
+    moves68 = m68.take_action(df68, player_id=0)
+    moves70 = mod70.take_action(df70, player_id=0)
+
+    assert moves68 == moves70, f"Agent 68 moves {moves68} != Agent 70 moves {moves70}"
