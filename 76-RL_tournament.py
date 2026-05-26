@@ -343,3 +343,81 @@ def build_schedule(agent_ids: list, root_seed: int) -> list:
 
     assert seed_idx == 24
     return schedule
+
+
+def compute_summary(matches: list, agent_ids: list) -> dict:
+    summary_2p = {pid: {"wins": 0, "losses": 0, "draws": 0} for pid in agent_ids}
+    summary_4p = {pid: {"wins": 0, "top2": 0, "losses": 0} for pid in agent_ids}
+
+    for m in matches:
+        if m["format"] == "2p":
+            a, b = m["players"]
+            if m["winner"] is None:  # draw
+                summary_2p[a]["draws"] += 1
+                summary_2p[b]["draws"] += 1
+            else:
+                winner, loser = (a, b) if m["winner"] == a else (b, a)
+                summary_2p[winner]["wins"] += 1
+                summary_2p[loser]["losses"] += 1
+
+        elif m["format"] == "4p":
+            players = m["players"]
+            # rank by final_score descending
+            scores = {
+                pid: m["stats"]["per_player"][pid]["final_score"]
+                for pid in players
+            }
+            ranked = sorted(players, key=lambda p: scores[p], reverse=True)
+            for rank, pid in enumerate(ranked):
+                if rank == 0:
+                    summary_4p[pid]["wins"] += 1
+                    summary_4p[pid]["top2"] += 1
+                elif rank == 1:
+                    summary_4p[pid]["top2"] += 1
+                else:
+                    summary_4p[pid]["losses"] += 1
+
+    return {"2p": summary_2p, "4p": summary_4p}
+
+
+def print_leaderboard(folder_name: str, root_seed: int, summary: dict, configs: dict):
+    W = 42
+    bar = "═" * W
+    print(f"\n{bar}")
+    print(f"  LEADERBOARD — {folder_name}  (seed={root_seed})")
+    print(bar)
+
+    # 2-player ranking by win%
+    print("  2-PLAYER")
+    print(f"  {'Rank':<5} {'Agent':<18} {'W':>3} {'L':>3} {'D':>3} {'Win%':>5}")
+    s2 = summary["2p"]
+    ranked_2p = sorted(
+        s2.keys(),
+        key=lambda p: (s2[p]["wins"] / max(s2[p]["wins"] + s2[p]["losses"] + s2[p]["draws"], 1)),
+        reverse=True,
+    )
+    for rank, pid in enumerate(ranked_2p, 1):
+        name = configs[pid].get("__meta__", {}).get("_name", pid)
+        label = f"{pid}-{name}"[:16]
+        w, l, d = s2[pid]["wins"], s2[pid]["losses"], s2[pid]["draws"]
+        total = w + l + d
+        pct = f"{round(100 * w / total)}%" if total > 0 else "—"
+        print(f"  {rank:<5} {label:<18} {w:>3} {l:>3} {d:>3} {pct:>5}")
+
+    # 4-player ranking by wins then top2
+    print()
+    print("  4-PLAYER")
+    print(f"  {'Rank':<5} {'Agent':<18} {'Wins':>5} {'Top2':>5} {'Losses':>7}")
+    s4 = summary["4p"]
+    ranked_4p = sorted(
+        s4.keys(),
+        key=lambda p: (s4[p]["wins"], s4[p]["top2"]),
+        reverse=True,
+    )
+    for rank, pid in enumerate(ranked_4p, 1):
+        name = configs[pid].get("__meta__", {}).get("_name", pid)
+        label = f"{pid}-{name}"[:16]
+        w, t2, l = s4[pid]["wins"], s4[pid]["top2"], s4[pid]["losses"]
+        print(f"  {rank:<5} {label:<18} {w:>5} {t2:>5} {l:>7}")
+
+    print(bar)
