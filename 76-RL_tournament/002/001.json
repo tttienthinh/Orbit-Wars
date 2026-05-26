@@ -1,0 +1,18 @@
+{
+  "_name": "Elite-g002",
+  "_description": "Elite: hall-of-fame (fitness=27)",
+  "PROD_MULT": 12.0,
+  "TIME_PROD_MULT": 0.5,
+  "ENEMY_MULT": 10.0,
+  "COMPOUND_MULT": 4.0,
+  "MINE_NEAR_TGT_MULT": 4.0,
+  "ENEMY_NEAR_TGT_MULT": 2.0,
+  "PROD_SRC_MULT": 4.0,
+  "ORBIT_BONUS": 20.0,
+  "PROXIMITY_MULT": 6.0,
+  "DIST_MULT": 0.3,
+  "SHIPS_MULT": 0.2,
+  "ETA_MULT": 0.8,
+  "OVEREXTEND_MULT": 0.3,
+  "PROXIMITY_DIST": 20.0
+}
