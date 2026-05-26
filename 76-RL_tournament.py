@@ -382,7 +382,7 @@ def compute_summary(matches: list, agent_ids: list) -> dict:
 
 def print_leaderboard(folder_name: str, root_seed: int, summary: dict, configs: dict):
     W = 42
-    bar = "═" * W
+    bar = "=" * W
     print(f"\n{bar}")
     print(f"  LEADERBOARD — {folder_name}  (seed={root_seed})")
     print(bar)
@@ -470,7 +470,7 @@ def run_tournament(folder: Path):
     out_path = folder / "results.json"
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(results, f, indent=2)
-    print(f"\n  Saved → {out_path}")
+    print(f"\n  Saved -> {out_path}")
 
     print_leaderboard(folder.name, root_seed, summary, configs)
 
