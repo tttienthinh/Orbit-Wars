@@ -138,7 +138,7 @@ def _update_step_stats(accum, states, prev_planets, prev_fleet_ids, player_ids, 
                 a["neutral_captures"] += 1
             elif curr_owner == i and prev_owner != i and prev_owner != -1:
                 a["enemy_flips"] += 1
-            elif prev_owner == i and curr_owner != i and curr_owner != -1:
+            elif prev_owner == i and curr_owner != i:
                 a["planets_lost"] += 1
 
         # ships sent: count ships in new fleet IDs
