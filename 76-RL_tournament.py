@@ -313,7 +313,7 @@ def build_schedule(agent_ids: list, root_seed: int) -> list:
 
     # 2-player: all C(4,2) pairs × 3 games
     for a, b in combinations(agent_ids, 2):
-        for g in range(3):
+        for _ in range(3):
             match_id = f"2p_{a}v{b}_g{seed_idx}"
             schedule.append({
                 "match_id": match_id,
