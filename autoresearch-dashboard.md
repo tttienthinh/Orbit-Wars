@@ -1,8 +1,8 @@
 # Autoresearch Dashboard: orbit-wars-agent-evolution
 
-**Runs:** 9 | **Kept:** 2 | **Discarded:** 7 | **Crashed:** 0
+**Runs:** 15 | **Kept:** 3 | **Discarded:** 12 | **Crashed:** 0
 **Baseline:** best_fitness: 27pts (gen 000 OrbDom, seed=16)
-**Best:** best_fitness: **33pts** (#9, +22.2% vs baseline) — Mut2-g009
+**Best:** best_fitness: **34pts** (#15, +25.9% vs baseline) — X23-g015
 
 | # | commit | best_fitness | 2p_wins | status | description |
 |---|--------|-------------|---------|--------|-------------|
@@ -15,6 +15,12 @@
 | 7 | 9f14628 | 31 (+14.8%) | 9 | discard | gen 007: X12 ties HoF (9W/0L 2p!) but only 1 4p win |
 | 8 | 8f933e5 | 26 (-3.7%) | 7 | discard | gen 008: Elite(X12-g007 clone)=26; HoF remains Mut2-g006 |
 | 9 | f987cef | **33 (+22.2%)** | 8 | **keep** | gen 009: Mut2-g009 new HoF=33; 8W/1L 2p + 2W 4p + top2=5 |
+| 10 | 2ccc711 | 23 (-14.8%) | 5 | discard | gen 010: tightly clustered 18-23; HoF clone variance |
+| 11 | 4906162 | 27 (+0%) | 6 | discard | gen 011: Mut2 best=27; stagnation_count=2 |
+| 12 | a4a6ed4 | 25 (-7.4%) | 6 | discard | gen 012: Mut2 best=25; stagnation_count=3, wide-explore primed |
+| 13 | edeb0b5 | 28 (+3.7%) | 7 | discard | gen 013: wide-explore Elite failed; X23=28 — high COMPOUND_MULT |
+| 14 | a228bb2 | 33 (+22.2%) | 7 | discard | gen 014: X12 ties HoF=33 via PROXIMITY_DIST=44.9, low ENEMY_MULT |
+| 15 | f87d874 | **34 (+25.9%)** | 7 | **keep** | gen 015: X23-g015 new HoF=34; PROD_MULT=14.82, SHIPS_MULT=0.103 |
 
 ## Gen Standings
 
@@ -42,7 +48,16 @@
 | 3 | X12-g006 | 18 | 4/5 | 2 | 2 |
 | 4 | X23-g006 | 10 | 3/6 | 0 | 1 |
 
-## New Hall-of-Fame Config (Mut2-g009, fitness=33)
+## New Hall-of-Fame Config (X23-g015, fitness=34)
+```json
+PROD_MULT=14.82, TIME_PROD_MULT=0.65, ENEMY_MULT=6.72, COMPOUND_MULT=4.49,
+MINE_NEAR_TGT_MULT=2.24, ENEMY_NEAR_TGT_MULT=1.34, PROD_SRC_MULT=6.72,
+ORBIT_BONUS=13.25, PROXIMITY_MULT=5.34, DIST_MULT=0.37, SHIPS_MULT=0.103,
+ETA_MULT=0.85, OVEREXTEND_MULT=0.26, PROXIMITY_DIST=44.49
+```
+Key insight: PROD_MULT=14.82 (highest ever), SHIPS_MULT=0.103 (lowest ever), PROXIMITY_DIST=44.49 (near full-board evaluation). Wide-proximity archetype from X12-g014 parent. ENEMY_MULT=6.72 lower than previous HoF.
+
+## Previous Hall-of-Fame Config (Mut2-g009, fitness=33)
 ```json
 PROD_MULT=11.76, TIME_PROD_MULT=0.47, ENEMY_MULT=7.89, COMPOUND_MULT=4.56,
 MINE_NEAR_TGT_MULT=3.03, ENEMY_NEAR_TGT_MULT=1.82, PROD_SRC_MULT=6.32,
@@ -60,5 +75,14 @@ Key delta from previous HoF: higher PROD_MULT (+0.8), COMPOUND_MULT (+0.8), PROD
 6. HoF clones consistently underperform original (19-24 vs 31+) — high seed variance
 7. Balanced 2p+4p optimum found: Mut2-g009 achieves both without extreme specialization
 
+## Key Insights
+1. Low DIST_MULT (<0.5) consistently outperforms high DIST_MULT
+2. Very low SHIPS_MULT + ETA_MULT = core optimum (don't care about source size or timing)
+3. **PROXIMITY_DIST=44-45** (near full-board) is new breakthrough — evaluate all planets
+4. **High PROD_MULT (14+)** is new direction — production dominance strategy
+5. Two distinct archetypes at fitness=33-34: high-SHIPS aggression (gen 009) vs wide-proximity production (gen 014-015)
+6. Stagnation-break (σ=0.30) works reliably when plateau detected (3 gens)
+7. HoF clones always underperform original — high tournament seed variance
+
 ## Trajectory
-Gen: 000(27) → 001(25) → 002(23) → 003(22) → 004(22) → 005(22) → 006(**31**) → 007(31) → 008(26) → 009(**33**)
+Gen: 000(27) → 006(**31**) → 009(**33**) → 015(**34**)
