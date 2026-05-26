@@ -12,6 +12,8 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+from kaggle_environments import make as _kenv_make
+
 TOURNAMENT_DIR = Path(__file__).parent / "76-RL_tournament"
 
 SCORING_CONSTANTS = [
@@ -182,3 +184,113 @@ def _finalize_stats(accum, states, player_ids) -> dict:
             "final_score": final_score,
         }
     return result
+
+
+def _extract_obs(state):
+    """Return the observation object from a single agent's state entry."""
+    if state is None:
+        return None
+    return state.observation
+
+
+def run_game(match_id: str, agents: list, player_ids: list, seed: int) -> dict:
+    """
+    Run one game and return a match result dict.
+    agents: list of callables (same length as player_ids)
+    player_ids: e.g. ["001", "002"] or ["001","002","003","004"]
+    """
+    N = len(agents)
+    # reset per-player state in the shared module before each game
+    _mod._states.clear()
+
+    try:
+        env = _kenv_make("orbit_wars", configuration={"seed": seed}, debug=False)
+        env.reset(num_agents=N)
+        states = env.step([[] for _ in range(N)])
+
+        accum = _init_accum(player_ids)
+        step = 0
+
+        while True:
+            statuses = [
+                (s.status if s is not None else "DONE") for s in states
+            ]
+            if not any(st == "ACTIVE" for st in statuses):
+                break
+
+            prev_planets = _planets_snapshot(states)
+            prev_fleet_ids = _fleet_ids_snapshot(states)
+
+            actions = []
+            for i, agent in enumerate(agents):
+                obs = _extract_obs(states[i])
+                try:
+                    action = agent(obs) if obs is not None else []
+                except Exception:
+                    action = []
+                actions.append(action)
+
+            states = env.step(actions)
+            step += 1
+            _update_step_stats(accum, states, prev_planets, prev_fleet_ids, player_ids, step)
+
+        # determine winner by final score
+        per_player = _finalize_stats(accum, states, player_ids)
+        scores = {pid: per_player[pid]["final_score"] for pid in player_ids}
+        max_score = max(scores.values())
+        winners = [pid for pid, sc in scores.items() if sc == max_score]
+        winner = winners[0] if len(winners) == 1 else None  # None = draw
+
+        return {
+            "match_id": match_id,
+            "format": f"{N}p",
+            "players": player_ids,
+            "seed": seed,
+            "status": "ok",
+            "winner": winner,
+            "stats": {
+                "win_turn": step,
+                "per_player": per_player,
+            },
+        }
+
+    except Exception as exc:
+        return {
+            "match_id": match_id,
+            "format": f"{N}p",
+            "players": player_ids,
+            "seed": seed,
+            "status": "crashed",
+            "winner": None,
+            "stats": {
+                "win_turn": 0,
+                "per_player": {
+                    pid: {
+                        "planets_owned_avg": 0.0,
+                        "peak_planets": 0,
+                        "ships_sent_total": 0,
+                        "neutral_captures": 0,
+                        "enemy_flips": 0,
+                        "planets_lost": 0,
+                        "first_action_step": None,
+                        "final_score": 0,
+                    }
+                    for pid in player_ids
+                },
+            },
+        }
+
+
+def _print_game_result(result: dict):
+    pid = result["players"]
+    label = " v ".join(pid)
+    mid = result["match_id"]
+    seed = result["seed"]
+    winner = result["winner"] or "draw"
+    turn = result["stats"]["win_turn"]
+    scores_str = "  ".join(
+        f"{p}={result['stats']['per_player'][p]['final_score']}"
+        for p in pid
+    )
+    status = "" if result["status"] == "ok" else f"  [CRASHED]"
+    print(f"[{label} {mid.split('_')[-1]}] seed={seed}  {winner} wins  turn={turn}  scores: {scores_str}{status}")
