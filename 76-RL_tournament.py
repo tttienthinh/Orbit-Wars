@@ -421,3 +421,81 @@ def print_leaderboard(folder_name: str, root_seed: int, summary: dict, configs: 
         print(f"  {rank:<5} {label:<18} {w:>5} {t2:>5} {l:>7}")
 
     print(bar)
+
+
+def run_tournament(folder: Path):
+    print(f"\n{'='*50}")
+    print(f"  Tournament: {folder.name}")
+    print(f"{'='*50}")
+
+    configs = load_configs(folder)
+    agent_ids = list(configs.keys())  # already sorted by glob
+
+    root_seed = random.randint(0, 100)
+    print(f"  root_seed = {root_seed}")
+
+    # build agents: inject __meta__ into the cfg passed to make_agent
+    agents_by_id = {}
+    for pid, cfg in configs.items():
+        clean_cfg = {k: v for k, v in cfg.items() if k != "__meta__"}
+        agents_by_id[pid] = make_agent(clean_cfg)
+
+    schedule = build_schedule(agent_ids, root_seed)
+
+    matches = []
+    for entry in schedule:
+        match_agents = [agents_by_id[pid] for pid in entry["player_ids"]]
+        result = run_game(entry["match_id"], match_agents, entry["player_ids"], entry["seed"])
+        _print_game_result(result)
+        matches.append(result)
+
+    summary = compute_summary(matches, agent_ids)
+
+    # build results.json
+    agents_section = {}
+    for pid, cfg in configs.items():
+        meta = cfg.get("__meta__", {})
+        entry = dict(meta)
+        entry.update({k: v for k, v in cfg.items() if k != "__meta__"})
+        agents_section[pid] = entry
+
+    results = {
+        "root_seed": root_seed,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "agents": agents_section,
+        "matches": matches,
+        "summary": summary,
+    }
+
+    out_path = folder / "results.json"
+    with open(out_path, "w", encoding="utf-8") as f:
+        json.dump(results, f, indent=2)
+    print(f"\n  Saved → {out_path}")
+
+    print_leaderboard(folder.name, root_seed, summary, configs)
+
+
+def main():
+    if not TOURNAMENT_DIR.exists():
+        raise FileNotFoundError(f"Tournament directory not found: {TOURNAMENT_DIR}")
+
+    folders = sorted(
+        d for d in TOURNAMENT_DIR.iterdir()
+        if d.is_dir() and not (d / "results.json").exists()
+    )
+
+    if not folders:
+        print("No unresolved tournament folders found.")
+        return
+
+    print(f"Found {len(folders)} unresolved folder(s): {[f.name for f in folders]}")
+
+    for folder in folders:
+        try:
+            run_tournament(folder)
+        except ValueError as e:
+            print(f"  SKIP {folder.name}: {e}")
+
+
+if __name__ == "__main__":
+    main()
