@@ -64,3 +64,121 @@ def load_configs(folder: Path) -> dict:
         # preserve metadata for results.json
         configs[agent_id]["__meta__"] = {k: v for k, v in raw.items() if k.startswith("_")}
     return configs
+
+
+def _init_accum(player_ids: list) -> dict:
+    """Create a blank accumulator dict for each player."""
+    return {
+        pid: {
+            "planets_owned_sum": 0,
+            "planets_owned_steps": 0,
+            "peak_planets": 0,
+            "ships_sent_total": 0,
+            "neutral_captures": 0,
+            "enemy_flips": 0,
+            "planets_lost": 0,
+            "first_action_step": None,
+        }
+        for pid in player_ids
+    }
+
+
+def _planets_snapshot(states: list) -> dict:
+    """Return {planet_id: owner} from the first non-None agent state."""
+    for s in states:
+        if s is None:
+            continue
+        obs = s.observation
+        planets = (
+            obs.planets if hasattr(obs, "planets") else obs.get("planets", [])
+        )
+        return {p[0]: p[1] for p in planets}
+    return {}
+
+
+def _fleet_ids_snapshot(states: list) -> set:
+    """Return the set of all current fleet IDs from the first valid state."""
+    for s in states:
+        if s is None:
+            continue
+        obs = s.observation
+        fleets = (
+            obs.fleets if hasattr(obs, "fleets") else obs.get("fleets", [])
+        )
+        return {f[0] for f in fleets}
+    return set()
+
+
+def _update_step_stats(accum, states, prev_planets, prev_fleet_ids, player_ids, step):
+    """Update per-player accumulators for one completed step."""
+    for i, pid in enumerate(player_ids):
+        s = states[i]
+        if s is None:
+            continue
+        obs = s.observation
+        planets = (
+            obs.planets if hasattr(obs, "planets") else obs.get("planets", [])
+        )
+        fleets = (
+            obs.fleets if hasattr(obs, "fleets") else obs.get("fleets", [])
+        )
+        a = accum[pid]
+
+        # planets owned this step
+        owned = sum(1 for p in planets if p[1] == i)  # owner index == player index
+        a["planets_owned_sum"] += owned
+        a["planets_owned_steps"] += 1
+        a["peak_planets"] = max(a["peak_planets"], owned)
+
+        # ownership transitions vs prev step
+        current_map = {p[0]: p[1] for p in planets}
+        for planet_id, prev_owner in prev_planets.items():
+            curr_owner = current_map.get(planet_id, prev_owner)
+            if curr_owner == i and prev_owner == -1:
+                a["neutral_captures"] += 1
+            elif curr_owner == i and prev_owner != i and prev_owner != -1:
+                a["enemy_flips"] += 1
+            elif prev_owner == i and curr_owner != i and curr_owner != -1:
+                a["planets_lost"] += 1
+
+        # ships sent: count ships in new fleet IDs
+        current_fleet_ids = {f[0] for f in fleets}
+        new_ids = current_fleet_ids - prev_fleet_ids
+        for f in fleets:
+            if f[0] in new_ids and f[1] == i:  # owner == player index
+                a["ships_sent_total"] += f[6]  # Fleet.ships at index 6
+                if a["first_action_step"] is None:
+                    a["first_action_step"] = step
+
+
+def _finalize_stats(accum, states, player_ids) -> dict:
+    """Compute final_score and per-player average stats at game end."""
+    result = {}
+    for i, pid in enumerate(player_ids):
+        a = accum[pid]
+        s = states[i]
+        final_score = 0
+        if s is not None:
+            obs = s.observation
+            planets = (
+                obs.planets if hasattr(obs, "planets") else obs.get("planets", [])
+            )
+            fleets = (
+                obs.fleets if hasattr(obs, "fleets") else obs.get("fleets", [])
+            )
+            final_score = (
+                sum(p[5] for p in planets if p[1] == i)  # ships on owned planets
+                + sum(f[6] for f in fleets if f[1] == i)  # ships in owned fleets
+            )
+        steps = max(a["planets_owned_steps"], 1)
+        result[pid] = {
+            "planets_owned_avg": round(a["planets_owned_sum"] / steps, 2),
+            "peak_planets": a["peak_planets"],
+            "ships_sent_total": a["ships_sent_total"],
+            "neutral_captures": a["neutral_captures"],
+            "enemy_flips": a["enemy_flips"],
+            "planets_lost": a["planets_lost"],
+            "first_action_step": a["first_action_step"],
+            "final_score": final_score,
+        }
+    return result
