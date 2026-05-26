@@ -10,6 +10,7 @@ import math
 import random
 import sys
 from datetime import datetime, timezone
+from itertools import combinations
 from pathlib import Path
 
 from kaggle_environments import make as _kenv_make
@@ -295,3 +296,50 @@ def _print_game_result(result: dict):
     )
     status = "" if result["status"] == "ok" else "  [CRASHED]"
     print(f"[{label} {mid.split('_')[-1]}] seed={seed}  {winner} wins  turn={turn}  scores: {scores_str}{status}")
+
+
+def build_schedule(agent_ids: list, root_seed: int) -> list:
+    """
+    Returns a list of 24 match dicts:
+      {"match_id": str, "player_ids": list, "seed": int}
+    18 × 2p (C(4,2)=6 pairs × 3 games) then 6 × 4p.
+    Seeds are derived deterministically from root_seed.
+    """
+    rng = random.Random(root_seed)
+    game_seeds = [rng.randint(0, 2**31) for _ in range(24)]
+
+    schedule = []
+    seed_idx = 0
+
+    # 2-player: all C(4,2) pairs × 3 games
+    for a, b in combinations(agent_ids, 2):
+        for g in range(3):
+            match_id = f"2p_{a}v{b}_g{seed_idx}"
+            schedule.append({
+                "match_id": match_id,
+                "player_ids": [a, b],
+                "seed": game_seeds[seed_idx],
+            })
+            seed_idx += 1
+
+    # 4-player: 6 fixed orderings (Agent1 always at position 0)
+    a1, a2, a3, a4 = agent_ids
+    orderings = [
+        [a1, a2, a3, a4],
+        [a1, a2, a4, a3],
+        [a1, a3, a2, a4],
+        [a1, a3, a4, a2],
+        [a1, a4, a2, a3],
+        [a1, a4, a3, a2],
+    ]
+    for i, order in enumerate(orderings):
+        match_id = f"4p_{i}"
+        schedule.append({
+            "match_id": match_id,
+            "player_ids": order,
+            "seed": game_seeds[seed_idx],
+        })
+        seed_idx += 1
+
+    assert seed_idx == 24
+    return schedule
