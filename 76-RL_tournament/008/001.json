@@ -1,0 +1,18 @@
+{
+  "_name": "Elite-g008",
+  "_description": "Elite: best from gen 007 (fitness=31)",
+  "PROD_MULT": 10.3667,
+  "TIME_PROD_MULT": 0.3776,
+  "ENEMY_MULT": 8.1025,
+  "COMPOUND_MULT": 3.9957,
+  "MINE_NEAR_TGT_MULT": 2.3035,
+  "ENEMY_NEAR_TGT_MULT": 2.445,
+  "PROD_SRC_MULT": 5.8682,
+  "ORBIT_BONUS": 16.3987,
+  "PROXIMITY_MULT": 5.0294,
+  "DIST_MULT": 0.2624,
+  "SHIPS_MULT": 0.1321,
+  "ETA_MULT": 0.6208,
+  "OVEREXTEND_MULT": 0.3717,
+  "PROXIMITY_DIST": 18.5158
+}
