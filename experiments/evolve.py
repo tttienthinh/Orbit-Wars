@@ -132,12 +132,11 @@ def main():
 
     # Determine next folder number
     last_completed_num = completed[-1][0]
-    existing_highest = highest_folder_number()
-    next_num = max(last_completed_num, existing_highest) + 1
+    next_num = last_completed_num + 1
     next_folder = TOURNAMENT_DIR / f"{next_num:03d}"
 
     if next_folder.exists():
-        print(f"Folder {next_folder.name} already exists (in-progress?). Nothing to do.")
+        print(f"Folder {next_folder.name} already exists (tournament in progress). Nothing to do.")
         return
 
     # Latest tournament for ranking parents
@@ -162,14 +161,31 @@ def main():
     second_cfg  = extract_constants(agents[ranked[1]])
     third_cfg   = extract_constants(agents[ranked[2]])
 
-    # Hall of fame check
+    # Hall of fame check with stagnation detection
     hof_fitness, hof_cfg = find_hall_of_fame(completed)
     current_best_fitness = fitness(summary, ranked[0])
 
-    if hof_fitness > current_best_fitness:
+    # Count consecutive recent gens where current-gen best did NOT beat HoF
+    # (i.e. HoF kept being used as Elite but the population didn't improve past it)
+    stagnation_count = 0
+    for _, _, past_data in reversed(completed[1:]):  # skip gen 000-test seed
+        past_pids = sorted(past_data["agents"].keys())
+        past_best = max(fitness(past_data["summary"], p) for p in past_pids)
+        if past_best < hof_fitness:
+            stagnation_count += 1
+        else:
+            break
+    HOF_STAGNATION_LIMIT = 3
+
+    if hof_fitness > current_best_fitness and stagnation_count < HOF_STAGNATION_LIMIT:
         print(f"\nHall-of-fame (fitness={hof_fitness}) beats current best ({current_best_fitness}) — using as Elite")
         elite_cfg = hof_cfg
         elite_desc = f"hall-of-fame (fitness={hof_fitness})"
+    elif hof_fitness > current_best_fitness and stagnation_count >= HOF_STAGNATION_LIMIT:
+        # HoF has been Elite for too long without the population catching up — explore instead
+        print(f"\nHoF stagnation ({stagnation_count} gens) — replacing Elite with wide-mutation of current best")
+        elite_cfg = mutate(best_cfg, sigma=0.30)
+        elite_desc = f"wide-explore mutation of gen {latest_num:03d} best (stagnation={stagnation_count})"
     else:
         elite_cfg = best_cfg
         elite_desc = f"best from gen {latest_num:03d} (fitness={current_best_fitness})"
