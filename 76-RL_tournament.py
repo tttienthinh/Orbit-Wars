@@ -200,10 +200,10 @@ def run_game(match_id: str, agents: list, player_ids: list, seed: int) -> dict:
     player_ids: e.g. ["001", "002"] or ["001","002","003","004"]
     """
     N = len(agents)
-    # reset per-player state in the shared module before each game
-    _mod._states.clear()
 
     try:
+        # reset per-player state in the shared module before each game
+        _mod._states.clear()
         env = _kenv_make("orbit_wars", configuration={"seed": seed}, debug=False)
         env.reset(num_agents=N)
         states = env.step([[] for _ in range(N)])
@@ -261,6 +261,7 @@ def run_game(match_id: str, agents: list, player_ids: list, seed: int) -> dict:
             "players": player_ids,
             "seed": seed,
             "status": "crashed",
+            "error": str(exc),
             "winner": None,
             "stats": {
                 "win_turn": 0,
@@ -292,5 +293,5 @@ def _print_game_result(result: dict):
         f"{p}={result['stats']['per_player'][p]['final_score']}"
         for p in pid
     )
-    status = "" if result["status"] == "ok" else f"  [CRASHED]"
+    status = "" if result["status"] == "ok" else "  [CRASHED]"
     print(f"[{label} {mid.split('_')[-1]}] seed={seed}  {winner} wins  turn={turn}  scores: {scores_str}{status}")
