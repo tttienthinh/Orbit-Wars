@@ -58,7 +58,7 @@ def load_configs(folder: Path) -> dict:
     configs = {}
     for path in json_files:
         agent_id = path.stem  # e.g. "001"
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             raw = json.load(f)
         configs[agent_id] = {k: v for k, v in raw.items() if not k.startswith("_")}
         # preserve metadata for results.json
