@@ -1,0 +1,18 @@
+{
+  "_name": "X12-g005",
+  "_description": "Crossover(1st,2nd) from gen 004 + mutation (sigma=0.18)",
+  "PROD_MULT": 15.473,
+  "TIME_PROD_MULT": 0.5494,
+  "ENEMY_MULT": 11.3611,
+  "COMPOUND_MULT": 4.2945,
+  "MINE_NEAR_TGT_MULT": 2.9103,
+  "ENEMY_NEAR_TGT_MULT": 1.8119,
+  "PROD_SRC_MULT": 3.9048,
+  "ORBIT_BONUS": 17.5361,
+  "PROXIMITY_MULT": 6.157,
+  "DIST_MULT": 0.3103,
+  "SHIPS_MULT": 0.1567,
+  "ETA_MULT": 0.785,
+  "OVEREXTEND_MULT": 0.3367,
+  "PROXIMITY_DIST": 16.2152
+}
