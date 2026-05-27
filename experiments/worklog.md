@@ -244,6 +244,54 @@ Key observations:
 - Insight: HoF near-clone dominates 2p (8/9!) confirming PROD+low-SHIPS is genuinely strong. But 4p limited to 2W — seed variance is the barrier (original HoF got 3-4W 4p). Mut2-g028 (mutated Elite-g027) also 30 with 7W 2p + 3W 4p — more balanced. Gen 029: Mut2 of HoF near-clone got PROD=18.41, SHIPS=0.098 — highest PROD ever! Three agents with SHIPS<0.105.
 - Next: Gen 029 — PROD=18.41+SHIPS=0.098 (Mut2), HoF near-clone (X12), HoF×Mut2-g028 (X23). Best gen setup yet for low-SHIPS territory.
 
+### Run 29: Gen 029 tournament — best_fitness=28 (DISCARD — convergent population hurts)
+- Timestamp: 2026-05-27
+- What changed: 3 low-SHIPS agents (Mut2=0.098, X12=0.102, X23=0.100) + Elite high-SHIPS=0.496; stagnation_count=14
+- Result: Elite-g029=28 (6W/3L 2p, 2W 4p, top2=6); X12=21; X23=17; Mut2(PROD=18.41)=12
+- Insight: KEY INSIGHT — when 3 agents share the same low-SHIPS archetype, they split wins among themselves and none scores high enough. Diversity is REQUIRED for any single agent to dominate. Elite (SHIPS=0.496) won precisely because it was differentiated. PROD=18.41 with SHIPS=0.098 failed at 12 — too similar to X12 and X23 in strategy. Gen 030 has better diversity: 2 low-SHIPS (Mut2=0.094, X12=0.101) vs 2 high-SHIPS (Elite=0.413, X23=0.417).
+- Next: Gen 030 — Mut2(PROD=14.59,SHIPS=0.094,PROX=36.4) vs X12(SHIPS=0.101,PROX=43.1) vs 2 diverse agents.
+
+### Run 30: Gen 030 tournament — best_fitness=28 (DISCARD — 2p/4p split continues)
+- Timestamp: 2026-05-27
+- What changed: Elite=wide-explore(X23-g029,σ=0.30); Mut2=mutated X12-g029; X12=HoF near-clone; X23=Crossover(HoF,X23-g029); stagnation_count=15
+- Result: X23-g030=28 (8W/1L 2p!, 1W 4p, top2=2, PROD=15.50,SHIPS=0.417); X12-g030=21; Mut2=15 (3W 4p!); Elite=14
+- Insight: X23(PROD=15.5,SHIPS=0.417) again dominated 2p (8/9!) but only 1 4p win. Mut2(SHIPS=0.094) is 4p specialist (3W 4p!) but only 2W 2p. Pattern: LOW SHIPS → 4p specialist, HIGH SHIPS → 2p specialist. The magic of HoF=34 was achieving BOTH — likely required the specific tournament seed. Gen 031 has X12(PROD=15.91,SHIPS=0.098,PROX=46.9) and X23(PROD=17.10,SHIPS=0.140,PROX=44.0,ENEMY=6.73). X23-g031 nearly matches HoF's PROX/ENEMY with higher PROD.
+- Next: Gen 031 — most promising setup in gens: X23 has PROD=17.10, SHIPS=0.140, PROX=44.0, ENEMY=6.73 (HoF had 6.72).
+
+### Run 31: Gen 031 tournament — best_fitness=24 (DISCARD — near-HoF params still fail)
+- Timestamp: 2026-05-27
+- What changed: Elite=wide-explore(X23-g030,σ=0.30); X23(PROD=17.10,SHIPS=0.140,PROX=44.0,ENEMY=6.73); stagnation_count=16
+- Result: X23-g031=24 (6W/3L 2p, 2W 4p); Elite=20; X12=18; Mut2(SHIPS=0.102)=16 (3W 4p!)
+- Insight: X23-g031 matched HoF's ENEMY=6.72 and PROX=44.49 almost exactly (6.73/44.0) with higher PROD but still only 24. The 2p/4p split is NOT about ENEMY or PROX — it's about SHIPS_MULT. Low SHIPS → 4p specialist (3W 4p, 2W 2p). Moderate SHIPS (0.14) → still 2p specialist (6W 2p, 2W 4p). Need SHIPS≈0.103 + specific tournament seed to achieve both. Gen 032: X12 near-perfect HoF clone (PROD=14.89,SHIPS=0.104,PROX=44.1,OVER=0.256). Elite PROD=20.69 (record!) but OVER=0.798 (kills aggression).
+- Next: Gen 032 — X12 is most faithful HoF clone yet; Elite PROD=20.69 is interesting outlier.
+
+### Run 32: Gen 032 tournament — best_fitness=28 (DISCARD — PROD=20.69 dominates HoF near-clone)
+- Timestamp: 2026-05-27
+- What changed: Elite=wide-explore(X23-g031,σ=0.30)→PROD=20.69,SHIPS=0.157,OVER=0.798; X12=HoF near-clone(PROD=14.89,SHIPS=0.104,OVER=0.256); stagnation_count=17
+- Result: Elite-g032=28 (7W/2L 2p, 1W 4p, top2=5); Mut2=22 (3W 4p); X23=19; X12=9 (crushed!)
+- Insight: CRITICAL — PROD=20.69 agent CRUSHED HoF near-clone (14.89) from 30 → 9. When PROD=20.69 enters, it outcompetes HoF's PROD=14.82. So the HoF=34 relied on NOT facing such a high-PROD opponent. The landscape: PROD=20+ beats PROD=14-15; but PROD=20+ with OVER=0.798 still only scores 28 due to 4p conservatism. Gen 033: Elite escalates to PROD=26.88 (record!), OVER=0.967 (hyper-conservative), PROX=27.6 (short-range only). X23=PROD=21.98+ENEMY=13.73.
+- Next: Gen 033 — exploring very-high-PROD territory (26.88, 21.98) with mixed OVER values; X12 again HoF near-clone.
+
+### Run 33: Gen 033 tournament — best_fitness=25 (DISCARD — PROX killed high-PROD agents)
+- Timestamp: 2026-05-27
+- What changed: Elite=wide-explore(Elite-g032)→PROD=26.88,PROX=27.6,OVER=0.967; X12=HoF near-clone(PROD=14.69,PROX=43.5); stagnation_count=18
+- Result: X12-g033=25 (7W/2L 2p, 1W 4p); X23=21; Elite=16 (PROX=27.6 crippled it); Mut2=16
+- Insight: CRITICAL — PROX_DIST is a key constraint: Elite(PROD=26.88) failed because PROX=27.6 (too short-range). HoF near-clone won despite PROD=14.69 < 21.98 because PROX=43.5 vs 41.1. On a 100x100 board, agents that can "see" far (PROX=44-50) evaluate more planets and find better targets. PROX<35 is seriously limiting. The HoF's PROX=44.49 is a core requirement, not just PROD. Gen 034: X12=PROD=15.62,SHIPS=0.100,PROX=45.2; Elite=PROD=23.36,SHIPS=0.116,PROX=34.3(lower).
+- Next: Gen 034 — test if Elite(PROD=23.36,PROX=34.3) works better than PROX=27.6 case.
+
+### Run 34: Gen 034 tournament — best_fitness=22 (DISCARD — PROX<35 pattern repeats)
+- Timestamp: 2026-05-27
+- What changed: X12=HoF near-clone(PROD=15.62,SHIPS=0.100,PROX=45.2); Elite=PROD=23.36,PROX=34.3; stagnation_count=19
+- Result: Mut2=X23=22 tied; X12=18; Elite=16 (PROX=34.3 again hurt)
+- Insight: Confirmed: PROX<35 consistently underperforms. Wide-explore keeps generating PROX=27-35 because lognormal mutation of PROX=43-45 with σ=0.30 can hit PROX≈32 (exp(-0.30)≈0.74 → 45*0.74=33). Fixed evolve.py to clamp PROX≥40 in wide-explore. Gen 035: Elite clamped to PROX=40.0; X12=near-perfect HoF match (PROD=14.76,SHIPS=0.095,ENEMY=6.72,OVER=0.262 — exact HoF values!).
+- Next: Gen 035 — PROX clamp active; X12 best HoF replica yet with exact ENEMY+OVER match.
+
+
+
+
+
+
+
 
 
 

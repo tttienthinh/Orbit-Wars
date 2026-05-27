@@ -1,6 +1,6 @@
 # Autoresearch Dashboard: orbit-wars-agent-evolution
 
-**Runs:** 28 | **Kept:** 3 | **Discarded:** 25 | **Crashed:** 0
+**Runs:** 34 | **Kept:** 3 | **Discarded:** 31 | **Crashed:** 0
 **Baseline:** best_fitness: 27pts (gen 000 OrbDom, seed=16)
 **Best:** best_fitness: **34pts** (#15, +25.9% vs baseline) — X23-g015
 
@@ -34,6 +34,12 @@
 | 26 | af40e6a | 30 (+11.1%) | 6 | discard | gen 026: X23(HoF×2nd)=30 (6W/3L 2p, 4W 4p, top2=4); HoF crossover works; X12(HoF×1st)=9 failed |
 | 27 | ac0e0ea | 28 (+3.7%) | 7 | discard | gen 027: Mut2=28 (7W/2L 2p, 2W 4p); HoF crossovers fail (SHIPS contamination); strategy → HoF injection |
 | 28 | e0642da | 30 (+11.1%) | 8 | discard | gen 028: HoF near-clone=30 (8W/1L 2p!); Mut2=30; tied but 4p limited by seed variance |
+| 29 | 464571b | 28 (+3.7%) | 6 | discard | gen 029: 3 low-SHIPS agents split wins; Elite(high-SHIPS)=28 won by differentiation; PROD=18 collapsed |
+| 30 | 09b0a25 | 28 (+3.7%) | 8 | discard | gen 030: X23(PROD=15.5,SHIPS=0.417)=28 (8W/1L 2p); Mut2 4p-specialist=15; 2p/4p split persists |
+| 31 | f46b769 | 24 (-11.1%) | 6 | discard | gen 031: X23(PROD=17.1,SHIPS=0.14,PROX=44,ENEMY=6.73)=24; near-HoF params still 2p/4p split |
+| 32 | 359aff2 | 28 (+3.7%) | 7 | discard | gen 032: Elite(PROD=20.69)=28 (7W 2p); HoF near-clone crushed at 9; high PROD beats HoF in head-to-head |
+| 33 | dbd9093 | 25 (-7.4%) | 7 | discard | gen 033: HoF near-clone=25 (7W 2p) when PROD=26.88+PROX=27.6 collapsed; PROX as critical as PROD |
+| 34 | 96d909c | 22 (-18.5%) | 6 | discard | gen 034: Mut2=X23=22; PROX<35 again crippled Elite; PROX≥40 clamp added to wide-explore |
 
 ## Gen Standings
 

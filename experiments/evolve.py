@@ -187,9 +187,11 @@ def main():
         x23_desc = f"Crossover(2nd,3rd) from gen {latest_num:03d} + mutation (sigma=0.18)"
     elif hof_fitness > current_best_fitness and stagnation_count >= HOF_DEEP_STAGNATION:
         # Deep stagnation: wide-explore Elite + inject near-clone of HoF as X12 + crossover(HoF,best)
-        # Avoids SHIPS/PROD contamination from HoF×population crossovers
+        # Clamp PROXIMITY_DIST >= 40 on wide-explore to prevent short-range regressions
         print(f"\nHoF deep stagnation ({stagnation_count} gens) — wide-explore Elite + HoF injection")
-        elite_cfg = mutate(best_cfg, sigma=0.30)
+        candidate = mutate(best_cfg, sigma=0.30)
+        candidate["PROXIMITY_DIST"] = max(40.0, candidate["PROXIMITY_DIST"])
+        elite_cfg = candidate
         elite_desc = f"wide-explore mutation of gen {latest_num:03d} best (stagnation={stagnation_count})"
         crossover_a, crossover_b, crossover_c = hof_cfg, best_cfg, second_cfg
         x12_desc = f"HoF near-clone (sigma=0.05, stagnation={stagnation_count})"
