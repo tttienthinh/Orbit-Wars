@@ -1,16 +1,16 @@
 import math
 import time
-from kaggle_environments.envs.orbit_wars.orbit_wars import Planet
 
-class Obj:
-    def __init__(self, step=0):
-        self.step = step
+_states = {}
 
-obj = Obj()
+def nearest_planet_sniper(obs):
+    pid = obs.get("player", 0) if isinstance(obs, dict) else obs.player
+    if pid not in _states:
+        _states[pid] = {"step": 0}
+    s = _states[pid]
 
-def nearest_planet_sniper(obs, test):
-    global obj
-    print(f"{obj.step}")
-    obj.step += 1
-
+    print(f"Agent step: {s['step']}")
+    s["step"] += 1
     return []
+
+agent = nearest_planet_sniper

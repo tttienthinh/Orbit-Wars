@@ -723,31 +723,27 @@ def take_action(df, player_id, nb_steps_sim=NB_STEPS_SIM, return_df=False):
 
 # ── Agent ─────────────────────────────────────────────────────────────────────
 
-step = 0
-num_agents = None
-player_id = None
+_states = {}
 
 def nearest_planet_sniper(obs):
-    global step
-    global num_agents
-    global player_id
+    pid = obs.get("player", 0) if isinstance(obs, dict) else obs.player
+    if pid not in _states:
+        _states[pid] = {"step": 0, "num_agents": None}
+    s = _states[pid]
 
-    print(f"Agent called step: {step} remainingOverageTime: {obs.get('remainingOverageTime', 0)}")
-    if num_agents is None:
+    print(f"Agent called step: {s['step']} remainingOverageTime: {obs.get('remainingOverageTime', 0)}")
+    if s["num_agents"] is None:
         initial = (
             obs.initial_planets if hasattr(obs, "initial_planets")
             else obs["initial_planets"]
         )
         owners = {p[1] for p in initial if p[1] != -1}
-        num_agents = 4 if len(owners) > 2 else 2
-    if player_id is None:
-        player_id = obs.get("player", 0) if isinstance(obs, dict) else obs.player
+        s["num_agents"] = 4 if len(owners) > 2 else 2
 
-    df = _simulate(obs, step, num_agents, n_steps=NB_STEPS_SIM)
-    moves = take_action(df, player_id=player_id, nb_steps_sim=NB_STEPS_SIM)
+    df = _simulate(obs, s["step"], s["num_agents"], n_steps=NB_STEPS_SIM)
+    moves = take_action(df, player_id=pid, nb_steps_sim=NB_STEPS_SIM)
 
-
-    step += 1
+    s["step"] += 1
     return moves
 
 

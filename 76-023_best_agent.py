@@ -10,10 +10,26 @@ ROTATION_RADIUS_LIMIT = 50.0
 MAX_SPEED = 6.0
 NB_STEPS_SIM = 10
 PLANET_MARGIN = 0.1
-# Max orbital displacement per tick (generous: 0.05 rad/tick * 45 unit radius ≈ 2.25)
 PLANET_MOVEMENT_SLACK = 3.0
 
-# ── Interpreter (verbatim from 32-board_from_kaggle.ipynb cell 0) ─────────────
+# ── Scoring weights — autoresearch gen 023 (Mut2-g023) ──
+# 7W/2L 2p, 1W 4p, top2=1
+PROD_MULT           = 11.2457
+TIME_PROD_MULT      =  0.2023
+ENEMY_MULT          = 11.0705
+COMPOUND_MULT       =  6.3440
+MINE_NEAR_TGT_MULT  =  3.3625
+ENEMY_NEAR_TGT_MULT =  2.4409
+PROD_SRC_MULT       =  7.8318
+ORBIT_BONUS         = 21.3624
+PROXIMITY_MULT      = 11.8388
+DIST_MULT           =  0.2473
+SHIPS_MULT          =  0.1182
+ETA_MULT            =  0.5523
+OVEREXTEND_MULT     =  0.2751
+PROXIMITY_DIST      = 50.0000
+
+# ── Interpreter ────────────────────────────────────────────────────────────────
 from collections import namedtuple
 
 Planet = namedtuple(
@@ -359,7 +375,6 @@ def take_action(df, player_id, nb_steps_sim=NB_STEPS_SIM, return_df=False):
     )
 
     # ── Section 3: three-phase collision filter ────────────────────────────────
-    # Shared lazy expressions (evaluated from raw cross-join columns)
     dx = pl.col("x") - pl.col("x_src")
     dy = pl.col("y") - pl.col("y_src")
     l2 = dx.pow(2) + dy.pow(2)
@@ -376,8 +391,6 @@ def take_action(df, player_id, nb_steps_sim=NB_STEPS_SIM, return_df=False):
         ((CENTER - pl.col("x_src")).pow(2) + (CENTER - pl.col("y_src")).pow(2)).sqrt()
     ).otherwise(proj_dist_sun) < (SUN_RADIUS + PLANET_MARGIN)
 
-    # Phase A: planet-level cross-join (N_src × N_tgt × N_steps, no ships_sent).
-    # Filter with actual per-tick planet displacement from simulation data.
     coarse_lf = (
         mine_base_lf
         .join(df_lf, how="cross")
@@ -395,7 +408,6 @@ def take_action(df, player_id, nb_steps_sim=NB_STEPS_SIM, return_df=False):
         )
     )
 
-    # Ships_sent expansion: only for (src, target, step) triples that passed Phase A.
     expanded_lf = (
         coarse_lf
         .with_columns(
@@ -408,7 +420,6 @@ def take_action(df, player_id, nb_steps_sim=NB_STEPS_SIM, return_df=False):
         .explode("ships_sent")
     )
 
-    # Phase B: fleet_speed-specific second filter, prev_pos join, swept-pair, angle cone.
     fleet_speed = 1.0 + (MAX_SPEED - 1.0) * (
         pl.col("ships_sent").cast(pl.Float64).log(base=math.e) / math.log(1000.0)
     ).pow(1.5)
@@ -550,19 +561,7 @@ def take_action(df, player_id, nb_steps_sim=NB_STEPS_SIM, return_df=False):
             id_to_avoid = awa_comets["id_src"].unique().to_list()
             attacks_with_angle = attacks_with_angle.filter(~pl.col("id_src").is_in(id_to_avoid))
 
-    top5_ids = (
-        attacks_with_angle
-        .sort(["step", "ships_sent"])
-        .group_by(["id_src", "id"], maintain_order=True)
-        .first()
-        .sort(["step", "ships_sent"])
-        .group_by("id_src", maintain_order=True)
-        .head(5)
-        .select(["id_src", "id"])
-        .with_columns(pl.lit(True).alias("is_top5"))
-    )
-
-    attacks = (
+    best_per_pair = (
         attacks_with_angle
         .with_columns(
             pl.when(pl.col("owner") == -1)
@@ -577,16 +576,93 @@ def take_action(df, player_id, nb_steps_sim=NB_STEPS_SIM, return_df=False):
         .sort(["step", "ships_sent"])
         .group_by(["id_src", "id"], maintain_order=True)
         .first()
-        .join(top5_ids, on=["id_src", "id"], how="left")
-        .with_columns(pl.col("is_top5").fill_null(False))
-        .with_columns((pl.col("ships_needed") / pl.col("production_src")).alias("time_cost"))
-        .with_columns(pl.col("time_cost").sum().over("id_src").alias("total_time_cost"))
+    )
+
+    if best_per_pair.is_empty():
+        return (moves, attacks_with_angle) if return_df else moves
+
+    # ── Context features ───────────────────────────────────────────────────────
+    src_neighbor_stats = (
+        best_per_pair
+        .sort(["id_src", "step", "ships_sent"])
+        .group_by("id_src", maintain_order=True)
+        .head(5)
+        .with_columns(
+            pl.when(
+                (pl.col("owner") != player_id) & (pl.col("owner") != -1)
+            ).then(pl.lit(1)).otherwise(pl.lit(0)).alias("_is_enemy")
+        )
+        .group_by("id_src", maintain_order=True)
+        .agg(pl.col("_is_enemy").sum().alias("n_enemy_nearby_src"))
+    )
+
+    tgt_support_stats = (
+        best_per_pair
+        .group_by("id", maintain_order=True)
+        .agg(pl.col("id_src").n_unique().alias("n_mine_nearby_target"))
+    )
+
+    step0_min = df["step"].min()
+    step0_pl = pl.from_pandas(df[df["step"] == step0_min][["id", "x", "y", "owner"]])
+    enemy_pos = (
+        step0_pl
+        .filter((pl.col("owner") != player_id) & (pl.col("owner") != -1))
+        .select(["id", "x", "y"])
+        .rename({"id": "id_enemy", "x": "x_enemy", "y": "y_enemy"})
+    )
+    target_pos = (
+        step0_pl
+        .join(best_per_pair.select("id").unique(), on="id")
+        .select(["id", "x", "y"])
+    )
+    if enemy_pos.is_empty() or target_pos.is_empty():
+        tgt_enemy_stats = (
+            target_pos.select("id")
+            .with_columns(pl.lit(0).cast(pl.Int32).alias("n_enemy_nearby_target"))
+        )
+    else:
+        tgt_enemy_stats = (
+            target_pos
+            .join(enemy_pos, how="cross")
+            .with_columns(
+                ((pl.col("x") - pl.col("x_enemy")).pow(2) +
+                 (pl.col("y") - pl.col("y_enemy")).pow(2)).sqrt().alias("_dist")
+            )
+            .filter(
+                (pl.col("id") != pl.col("id_enemy")) &
+                (pl.col("_dist") <= PROXIMITY_DIST)
+            )
+            .group_by("id", maintain_order=True)
+            .agg(pl.len().alias("n_enemy_nearby_target"))
+        )
+
+    # ── Full scoring formula ───────────────────────────────────────────────────
+    is_enemy = (pl.col("owner") != player_id) & (pl.col("owner") != -1)
+    attacks = (
+        best_per_pair
+        .join(src_neighbor_stats, on="id_src", how="left")
+        .join(tgt_support_stats, on="id", how="left")
+        .join(tgt_enemy_stats, on="id", how="left")
+        .with_columns([
+            pl.col("n_enemy_nearby_src").fill_null(0).cast(pl.Float64),
+            pl.col("n_mine_nearby_target").fill_null(0).cast(pl.Float64),
+            pl.col("n_enemy_nearby_target").fill_null(0).cast(pl.Float64),
+        ])
         .with_columns(
             (
-                (pl.col("total_time_cost") - pl.col("time_cost") - pl.col("step_diff"))
-                * pl.col("production")
-                - pl.when(~pl.col("is_top5")).then(pl.lit(100.0)).otherwise(pl.lit(0.0))
-                - pl.when(pl.col("owner") == player_id).then(pl.lit(100.0)).otherwise(pl.lit(0.0))
+                PROD_MULT * pl.col("production")
+                + TIME_PROD_MULT * (NB_STEPS_SIM - pl.col("step_diff")).clip(lower_bound=0) * pl.col("production")
+                + ENEMY_MULT * pl.when(is_enemy).then(pl.lit(1.0)).otherwise(pl.lit(0.0))
+                + COMPOUND_MULT * pl.when(is_enemy).then(pl.col("n_enemy_nearby_target")).otherwise(pl.lit(0.0))
+                + MINE_NEAR_TGT_MULT * pl.col("n_mine_nearby_target")
+                + ENEMY_NEAR_TGT_MULT * pl.col("n_enemy_nearby_target")
+                + PROD_SRC_MULT * pl.col("production_src")
+                + ORBIT_BONUS * pl.when(pl.col("nature_src") == "moving").then(pl.lit(1.0)).otherwise(pl.lit(0.0))
+                + PROXIMITY_MULT * pl.col("n_enemy_nearby_src")
+                - DIST_MULT * pl.col("dist_tgt_src")
+                - SHIPS_MULT * pl.col("ships_sent")
+                - ETA_MULT * pl.col("step_diff")
+                - OVEREXTEND_MULT * (pl.col("ships_sent") - pl.col("ships_needed")).clip(lower_bound=0)
             ).alias("score")
         )
         .filter(pl.col("score") > 0)
@@ -598,10 +674,11 @@ def take_action(df, player_id, nb_steps_sim=NB_STEPS_SIM, return_df=False):
 
     for row in attacks.iter_rows(named=True):
         print(f"From {row['id_src']}, To {row['id']} at step {row['step']} "
-              f"with {row['ships_sent']} ships (target has min {row['ships_min']})")
+              f"with {row['ships_sent']} ships (score={row['score']:.1f})")
 
     moves += [list(r) for r in attacks.select(["id_src", "final_angle", "ships_sent"]).rows()]
     return (moves, attacks_with_angle) if return_df else moves
+
 
 # ── Agent ─────────────────────────────────────────────────────────────────────
 
