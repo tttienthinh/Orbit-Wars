@@ -393,3 +393,10 @@ Key observations:
 - Result: X12-g033=22 (7W/2L 2p, PROX=50,ORBIT=24); Elite-g033=21 (4W/5L 2p, ORBIT=34,PROD=23); X23-g033=19 (6W/3L 2p); Mut2-g033=16 (1W/8L 2p, 4W 4p RECORD tie!)
 - Insight: ORBIT sweet spot confirmed at 20-27 — ORBIT=24 (X12) beat ORBIT=34 (Elite) in 2p. PROD=22.94 too high (over-invests in far planets). Mut2 (PROD=11.85,ENEMY=5.15) got 4W 4p — tied the 4p record! Low ENEMY+PROD in 4p means less aggression = better survival. Wide-explore from σ=0.30 drifted to extremes (ORBIT>30, PROD>20) that hurt performance. Gen 034 will wide-explore X12-g033 (the best recent config, ORBIT=24, closer to HoF=27).
 - Next: Gen 034 — stagnation=4; wide-explore (σ=0.30) of X12-g033 (PROX=50, ORBIT=24, ENEMY=6.47); crossovers from Elite+X23 of gen 033.
+
+### Run 49: Gen 034 — best_fitness=24 (DISCARD — SHIPS=0.216 toxic, X23 winner at 24)
+- Timestamp: 2026-05-27
+- What changed: Elite-g034=wide-explore(X12-g033,σ=0.30,SHIPS=0.216,PROD=25.45,ORBIT=30.87); Mut2=mutate(Elite-g033,PROX=44,ORBIT=33.77); X12=Crossover(wide,Elite-g033,ORBIT=35,ENEMY=5.0); X23=Crossover(Elite-g033,X23-g033,PROX=50,ENEMY=6.49,PROD=11.73,ORBIT=16.12); stagnation=5
+- Result: X23-g034=24 (6W/3L 2p, 2W 4p); X12-g034=21 (6W/3L 2p, 1W 4p); Mut2-g034=18 (3W 4p); Elite-g034=15 (3W/6L 2p — worst despite being wide-explore!)
+- Insight: SHIPS>0.15 is CONFIRMED HARMFUL — Elite with SHIPS=0.216 went 3W/6L 2p. The agent waits too long before attacking (needs too many ships). SHIPS range 0.04-0.11 is the only working zone; 0.087 (HoF) is optimal. X23 won with low PROD=11.73 + moderate ORBIT=16 — gen 034 confirms that PROD and ORBIT don't need to be high; the key is PROX=50 + ENEMY<7. Wide-explore consistently drifts to SHIPS>0.15 and PROD>20 — both are dangerous zones. Deep stagnation triggers at stagnation=6 (gen 035 if it fails), bringing HoF near-clone injection.
+- Next: Gen 035 — stagnation=5; wide-explore (σ=0.30) of X23-g034; crossovers from X23+X12 of gen 034. Deep stagnation strategy at stagnation=6 (gen 036).
