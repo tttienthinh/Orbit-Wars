@@ -1,6 +1,6 @@
 # Autoresearch Dashboard: orbit-wars-agent-evolution
 
-**Runs:** 50 | **Kept:** 4 | **Discarded:** 46 | **Crashed:** 0
+**Runs:** 51 | **Kept:** 4 | **Discarded:** 47 | **Crashed:** 0
 **Baseline:** best_fitness: 25pts (#1)
 **Best:** best_fitness: 36pts (#44, +44.0%)
 **HoF target:** 36 (gen 029 Elite-g029)
@@ -38,3 +38,4 @@
 | 48 | c59ecb8 | 22pts (-12.0%) | discard | gen 033 (stagnation=4): X12(ORBIT=24,PROX=50)=22 (7W/2L 2p); Elite(ORBIT=34,PROD=23)=21 (4W/5L 2p); Mut2=16 (4W 4p!) |
 | 49 | 81511c7 | 24pts (-4.0%) | discard | gen 034 (stagnation=5): X23(PROX=50,PROD=11.7,ORBIT=16)=24; X12=21; Elite(SHIPS=0.216,PROD=25)=15 — extreme SHIPS/PROD failed |
 | 50 | ae4c8e4 | 28pts (+12.0%) | discard | gen 035 (stagnation=6→DEEP): Mut2(ENEMY=4.67,ORBIT=35,PROX=50)=28; X12(ENEMY=11.69,ORBIT=35,PROX=50)=25; Elite=16; X23(PROD=24)=9 |
+| 51 | 9a8d048 | 25pts (+0.0%) | discard | gen 036 (stagnation=7): X12(HoF near-clone ENEMY=7.46,ORBIT=29.43,PROX=49.1)=25 (8W/1L 2p, 0W 4p top2=1); Elite(SHIPS=0.238,PROD=25.82,ORBIT=35)=19; X23(ENEMY=4.39)=18; Mut2(ENEMY=11.7)=16 |
