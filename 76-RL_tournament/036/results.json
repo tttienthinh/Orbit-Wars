@@ -1,0 +1,1122 @@
+{
+  "root_seed": 41,
+  "generated_at": "2026-05-27T21:30:39.356797+00:00",
+  "agents": {
+    "001": {
+      "_name": "Elite-g036",
+      "_description": "Elite: wide-explore mutation of gen 035 best (stagnation=6)",
+      "PROD_MULT": 25.8207,
+      "TIME_PROD_MULT": 0.1682,
+      "ENEMY_MULT": 6.5682,
+      "COMPOUND_MULT": 25.0,
+      "MINE_NEAR_TGT_MULT": 2.8428,
+      "ENEMY_NEAR_TGT_MULT": 1.2534,
+      "PROD_SRC_MULT": 4.6665,
+      "ORBIT_BONUS": 35.0,
+      "PROXIMITY_MULT": 4.7273,
+      "DIST_MULT": 0.7126,
+      "SHIPS_MULT": 0.2381,
+      "ETA_MULT": 0.6511,
+      "OVEREXTEND_MULT": 0.4146,
+      "PROXIMITY_DIST": 50.0
+    },
+    "002": {
+      "_name": "Mut2-g036",
+      "_description": "Mutant of 2nd place from gen 035 (sigma=0.12)",
+      "PROD_MULT": 15.8024,
+      "TIME_PROD_MULT": 0.1806,
+      "ENEMY_MULT": 11.6981,
+      "COMPOUND_MULT": 7.3149,
+      "MINE_NEAR_TGT_MULT": 0.9945,
+      "ENEMY_NEAR_TGT_MULT": 4.6274,
+      "PROD_SRC_MULT": 6.9295,
+      "ORBIT_BONUS": 33.0776,
+      "PROXIMITY_MULT": 4.2668,
+      "DIST_MULT": 0.1181,
+      "SHIPS_MULT": 0.1387,
+      "ETA_MULT": 0.3142,
+      "OVEREXTEND_MULT": 1.7882,
+      "PROXIMITY_DIST": 49.35
+    },
+    "003": {
+      "_name": "X12-g036",
+      "_description": "HoF near-clone (sigma=0.05, stagnation=6)",
+      "PROD_MULT": 16.75,
+      "TIME_PROD_MULT": 0.1114,
+      "ENEMY_MULT": 7.4562,
+      "COMPOUND_MULT": 18.3269,
+      "MINE_NEAR_TGT_MULT": 1.7067,
+      "ENEMY_NEAR_TGT_MULT": 2.0146,
+      "PROD_SRC_MULT": 5.9159,
+      "ORBIT_BONUS": 29.4346,
+      "PROXIMITY_MULT": 25.0,
+      "DIST_MULT": 0.5132,
+      "SHIPS_MULT": 0.0833,
+      "ETA_MULT": 0.4151,
+      "OVEREXTEND_MULT": 0.5354,
+      "PROXIMITY_DIST": 49.1417
+    },
+    "004": {
+      "_name": "X23-g036",
+      "_description": "Crossover(1st,2nd) from gen 035 + mutation (sigma=0.18) \u2014 fuse archetypes",
+      "PROD_MULT": 16.0387,
+      "TIME_PROD_MULT": 0.1092,
+      "ENEMY_MULT": 4.3919,
+      "COMPOUND_MULT": 6.906,
+      "MINE_NEAR_TGT_MULT": 3.6647,
+      "ENEMY_NEAR_TGT_MULT": 3.1667,
+      "PROD_SRC_MULT": 6.4649,
+      "ORBIT_BONUS": 35.0,
+      "PROXIMITY_MULT": 4.7161,
+      "DIST_MULT": 0.9362,
+      "SHIPS_MULT": 0.1445,
+      "ETA_MULT": 0.2595,
+      "OVEREXTEND_MULT": 0.5973,
+      "PROXIMITY_DIST": 50.0
+    }
+  },
+  "matches": [
+    {
+      "match_id": "2p_001v002_g0",
+      "format": "2p",
+      "players": [
+        "001",
+        "002"
+      ],
+      "seed": 1636471393,
+      "status": "ok",
+      "winner": "002",
+      "stats": {
+        "win_turn": 333,
+        "per_player": {
+          "001": {
+            "planets_owned_avg": 10.07,
+            "peak_planets": 18,
+            "ships_sent_total": 14894,
+            "neutral_captures": 17,
+            "enemy_flips": 59,
+            "planets_lost": 74,
+            "first_action_step": 11,
+            "final_score": 0
+          },
+          "002": {
+            "planets_owned_avg": 15.95,
+            "peak_planets": 36,
+            "ships_sent_total": 41124,
+            "neutral_captures": 26,
+            "enemy_flips": 74,
+            "planets_lost": 59,
+            "first_action_step": 11,
+            "final_score": 4590
+          }
+        }
+      }
+    },
+    {
+      "match_id": "2p_001v002_g1",
+      "format": "2p",
+      "players": [
+        "001",
+        "002"
+      ],
+      "seed": 1426894585,
+      "status": "ok",
+      "winner": "001",
+      "stats": {
+        "win_turn": 397,
+        "per_player": {
+          "001": {
+            "planets_owned_avg": 13.77,
+            "peak_planets": 29,
+            "ships_sent_total": 51810,
+            "neutral_captures": 19,
+            "enemy_flips": 109,
+            "planets_lost": 94,
+            "first_action_step": 11,
+            "final_score": 3709
+          },
+          "002": {
+            "planets_owned_avg": 10.62,
+            "peak_planets": 16,
+            "ships_sent_total": 21283,
+            "neutral_captures": 16,
+            "enemy_flips": 94,
+            "planets_lost": 109,
+            "first_action_step": 11,
+            "final_score": 0
+          }
+        }
+      }
+    },
+    {
+      "match_id": "2p_001v002_g2",
+      "format": "2p",
+      "players": [
+        "001",
+        "002"
+      ],
+      "seed": 990931328,
+      "status": "ok",
+      "winner": "001",
+      "stats": {
+        "win_turn": 498,
+        "per_player": {
+          "001": {
+            "planets_owned_avg": 10.98,
+            "peak_planets": 15,
+            "ships_sent_total": 61373,
+            "neutral_captures": 18,
+            "enemy_flips": 76,
+            "planets_lost": 75,
+            "first_action_step": 4,
+            "final_score": 1140
+          },
+          "002": {
+            "planets_owned_avg": 11.16,
+            "peak_planets": 16,
+            "ships_sent_total": 54924,
+            "neutral_captures": 22,
+            "enemy_flips": 75,
+            "planets_lost": 76,
+            "first_action_step": 4,
+            "final_score": 985
+          }
+        }
+      }
+    },
+    {
+      "match_id": "2p_001v003_g3",
+      "format": "2p",
+      "players": [
+        "001",
+        "003"
+      ],
+      "seed": 713122277,
+      "status": "ok",
+      "winner": "003",
+      "stats": {
+        "win_turn": 179,
+        "per_player": {
+          "001": {
+            "planets_owned_avg": 6.16,
+            "peak_planets": 11,
+            "ships_sent_total": 7566,
+            "neutral_captures": 11,
+            "enemy_flips": 20,
+            "planets_lost": 32,
+            "first_action_step": 4,
+            "final_score": 0
+          },
+          "003": {
+            "planets_owned_avg": 13.47,
+            "peak_planets": 34,
+            "ships_sent_total": 28878,
+            "neutral_captures": 22,
+            "enemy_flips": 32,
+            "planets_lost": 20,
+            "first_action_step": 4,
+            "final_score": 3838
+          }
+        }
+      }
+    },
+    {
+      "match_id": "2p_001v003_g4",
+      "format": "2p",
+      "players": [
+        "001",
+        "003"
+      ],
+      "seed": 1656267096,
+      "status": "ok",
+      "winner": "003",
+      "stats": {
+        "win_turn": 380,
+        "per_player": {
+          "001": {
+            "planets_owned_avg": 10.74,
+            "peak_planets": 16,
+            "ships_sent_total": 19296,
+            "neutral_captures": 16,
+            "enemy_flips": 65,
+            "planets_lost": 79,
+            "first_action_step": 6,
+            "final_score": 0
+          },
+          "003": {
+            "planets_owned_avg": 14.59,
+            "peak_planets": 32,
+            "ships_sent_total": 48302,
+            "neutral_captures": 22,
+            "enemy_flips": 79,
+            "planets_lost": 65,
+            "first_action_step": 6,
+            "final_score": 3655
+          }
+        }
+      }
+    },
+    {
+      "match_id": "2p_001v003_g5",
+      "format": "2p",
+      "players": [
+        "001",
+        "003"
+      ],
+      "seed": 1217441760,
+      "status": "ok",
+      "winner": "003",
+      "stats": {
+        "win_turn": 460,
+        "per_player": {
+          "001": {
+            "planets_owned_avg": 11.3,
+            "peak_planets": 17,
+            "ships_sent_total": 28369,
+            "neutral_captures": 21,
+            "enemy_flips": 85,
+            "planets_lost": 103,
+            "first_action_step": 9,
+            "final_score": 0
+          },
+          "003": {
+            "planets_owned_avg": 13.63,
+            "peak_planets": 33,
+            "ships_sent_total": 40188,
+            "neutral_captures": 21,
+            "enemy_flips": 103,
+            "planets_lost": 85,
+            "first_action_step": 9,
+            "final_score": 2848
+          }
+        }
+      }
+    },
+    {
+      "match_id": "2p_001v004_g6",
+      "format": "2p",
+      "players": [
+        "001",
+        "004"
+      ],
+      "seed": 1188787719,
+      "status": "ok",
+      "winner": "001",
+      "stats": {
+        "win_turn": 194,
+        "per_player": {
+          "001": {
+            "planets_owned_avg": 12.21,
+            "peak_planets": 32,
+            "ships_sent_total": 18619,
+            "neutral_captures": 26,
+            "enemy_flips": 34,
+            "planets_lost": 25,
+            "first_action_step": 4,
+            "final_score": 2852
+          },
+          "004": {
+            "planets_owned_avg": 6.44,
+            "peak_planets": 12,
+            "ships_sent_total": 4681,
+            "neutral_captures": 11,
+            "enemy_flips": 25,
+            "planets_lost": 34,
+            "first_action_step": 10,
+            "final_score": 0
+          }
+        }
+      }
+    },
+    {
+      "match_id": "2p_001v004_g7",
+      "format": "2p",
+      "players": [
+        "001",
+        "004"
+      ],
+      "seed": 1647309211,
+      "status": "ok",
+      "winner": "004",
+      "stats": {
+        "win_turn": 498,
+        "per_player": {
+          "001": {
+            "planets_owned_avg": 10.64,
+            "peak_planets": 15,
+            "ships_sent_total": 39325,
+            "neutral_captures": 18,
+            "enemy_flips": 77,
+            "planets_lost": 83,
+            "first_action_step": 1,
+            "final_score": 209
+          },
+          "004": {
+            "planets_owned_avg": 12.42,
+            "peak_planets": 20,
+            "ships_sent_total": 74895,
+            "neutral_captures": 24,
+            "enemy_flips": 83,
+            "planets_lost": 77,
+            "first_action_step": 1,
+            "final_score": 2725
+          }
+        }
+      }
+    },
+    {
+      "match_id": "2p_001v004_g8",
+      "format": "2p",
+      "players": [
+        "001",
+        "004"
+      ],
+      "seed": 40064325,
+      "status": "ok",
+      "winner": "004",
+      "stats": {
+        "win_turn": 498,
+        "per_player": {
+          "001": {
+            "planets_owned_avg": 16.09,
+            "peak_planets": 24,
+            "ships_sent_total": 27856,
+            "neutral_captures": 28,
+            "enemy_flips": 124,
+            "planets_lost": 121,
+            "first_action_step": 1,
+            "final_score": 919
+          },
+          "004": {
+            "planets_owned_avg": 19.37,
+            "peak_planets": 27,
+            "ships_sent_total": 41589,
+            "neutral_captures": 30,
+            "enemy_flips": 121,
+            "planets_lost": 124,
+            "first_action_step": 1,
+            "final_score": 1157
+          }
+        }
+      }
+    },
+    {
+      "match_id": "2p_002v003_g9",
+      "format": "2p",
+      "players": [
+        "002",
+        "003"
+      ],
+      "seed": 1069750936,
+      "status": "ok",
+      "winner": "003",
+      "stats": {
+        "win_turn": 481,
+        "per_player": {
+          "002": {
+            "planets_owned_avg": 9.14,
+            "peak_planets": 16,
+            "ships_sent_total": 23532,
+            "neutral_captures": 16,
+            "enemy_flips": 101,
+            "planets_lost": 110,
+            "first_action_step": 2,
+            "final_score": 0
+          },
+          "003": {
+            "planets_owned_avg": 13.26,
+            "peak_planets": 27,
+            "ships_sent_total": 72429,
+            "neutral_captures": 26,
+            "enemy_flips": 110,
+            "planets_lost": 101,
+            "first_action_step": 2,
+            "final_score": 4061
+          }
+        }
+      }
+    },
+    {
+      "match_id": "2p_002v003_g10",
+      "format": "2p",
+      "players": [
+        "002",
+        "003"
+      ],
+      "seed": 78742735,
+      "status": "ok",
+      "winner": "003",
+      "stats": {
+        "win_turn": 179,
+        "per_player": {
+          "002": {
+            "planets_owned_avg": 8.02,
+            "peak_planets": 15,
+            "ships_sent_total": 6247,
+            "neutral_captures": 14,
+            "enemy_flips": 28,
+            "planets_lost": 41,
+            "first_action_step": 2,
+            "final_score": 0
+          },
+          "003": {
+            "planets_owned_avg": 14.54,
+            "peak_planets": 32,
+            "ships_sent_total": 20637,
+            "neutral_captures": 20,
+            "enemy_flips": 41,
+            "planets_lost": 28,
+            "first_action_step": 1,
+            "final_score": 3027
+          }
+        }
+      }
+    },
+    {
+      "match_id": "2p_002v003_g11",
+      "format": "2p",
+      "players": [
+        "002",
+        "003"
+      ],
+      "seed": 1887185049,
+      "status": "ok",
+      "winner": "003",
+      "stats": {
+        "win_turn": 217,
+        "per_player": {
+          "002": {
+            "planets_owned_avg": 5.08,
+            "peak_planets": 10,
+            "ships_sent_total": 4754,
+            "neutral_captures": 11,
+            "enemy_flips": 25,
+            "planets_lost": 35,
+            "first_action_step": 17,
+            "final_score": 0
+          },
+          "003": {
+            "planets_owned_avg": 9.97,
+            "peak_planets": 20,
+            "ships_sent_total": 20703,
+            "neutral_captures": 15,
+            "enemy_flips": 35,
+            "planets_lost": 25,
+            "first_action_step": 17,
+            "final_score": 2716
+          }
+        }
+      }
+    },
+    {
+      "match_id": "2p_002v004_g12",
+      "format": "2p",
+      "players": [
+        "002",
+        "004"
+      ],
+      "seed": 665932189,
+      "status": "ok",
+      "winner": "004",
+      "stats": {
+        "win_turn": 171,
+        "per_player": {
+          "002": {
+            "planets_owned_avg": 2.76,
+            "peak_planets": 6,
+            "ships_sent_total": 1753,
+            "neutral_captures": 5,
+            "enemy_flips": 12,
+            "planets_lost": 18,
+            "first_action_step": 5,
+            "final_score": 0
+          },
+          "004": {
+            "planets_owned_avg": 11.12,
+            "peak_planets": 32,
+            "ships_sent_total": 15514,
+            "neutral_captures": 25,
+            "enemy_flips": 18,
+            "planets_lost": 12,
+            "first_action_step": 7,
+            "final_score": 3098
+          }
+        }
+      }
+    },
+    {
+      "match_id": "2p_002v004_g13",
+      "format": "2p",
+      "players": [
+        "002",
+        "004"
+      ],
+      "seed": 643536662,
+      "status": "ok",
+      "winner": "002",
+      "stats": {
+        "win_turn": 498,
+        "per_player": {
+          "002": {
+            "planets_owned_avg": 16.82,
+            "peak_planets": 35,
+            "ships_sent_total": 67545,
+            "neutral_captures": 27,
+            "enemy_flips": 152,
+            "planets_lost": 139,
+            "first_action_step": 3,
+            "final_score": 4959
+          },
+          "004": {
+            "planets_owned_avg": 12.62,
+            "peak_planets": 20,
+            "ships_sent_total": 44396,
+            "neutral_captures": 20,
+            "enemy_flips": 139,
+            "planets_lost": 152,
+            "first_action_step": 3,
+            "final_score": 16
+          }
+        }
+      }
+    },
+    {
+      "match_id": "2p_002v004_g14",
+      "format": "2p",
+      "players": [
+        "002",
+        "004"
+      ],
+      "seed": 1369597099,
+      "status": "ok",
+      "winner": "002",
+      "stats": {
+        "win_turn": 366,
+        "per_player": {
+          "002": {
+            "planets_owned_avg": 14.46,
+            "peak_planets": 32,
+            "ships_sent_total": 46602,
+            "neutral_captures": 25,
+            "enemy_flips": 57,
+            "planets_lost": 45,
+            "first_action_step": 4,
+            "final_score": 2845
+          },
+          "004": {
+            "planets_owned_avg": 10.24,
+            "peak_planets": 16,
+            "ships_sent_total": 22696,
+            "neutral_captures": 17,
+            "enemy_flips": 45,
+            "planets_lost": 57,
+            "first_action_step": 3,
+            "final_score": 0
+          }
+        }
+      }
+    },
+    {
+      "match_id": "2p_003v004_g15",
+      "format": "2p",
+      "players": [
+        "003",
+        "004"
+      ],
+      "seed": 719453320,
+      "status": "ok",
+      "winner": "003",
+      "stats": {
+        "win_turn": 325,
+        "per_player": {
+          "003": {
+            "planets_owned_avg": 16.44,
+            "peak_planets": 32,
+            "ships_sent_total": 57285,
+            "neutral_captures": 26,
+            "enemy_flips": 57,
+            "planets_lost": 47,
+            "first_action_step": 9,
+            "final_score": 4805
+          },
+          "004": {
+            "planets_owned_avg": 8.9,
+            "peak_planets": 16,
+            "ships_sent_total": 10818,
+            "neutral_captures": 12,
+            "enemy_flips": 47,
+            "planets_lost": 57,
+            "first_action_step": 5,
+            "final_score": 0
+          }
+        }
+      }
+    },
+    {
+      "match_id": "2p_003v004_g16",
+      "format": "2p",
+      "players": [
+        "003",
+        "004"
+      ],
+      "seed": 1106010448,
+      "status": "ok",
+      "winner": "003",
+      "stats": {
+        "win_turn": 498,
+        "per_player": {
+          "003": {
+            "planets_owned_avg": 13.78,
+            "peak_planets": 23,
+            "ships_sent_total": 48824,
+            "neutral_captures": 23,
+            "enemy_flips": 124,
+            "planets_lost": 116,
+            "first_action_step": 2,
+            "final_score": 2233
+          },
+          "004": {
+            "planets_owned_avg": 12.24,
+            "peak_planets": 17,
+            "ships_sent_total": 45458,
+            "neutral_captures": 20,
+            "enemy_flips": 116,
+            "planets_lost": 124,
+            "first_action_step": 1,
+            "final_score": 219
+          }
+        }
+      }
+    },
+    {
+      "match_id": "2p_003v004_g17",
+      "format": "2p",
+      "players": [
+        "003",
+        "004"
+      ],
+      "seed": 255546887,
+      "status": "ok",
+      "winner": "004",
+      "stats": {
+        "win_turn": 192,
+        "per_player": {
+          "003": {
+            "planets_owned_avg": 7.16,
+            "peak_planets": 13,
+            "ships_sent_total": 3979,
+            "neutral_captures": 12,
+            "enemy_flips": 34,
+            "planets_lost": 46,
+            "first_action_step": 6,
+            "final_score": 0
+          },
+          "004": {
+            "planets_owned_avg": 12.68,
+            "peak_planets": 28,
+            "ships_sent_total": 11950,
+            "neutral_captures": 18,
+            "enemy_flips": 46,
+            "planets_lost": 34,
+            "first_action_step": 6,
+            "final_score": 2109
+          }
+        }
+      }
+    },
+    {
+      "match_id": "4p_0",
+      "format": "4p",
+      "players": [
+        "001",
+        "002",
+        "003",
+        "004"
+      ],
+      "seed": 514617483,
+      "status": "ok",
+      "winner": "002",
+      "stats": {
+        "win_turn": 306,
+        "per_player": {
+          "001": {
+            "planets_owned_avg": 2.63,
+            "peak_planets": 7,
+            "ships_sent_total": 2274,
+            "neutral_captures": 7,
+            "enemy_flips": 28,
+            "planets_lost": 36,
+            "first_action_step": 1,
+            "final_score": 0
+          },
+          "002": {
+            "planets_owned_avg": 14.96,
+            "peak_planets": 32,
+            "ships_sent_total": 51608,
+            "neutral_captures": 16,
+            "enemy_flips": 54,
+            "planets_lost": 35,
+            "first_action_step": 1,
+            "final_score": 5516
+          },
+          "003": {
+            "planets_owned_avg": 5.45,
+            "peak_planets": 10,
+            "ships_sent_total": 5313,
+            "neutral_captures": 7,
+            "enemy_flips": 40,
+            "planets_lost": 44,
+            "first_action_step": 1,
+            "final_score": 0
+          },
+          "004": {
+            "planets_owned_avg": 1.37,
+            "peak_planets": 9,
+            "ships_sent_total": 1077,
+            "neutral_captures": 6,
+            "enemy_flips": 8,
+            "planets_lost": 15,
+            "first_action_step": 1,
+            "final_score": 0
+          }
+        }
+      }
+    },
+    {
+      "match_id": "4p_1",
+      "format": "4p",
+      "players": [
+        "001",
+        "002",
+        "004",
+        "003"
+      ],
+      "seed": 141760658,
+      "status": "ok",
+      "winner": "001",
+      "stats": {
+        "win_turn": 312,
+        "per_player": {
+          "001": {
+            "planets_owned_avg": 18.04,
+            "peak_planets": 36,
+            "ships_sent_total": 72043,
+            "neutral_captures": 21,
+            "enemy_flips": 89,
+            "planets_lost": 69,
+            "first_action_step": 1,
+            "final_score": 6648
+          },
+          "002": {
+            "planets_owned_avg": 1.65,
+            "peak_planets": 8,
+            "ships_sent_total": 1478,
+            "neutral_captures": 7,
+            "enemy_flips": 13,
+            "planets_lost": 21,
+            "first_action_step": 12,
+            "final_score": 0
+          },
+          "004": {
+            "planets_owned_avg": 1.14,
+            "peak_planets": 6,
+            "ships_sent_total": 1083,
+            "neutral_captures": 1,
+            "enemy_flips": 14,
+            "planets_lost": 16,
+            "first_action_step": 12,
+            "final_score": 0
+          },
+          "003": {
+            "planets_owned_avg": 8.35,
+            "peak_planets": 16,
+            "ships_sent_total": 13202,
+            "neutral_captures": 11,
+            "enemy_flips": 73,
+            "planets_lost": 83,
+            "first_action_step": 12,
+            "final_score": 0
+          }
+        }
+      }
+    },
+    {
+      "match_id": "4p_2",
+      "format": "4p",
+      "players": [
+        "001",
+        "003",
+        "002",
+        "004"
+      ],
+      "seed": 1857991744,
+      "status": "ok",
+      "winner": "001",
+      "stats": {
+        "win_turn": 238,
+        "per_player": {
+          "001": {
+            "planets_owned_avg": 9.82,
+            "peak_planets": 24,
+            "ships_sent_total": 16957,
+            "neutral_captures": 7,
+            "enemy_flips": 48,
+            "planets_lost": 30,
+            "first_action_step": 17,
+            "final_score": 2558
+          },
+          "003": {
+            "planets_owned_avg": 1.5,
+            "peak_planets": 5,
+            "ships_sent_total": 793,
+            "neutral_captures": 6,
+            "enemy_flips": 4,
+            "planets_lost": 11,
+            "first_action_step": 17,
+            "final_score": 0
+          },
+          "002": {
+            "planets_owned_avg": 2.55,
+            "peak_planets": 7,
+            "ships_sent_total": 1391,
+            "neutral_captures": 5,
+            "enemy_flips": 21,
+            "planets_lost": 27,
+            "first_action_step": 17,
+            "final_score": 0
+          },
+          "004": {
+            "planets_owned_avg": 5.67,
+            "peak_planets": 11,
+            "ships_sent_total": 5973,
+            "neutral_captures": 5,
+            "enemy_flips": 38,
+            "planets_lost": 43,
+            "first_action_step": 17,
+            "final_score": 0
+          }
+        }
+      }
+    },
+    {
+      "match_id": "4p_3",
+      "format": "4p",
+      "players": [
+        "001",
+        "003",
+        "004",
+        "002"
+      ],
+      "seed": 1210476600,
+      "status": "ok",
+      "winner": "004",
+      "stats": {
+        "win_turn": 383,
+        "per_player": {
+          "001": {
+            "planets_owned_avg": 1.23,
+            "peak_planets": 5,
+            "ships_sent_total": 709,
+            "neutral_captures": 6,
+            "enemy_flips": 10,
+            "planets_lost": 17,
+            "first_action_step": 1,
+            "final_score": 0
+          },
+          "003": {
+            "planets_owned_avg": 7.32,
+            "peak_planets": 16,
+            "ships_sent_total": 10704,
+            "neutral_captures": 7,
+            "enemy_flips": 61,
+            "planets_lost": 66,
+            "first_action_step": 1,
+            "final_score": 0
+          },
+          "004": {
+            "planets_owned_avg": 13.94,
+            "peak_planets": 33,
+            "ships_sent_total": 45017,
+            "neutral_captures": 19,
+            "enemy_flips": 75,
+            "planets_lost": 57,
+            "first_action_step": 1,
+            "final_score": 2981
+          },
+          "002": {
+            "planets_owned_avg": 2.63,
+            "peak_planets": 8,
+            "ships_sent_total": 2372,
+            "neutral_captures": 7,
+            "enemy_flips": 21,
+            "planets_lost": 27,
+            "first_action_step": 1,
+            "final_score": 0
+          }
+        }
+      }
+    },
+    {
+      "match_id": "4p_4",
+      "format": "4p",
+      "players": [
+        "001",
+        "004",
+        "002",
+        "003"
+      ],
+      "seed": 927168981,
+      "status": "ok",
+      "winner": "004",
+      "stats": {
+        "win_turn": 236,
+        "per_player": {
+          "001": {
+            "planets_owned_avg": 1.12,
+            "peak_planets": 7,
+            "ships_sent_total": 691,
+            "neutral_captures": 7,
+            "enemy_flips": 8,
+            "planets_lost": 16,
+            "first_action_step": 5,
+            "final_score": 0
+          },
+          "004": {
+            "planets_owned_avg": 16.36,
+            "peak_planets": 32,
+            "ships_sent_total": 53919,
+            "neutral_captures": 16,
+            "enemy_flips": 63,
+            "planets_lost": 45,
+            "first_action_step": 5,
+            "final_score": 5616
+          },
+          "002": {
+            "planets_owned_avg": 6.85,
+            "peak_planets": 15,
+            "ships_sent_total": 6980,
+            "neutral_captures": 6,
+            "enemy_flips": 60,
+            "planets_lost": 63,
+            "first_action_step": 5,
+            "final_score": 0
+          },
+          "003": {
+            "planets_owned_avg": 2.3,
+            "peak_planets": 7,
+            "ships_sent_total": 1620,
+            "neutral_captures": 6,
+            "enemy_flips": 22,
+            "planets_lost": 29,
+            "first_action_step": 5,
+            "final_score": 0
+          }
+        }
+      }
+    },
+    {
+      "match_id": "4p_5",
+      "format": "4p",
+      "players": [
+        "001",
+        "004",
+        "003",
+        "002"
+      ],
+      "seed": 312319141,
+      "status": "ok",
+      "winner": "002",
+      "stats": {
+        "win_turn": 330,
+        "per_player": {
+          "001": {
+            "planets_owned_avg": 0.97,
+            "peak_planets": 8,
+            "ships_sent_total": 703,
+            "neutral_captures": 6,
+            "enemy_flips": 8,
+            "planets_lost": 14,
+            "first_action_step": 1,
+            "final_score": 0
+          },
+          "004": {
+            "planets_owned_avg": 5.2,
+            "peak_planets": 11,
+            "ships_sent_total": 7095,
+            "neutral_captures": 8,
+            "enemy_flips": 47,
+            "planets_lost": 54,
+            "first_action_step": 1,
+            "final_score": 0
+          },
+          "003": {
+            "planets_owned_avg": 5.35,
+            "peak_planets": 10,
+            "ships_sent_total": 6975,
+            "neutral_captures": 7,
+            "enemy_flips": 41,
+            "planets_lost": 47,
+            "first_action_step": 1,
+            "final_score": 0
+          },
+          "002": {
+            "planets_owned_avg": 9.92,
+            "peak_planets": 24,
+            "ships_sent_total": 23415,
+            "neutral_captures": 8,
+            "enemy_flips": 60,
+            "planets_lost": 41,
+            "first_action_step": 1,
+            "final_score": 3526
+          }
+        }
+      }
+    }
+  ],
+  "summary": {
+    "2p": {
+      "001": {
+        "wins": 3,
+        "losses": 6,
+        "draws": 0
+      },
+      "002": {
+        "wins": 3,
+        "losses": 6,
+        "draws": 0
+      },
+      "003": {
+        "wins": 8,
+        "losses": 1,
+        "draws": 0
+      },
+      "004": {
+        "wins": 4,
+        "losses": 5,
+        "draws": 0
+      }
+    },
+    "4p": {
+      "001": {
+        "wins": 2,
+        "top2": 6,
+        "losses": 0
+      },
+      "002": {
+        "wins": 2,
+        "top2": 3,
+        "losses": 3
+      },
+      "003": {
+        "wins": 0,
+        "top2": 1,
+        "losses": 5
+      },
+      "004": {
+        "wins": 2,
+        "top2": 2,
+        "losses": 4
+      }
+    }
+  }
+}
