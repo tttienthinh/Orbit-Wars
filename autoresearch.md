@@ -52,28 +52,35 @@ Hall of fame: the single best-ever agent config across all completed tournaments
 If hall-of-fame fitness > current-best fitness, use hall-of-fame as Elite.
 
 ## What's Been Tried
-- **Baseline HoF** (gen 015, fitness=34): PROD=14.82, SHIPS=0.103, PROX=44.49, ENEMY=6.72, OVER=0.256, ORBIT=~12
+- **NEW HoF** (gen 029 Elite, fitness=36): PROD=15.97, SHIPS=0.087, PROX=50.0, ENEMY=6.81, ORBIT=27.75, COMPOUND=17.73, OVER=0.476
+  - PERFECT 9W/0L 2p + 2W 4p + top2=5 — best result ever, stagnation resets to 0
+  - Key: PROX=50 (max board reach) + LOW ENEMY=6.81 + HIGH ORBIT=27.75 + HIGH COMPOUND=17.73
 
-- **Best non-HoF** (gen 024 Elite, fitness=33): PROD=11.83, SHIPS=0.053, PROX=50, ENEMY=13.94, ORBIT=18.24
-  - Achieved 7W/2L 2p + 3W 4p + top2=6 simultaneously — proving both-format dominance is possible
+- **Old HoF** (gen 015, fitness=34): PROD=14.82, SHIPS=0.103, PROX=44.49, ENEMY=6.72, OVER=0.256, ORBIT=~12
+  - Superseded by gen 029
 
-- **Critical constraints** (hard rules from 41 experiments):
-  - PROXIMITY_DIST MUST be ≥ 40; PROX<35 = catastrophic 0-win collapse in 2p
-  - PROXIMITY_DIST = 50 is safe with HIGH ENEMY (13+) because abundant neutrals absorb aggression
-  - ENEMY_MULT 8-16 with PROX=50 seems fine for 2p — contradicts earlier assumption of ≤7
-  - ENEMY_MULT ≤ 7 favors 2p when PROX < 48 (agent runs out of neutrals, avoids enemy planets)
-  - SHIPS_MULT 0.04-0.11 is the working range; lower = faster expansion (more attacks)
-  - PROD_MULT 10-16 works; PROD~12 may be optimal for balanced 2p+4p
+- **Vice-HoF** (gen 024 Elite, fitness=33): PROD=11.83, SHIPS=0.053, PROX=50, ENEMY=13.94, ORBIT=18.24
+  - Still useful as a diverse archetype (HIGH ENEMY vs LOW ENEMY)
+
+- **Critical constraints** (hard rules from 44 experiments):
+  - PROXIMITY_DIST MUST be ≥ 44; PROX<40 = catastrophic 0-win collapse in 2p
+  - PROXIMITY_DIST = 50 optimal — used in both HoF (gen 029) and vice-HoF (gen 024)
+  - ENEMY_MULT ≤ 7 strongly preferred for 2p; higher ENEMY only works with PROX=50 AND abundant neutrals
+  - ORBIT_BONUS 27+ appears highly beneficial — gen 029 HoF has ORBIT=27.75 (highest yet in a winner)
+  - COMPOUND_MULT 17+ may help coordinate multi-fleet captures
+  - SHIPS_MULT 0.04-0.11 is the working range; 0.087 optimal for combined 2p+4p
+  - PROD_MULT 15-16 works well; combined with low ENEMY and high ORBIT
 
 - **Failed strategies** (dead ends):
-  - HoF near-clone (σ=0.05 of gen 015): consistently fails in 2p (0-2W/9L typical), fitness 6-28
-  - High ENEMY (10-16) with PROX<45: 0W/9L 2p pattern (gen 037 X23 ENEMY=10.15, PROX=40.7)
+  - HoF near-clone (σ=0.05): consistently fails to reproduce HoF=34/36 on different seeds
+  - High ENEMY (10-16) with PROX<45: 0W/9L 2p pattern
   - Ultra-wide exploration (σ=0.30) without PROX clamp: generates PROX=25-35 → catastrophe
-  - Crossover of 2p-specialist × 4p-specialist: if ENEMY blends to 8-10, can work; if to 10+, 2p collapses
+  - Crossover of 2p-specialist × 4p-specialist: if ENEMY blends to 8-10+, 2p collapses
 
 - **Promising directions**:
-  - Wide-explore (σ=0.30) of recent winners with PROX clamped ≥ 40: produced best results (33)
-  - PROX=50 + HIGH ENEMY (8-16): the gen 024 Elite archetype — most reliable high-fitness pattern
-  - Crossover of gen 015 HoF × gen 024 Elite configs: unexplored, might find fitness>34 sweet spot
+  - Wide-explore (σ=0.30) of recent winners with PROX=50: produced new HoF=36!
+  - High ORBIT_BONUS (27+) + low ENEMY (≤7) + PROX=50: the new champion archetype
+  - Explore COMPOUND_MULT further (17.73 in HoF — is higher better?)
+  - Push fitness above 36: theoretical max = 45; currently at 80% of max
 
-- **Stagnation tracking**: HoF=34 (gen 015), current stagnation=11 gens (gens 016-026 all below 34)
+- **Stagnation tracking**: HoF=36 (gen 029), stagnation=0 (just reset)

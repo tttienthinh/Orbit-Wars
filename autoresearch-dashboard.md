@@ -1,9 +1,9 @@
 # Autoresearch Dashboard: orbit-wars-agent-evolution
 
-**Runs:** 43 | **Kept:** 3 | **Discarded:** 40 | **Crashed:** 0
+**Runs:** 44 | **Kept:** 4 | **Discarded:** 40 | **Crashed:** 0
 **Baseline:** best_fitness: 25pts (#1)
-**Best:** best_fitness: 34pts (#15, +36.0%)
-**HoF target:** 34 (gen 015 X23-g015)
+**Best:** best_fitness: 36pts (#44, +44.0%)
+**HoF target:** 36 (gen 029 Elite-g029)
 
 | # | commit | best_fitness | status | description |
 |---|--------|---------------|--------|-------------|
@@ -31,3 +31,4 @@
 | 41 | e470331 | 27pts (+8.0%) | discard | gen 026 (stagnation=11): Elite-g026=27 (6W/3L 2p, 2W 4p, ENEMY=8.35,PROX=50); X12 near-clone=14; Mut2=19; X23=18 |
 | 42 | dff479e | 25pts (+0.0%) | discard | gen 027 (stagnation=12): X23-g027=25 (6W/3L 2p, 2W 4p); Elite-g027=21 (PROX=40 crippled 2p); X12 HoF near-clone=13; Mut2=19 |
 | 43 | 5cb627f | 26pts (+4.0%) | discard | gen 028 (stagnation=13): Elite-g028=26 (6W/3L 2p, 1W 4p, top2=6); X12 HoF near-clone=19; Mut2=18; X23=15 (ENEMY=9.23 weak) |
+| 44 | b13f33b | 36pts (+44.0%) | **KEEP** | gen 029 NEW HOF! Elite-g029=36 PERFECT 9W/0L 2p + 2W 4p top2=5; PROX=50,ENEMY=6.81,ORBIT=27.75,SHIPS=0.087,PROD=15.97 |

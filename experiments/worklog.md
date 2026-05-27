@@ -358,3 +358,10 @@ Key observations:
 - Result: Elite-g028=26 (6W/3L 2p, 1W 4p, top2=6); X12-g028=19 (4W/5L 2p, 2W 4p); Mut2-g028=18 (4W/5L 2p); X23-g028=15 (4W/5L 2p, ENEMY=9.23)
 - Insight: PROX=44.0 (minimum clamp) is less robust than PROX=48-50 — agents with PROX just at 44 tend to have mediocre 2p results. X23 at ENEMY=9.23+PROX=44 confirmed weak (4W/5L 2p) — consistent with ENEMY>8 needing PROX≥48. HoF near-clone X12 again 4W/5L — cannot reproduce HoF=34. Elite's top2=6 (perfect 4p survival) with only 1W 4p shows high ORBIT_BONUS (13.1) = good survival but not aggressive enough. Ultra-stagnation strategy activates next gen (stagnation=14, threshold=15 → gen 030 if gen 029 also fails).
 - Next: Gen 029 — stagnation=13, deep stagnation strategy; Ultra-stagnation at stagnation=15 triggers gen 030 if needed.
+
+### Run 44: Gen 029 — best_fitness=36 *** NEW HOF! *** (KEEP — beats old HoF=34!)
+- Timestamp: 2026-05-27
+- What changed: Elite-g029=wide-explore(Elite-g028,σ=0.30,PROX=50.0,ENEMY=6.81,SHIPS=0.087,PROD=15.97,ORBIT=27.75,COMPOUND=17.73,PROX_MULT=25.0(capped)); stagnation=13 (deep stagnation → wide-explore + HoF injection)
+- Result: Elite-g029=36 PERFECT 9W/0L 2p + 2W 4p top2=5; X23-g029=19 (3W/6L 2p, 3W 4p); Mut2-g029=12; X12-g029=11
+- Insight: NEW HOF (36 > old 34)! PERFECT 2p record — never seen before in this session. Key config: PROX=50.0 (max board reach), ENEMY=6.81 (low — no wasted attacks on enemy planets), ORBIT=27.75 (HIGH — prizes orbiting planets), SHIPS=0.087 (moderate expansion rate), PROD=15.97 (moderate-high). COMPOUND_MULT=17.73 (HIGH) may help coordinate multi-fleet attacks. Wide-explore of Elite-g028 with σ=0.30 jumped PROX from 44→50, ORBIT from 13.1→27.75. The ORBIT jump is significant — orbiting planets generate continuous production, and high ORBIT_BONUS incentivizes capturing them. Stagnation counter resets to 0. Vice-HoF archetype (gen 024, ENEMY=13.94) still held for comparison.
+- Next: Gen 030 — stagnation=0 (new HoF!); Elite=Elite-g029 (fitness=36); standard evolution: Mut2+crossovers from gen 029 top agents. Goal: push past 36.
