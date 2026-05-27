@@ -324,6 +324,13 @@ Key observations:
 
 
 
+### Run 41: Gen 026 — best_fitness=27 (DISCARD — HoF near-clone collapsed, Elite dipped to 6W/3L)
+- Timestamp: 2026-05-27
+- What changed: Elite=wide-explore(Elite-g025,σ=0.30,PROX=50,ENEMY=8.35,PROD=15.27,ORBIT=23.37); X12=HoF near-clone(σ=0.05,PROX=44.57,ENEMY=7.14,PROD=15.85,SHIPS=0.100); Mut2=mutate(X23-g025,σ=0.12,PROX=46.47,ENEMY=9.36); X23=crossover(Elite-g025,X23-g025); stagnation=11
+- Result: Elite-g026=27 (6W/3L 2p, 2W 4p, top2=5); Mut2-g026=19 (5W/4L 2p, 1W 4p); X23-g026=18; X12-g026=14 (2W/7L 2p, 2W 4p)
+- Insight: Elite dropped from 7W/2L (gen 025) to 6W/3L. The difference vs gen 024 Elite (fitness=33): ENEMY went from 13.94→8.35 and PROD went from 11.83→15.27. One of these changes hurt 2p. HoF near-clone (X12) again collapsed in 2p despite close ENEMY=7.14 to HoF's 6.72 — X12's SHIPS=0.100 matched HoF but PROD=15.85 slightly higher. INSIGHT: Elite-g024's key feature might be LOW PROD (11.83) not high — agents with PROD≥15 seem to over-invest in distant planets. NEW INSIGHT: High ENEMY (13.94) with PROX=50 may HELP 2p by prioritizing aggressive expansion (enemies count for urgency) while PROX=50 ensures neutrals are always available.
+- Next: Gen 027 — deep stagnation=11, wide-explore Elite-g026 (PROX clamped at 40); X12=HoF near-clone; X23=crossover(Elite-g026,Mut2-g026). Watch if lower PROD in Elite helps.
+
 ### Run 40: Gen 025 — best_fitness=26 (DISCARD — Elite lost 4p edge vs gen024)
 - Timestamp: 2026-05-27
 - What changed: Elite=wide-explore(Elite-g024,σ=0.30,PROX=45.41,ORBIT=20.83,PROD=9.14); Mut2=mutate(X23-g024,σ=0.12,PROX=48.80); X12=HoF near-clone(σ=0.05,PROX=45.90,PROD=14.24); X23=crossover(Elite-g024,X23-g024,σ=0.18,PROX=48.81); deep stagnation=10
