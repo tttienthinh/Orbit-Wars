@@ -449,3 +449,10 @@ Key observations:
 - Result: Elite-g041=24 (6W/3L 2p, 0W 4p top2=6); X12-g041=21 (4W/5L 2p, 3W 4p!); X23-g041=18 (3W/6L 2p, 3W 4p!); Mut2-g041=15 (5W/4L 2p, 0W 4p)
 - Insight: X12 and X23 both got 3W 4p — strong 4p performance from HoF-archetype configs but weak 2p on this seed. PROD=26.24 (Elite) didn't kill 2p (6W/3L) — high PROD tolerable when ORBIT is also high (32.25) and PROX=44+. Mut2 (ENEMY=4.82, PROX=50) got 0 4p wins — very low ENEMY doesn't help 4p either. Ultra-stagnation (15) approaching in 3 more gens.
 - Next: Gen 042 — stagnation=12; deep strategy. Ultra-stagnation (HOF×vice-HoF crossover) triggers at stagnation=15.
+
+### Run 57: Gen 042 — best_fitness=24 (DISCARD — stagnation=13; X12 near-clone consistent at 24)
+- Timestamp: 2026-05-28
+- What changed: Elite-g042=wide-explore(Elite-g041,PROD=28.35,ENEMY=3.82,ORBIT=25.32,SHIPS=0.173,PROX=44); Mut2-g042=mutate(Mut2-g041,PROD=16.82,ENEMY=6.28,ORBIT=34.14,SHIPS=0.083,PROX=50); X12-g042=HoF near-clone(PROD=16.61,ENEMY=7.64,ORBIT=26.93,SHIPS=0.091,PROX=50); X23-g042=Crossover(X12-g041,X23-g041,PROD=13.40,ENEMY=5.98,ORBIT=32.88,SHIPS=0.192,PROX=50)
+- Result: X12-g042=24 (6W/3L 2p, 2W 4p); Elite-g042=20 (4W/5L 2p, 1W 4p); Mut2-g042=18 (3W/6L 2p, 3W 4p); X23-g042=16 (5W/4L 2p, 0W 4p)
+- Insight: HoF near-clone (X12) wins again at 24 — consistent but capped. ENEMY=7.64 slightly higher than HoF=6.81 but still works. Mut2 (ORBIT=34) got 3W 4p but only 3W/6L 2p — high ORBIT hurts 2p head-to-head. Elite ENEMY=3.82 (very passive) = 4W/5L 2p + only 1W 4p — too passive even for 4p. SHIPS=0.192 (X23) worked for 2p (5W/4L) but 0W 4p. Stagnation=13 — ultra-stagnation (15) triggers in 2 more gens if stuck.
+- Next: Gen 043 — stagnation=13; deep strategy. Ultra-stagnation (HoF×vice-HoF crossover) at stagnation=15.
