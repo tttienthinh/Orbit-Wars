@@ -176,19 +176,38 @@ def main():
         else:
             break
     HOF_STAGNATION_LIMIT = 3
+    HOF_DEEP_STAGNATION = 6  # after this many gens, use HoF in crossovers directly
 
     if hof_fitness > current_best_fitness and stagnation_count < HOF_STAGNATION_LIMIT:
         print(f"\nHall-of-fame (fitness={hof_fitness}) beats current best ({current_best_fitness}) — using as Elite")
         elite_cfg = hof_cfg
         elite_desc = f"hall-of-fame (fitness={hof_fitness})"
+        crossover_a, crossover_b, crossover_c = elite_cfg, second_cfg, third_cfg
+        x12_desc = f"Crossover(HoF,2nd) from gen {latest_num:03d} + mutation (sigma=0.18)"
+        x23_desc = f"Crossover(2nd,3rd) from gen {latest_num:03d} + mutation (sigma=0.18)"
+    elif hof_fitness > current_best_fitness and stagnation_count >= HOF_DEEP_STAGNATION:
+        # Deep stagnation: wide-explore Elite + inject near-clone of HoF as X12 + crossover(HoF,best)
+        # Avoids SHIPS/PROD contamination from HoF×population crossovers
+        print(f"\nHoF deep stagnation ({stagnation_count} gens) — wide-explore Elite + HoF injection")
+        elite_cfg = mutate(best_cfg, sigma=0.30)
+        elite_desc = f"wide-explore mutation of gen {latest_num:03d} best (stagnation={stagnation_count})"
+        crossover_a, crossover_b, crossover_c = hof_cfg, best_cfg, second_cfg
+        x12_desc = f"HoF near-clone (sigma=0.05, stagnation={stagnation_count})"
+        x23_desc = f"Crossover(HoF,1st) from gen {latest_num:03d} + mutation (sigma=0.18)"
     elif hof_fitness > current_best_fitness and stagnation_count >= HOF_STAGNATION_LIMIT:
         # HoF has been Elite for too long without the population catching up — explore instead
         print(f"\nHoF stagnation ({stagnation_count} gens) — replacing Elite with wide-mutation of current best")
         elite_cfg = mutate(best_cfg, sigma=0.30)
         elite_desc = f"wide-explore mutation of gen {latest_num:03d} best (stagnation={stagnation_count})"
+        crossover_a, crossover_b, crossover_c = elite_cfg, second_cfg, third_cfg
+        x12_desc = f"Crossover(1st,2nd) from gen {latest_num:03d} + mutation (sigma=0.18)"
+        x23_desc = f"Crossover(2nd,3rd) from gen {latest_num:03d} + mutation (sigma=0.18)"
     else:
         elite_cfg = best_cfg
         elite_desc = f"best from gen {latest_num:03d} (fitness={current_best_fitness})"
+        crossover_a, crossover_b, crossover_c = elite_cfg, second_cfg, third_cfg
+        x12_desc = f"Crossover(1st,2nd) from gen {latest_num:03d} + mutation (sigma=0.18)"
+        x23_desc = f"Crossover(2nd,3rd) from gen {latest_num:03d} + mutation (sigma=0.18)"
 
     # Build new generation
     gen_tag = f"g{next_num:03d}"
@@ -205,13 +224,15 @@ def main():
         },
         "003": {
             "_name": f"X12-{gen_tag}",
-            "_description": f"Crossover(1st,2nd) from gen {latest_num:03d} + mutation (sigma=0.18)",
-            **crossover(elite_cfg, second_cfg, sigma=0.18),
+            "_description": x12_desc,
+            **(mutate(crossover_a, sigma=0.05)
+               if x12_desc.startswith("HoF near-clone")
+               else crossover(crossover_a, crossover_b, sigma=0.18)),
         },
         "004": {
             "_name": f"X23-{gen_tag}",
-            "_description": f"Crossover(2nd,3rd) from gen {latest_num:03d} + mutation (sigma=0.18)",
-            **crossover(second_cfg, third_cfg, sigma=0.18),
+            "_description": x23_desc,
+            **crossover(crossover_b, crossover_c, sigma=0.18),
         },
     }
 

@@ -152,3 +152,99 @@ Key observations:
 - Result: X23-g015=34 (7W/2L 2p, 4W 4p, top2=5), Elite=23, Mut2=12, X12=6
 - Insight: BREAKTHROUGH! X23-g015 (crossover of Elite-g014×X23-g014) achieves fitness=34 — new HoF. Key config: PROD_MULT=14.82 (highest ever), SHIPS_MULT=0.103 (lowest ever), PROXIMITY_DIST=44.49 (near full-board). Inherited X12-g014's wide-proximity archetype. Two gens of wide-PROXIMITY_DIST convergence → new optimum.
 - Next: Gen 016 — X23-g015 as Elite; explore PROD_MULT>14, SHIPS_MULT<0.10 direction
+
+### Run 16: Gen 016 tournament — best_fitness=31 (DISCARD — HoF clone collapses again)
+- Timestamp: 2026-05-27
+- What changed: Elite=X23-g015 clone (HoF), Mut2=mutated Elite-g015(2nd), X12/X23=crossovers
+- Result: X23-g016=31 (7W/2L 2p, 3W 4p, top2=4), Mut2=22, X12=18, Elite=7 (0W/9L 2p!)
+- Insight: HoF clone gets 0W/9L in 2p — extreme seed variance at play. X23 operator again best (31), X12 reasonable (18). Pattern: X23 crossover(2nd,3rd) consistently produces competitive agents even when Elite collapses. stagnation_count=1.
+- Next: Gen 017 — HoF (X23-g015) as Elite; stagnation_count=1
+
+### Run 17: Gen 017 tournament — best_fitness=22 (DISCARD — sharp regression)
+- Timestamp: 2026-05-27
+- What changed: Elite=HoF X23-g015 clone, Mut2=mutated X23-g016(1st), X12/X23=crossovers of gen016 top agents
+- Result: X12-g017=X23-g017=22 (tied), Elite=18, Mut2=16
+- Insight: Sharp regression to 22 — worst since gens 003-005. HoF clone mediocre again (18). All agents compressed in 16-22 range. Tournament variance likely — different seed than gen 015's 34. stagnation_count=2, one more discard before wide-explore fires.
+- Next: Gen 018 — HoF as Elite; stagnation_count=2
+
+### Run 18: Gen 018 tournament — best_fitness=24 (DISCARD — stagnation_count=3, wide-explore fires!)
+- Timestamp: 2026-05-27
+- What changed: Elite=HoF X23-g015 clone, Mut2=mutated X12-g017(1st), X12/X23=crossovers
+- Result: Mut2-g018=24 (5W/4L 2p, 2W 4p, top2=5), X12-g018=21 (7W/2L but 0 4p), X23=18, Elite=15
+- Insight: Persistent plateau at 15-24. HoF clone collapses in 2p (3W/6L). X12 shows classic 2p-only specialization again (7W/2L but 0 4p). stagnation_count=3 triggers wide-explore for gen 019 — last time (gen 013) it produced X23-g013=28 which led to the gen 014-015 breakthrough chain.
+- Next: Gen 019 — wide-explore (σ=0.30) of Mut2-g018 (best this gen)
+
+### Run 19: Gen 019 tournament — best_fitness=31 (DISCARD — wide-explore plateau)
+- Timestamp: 2026-05-27
+- What changed: Elite=wide-explore(σ=0.30) of Mut2-g018; Mut2/X12/X23=crossovers of gen018 agents
+- Result: X23-g019=31 (8W/1L 2p, 2W 4p, top2=3), Elite=21, Mut2=16, X12=10
+- Insight: X23 continues to be the best operator — 8W/1L 2p but only 2 4p wins. Wide-explore Elite (21) is mediocre. Persistent plateau: gens 016-019 all 22-31, can't reach 34. stagnation_count=4, wide-explore fires again for gen 020 off X23-g019.
+- Next: Gen 020 — wide-explore(σ=0.30) of X23-g019 (8W/1L 2p agent)
+
+### Run 20: Gen 020 tournament — best_fitness=22 (DISCARD — 2p/4p tradeoff maximally visible)
+- Timestamp: 2026-05-27
+- What changed: Elite=wide-explore(σ=0.30) of X23-g019; Mut2/X12/X23=crossovers
+- Result: Elite=22 (2W/7L 2p but 5W 4p — best 4p record ever!), Mut2=22 (6W/3L 2p, 1W 4p), X12=X23=17
+- Insight: Perfect illustration of 2p/4p tradeoff — Elite has 5W/6 in 4p (best ever) but only 2W/9 in 2p. Mut2 is the opposite: 6W in 2p but 1W in 4p. Neither is the combined champion. The 2p formula awards 3pts/win vs 2pts/4p-win — to beat HoF=34, we need ≥6W 2p + ≥4W 4p + high top2. stagnation_count=5 — wide-explore fires again.
+- Next: Gen 021 — wide-explore(σ=0.30) of Elite-g020 (4p specialist); try to combine 4p strength with better 2p
+
+### Run 21: Gen 021 tournament — best_fitness=30 (DISCARD — closest to HoF since gen 016)
+- Timestamp: 2026-05-27
+- What changed: Elite=wide-explore(σ=0.30) of Elite-g020 (4p specialist); Mut2/X12/X23=crossovers of gen020 agents
+- Result: Elite-g021=30 (6W/3L 2p, 3W 4p, top2=6), X12-g021=25, Mut2=13, X23=10
+- Insight: Elite-g021 is best in gens 016-021. Config: ORBIT_BONUS=22.67 (very high), TIME_PROD_MULT=0.18 (ultra-low), SHIPS_MULT=0.094 (lowest ever), DIST_MULT=0.25. Different from PROXIMITY_DIST=44 archetype — this is an orbit-bonus focused grabber. stagnation_count=6, wide-explore fires again for gen 022.
+- Next: Gen 022 — wide-explore(σ=0.30) of Elite-g021 (orbit+low-ships archetype, fitness=30)
+
+### Run 22: Gen 022 tournament — best_fitness=27 (DISCARD — below HoF 34)
+- Timestamp: 2026-05-27
+- What changed: Elite=wide-explore(σ=0.30) of Elite-g021; Mut2/X12/X23=crossovers; stagnation_count=7
+- Result: X12-g022=27 (6W/3L 2p, 2W 4p, top2=3); Elite=24; Mut2=22; X23=18
+- Insight: Wide-explore keeps producing 27-31 range but cannot break 34. X12 crossover consistently finds decent combined configs but lacks the breakthrough. HoF=34 remains distant. stagnation_count now=7.
+- Next: Gen 023 — stagnation_count=8 fires wide-explore again; use X12-g022 top seed.
+
+### Run 23: Gen 023 tournament — best_fitness=30 (DISCARD — below HoF 34)
+- Timestamp: 2026-05-27
+- What changed: Elite=wide-explore(σ=0.30) of X12-g022; Mut2/X12/X23=crossovers; stagnation_count=8
+- Result: X23-g023=30 (6W/3L 2p, 4W 4p, top2=4); X12=25; Mut2=12; Elite=11
+- Insight: X23 crossover continues to be most consistent performer (30+) but Elite with wide-explore sigma now collapses (11 fitness). The wide-explore mutation is generating Elite configs that lose everything. X23 picks up good combination from parent mix. Two archetypes diverging: X12 finds 2p specialists, X23 finds 4p specialists. stagnation_count=8.
+- Next: Gen 024 — continue wide-explore of X23-g023; explore if any config can break 34.
+
+### Run 24: Gen 024 tournament — best_fitness=24 (DISCARD — below HoF 34)
+- Timestamp: 2026-05-27
+- What changed: Elite=wide-explore(σ=0.30) of X23-g023; Mut2=mutated X12-g023; X12/X23=crossovers; stagnation_count=9
+- Result: X23-g024=24 (6W/3L 2p, 2W 4p, top2=2); Elite=20 (4W/5L 2p, 1W 4p, top2=6!); X12=19; Mut2=15
+- Insight: Elite-g024 has notable survival (top2=6/6 games, losses=0 in 4p) but only 1 win. PROXIMITY_MULT=15.38, PROXIMITY_DIST=50.0, ORBIT_BONUS=19.1 — extreme proximity-first config survives well but doesn't close games. X23 retains 2p dominance but weak 4p this gen. 9 gens of stagnation below HoF=34.
+- Next: Gen 025 — wide-explore of X23-g024; if this continues to stagnate consider changing stagnation strategy.
+
+### Run 25: Gen 025 tournament — best_fitness=24 (DISCARD — 10 gens stagnation)
+- Timestamp: 2026-05-27
+- What changed: Elite=wide-explore(σ=0.30) of X23-g024 (ORBIT_BONUS=34.43, extreme orbit config); X12/X23=crossovers; stagnation_count=10
+- Result: X12-g025=24 (7W/2L 2p, 1W 4p, top2=1); Elite=18 (3W/6L 2p, 2W 4p, top2=5); Mut2=18; X23=18
+- Insight: Elite with ORBIT_BONUS=34.43 again survives 4p (2W,top2=5) but weak 2p. X12 wins most 2p but loses 4p. No agent integrates both. Modified evolve.py: stagnation≥6 now uses HoF directly in crossovers (X12=HoF×1st, X23=HoF×2nd) to reintroduce winning genome.
+- Next: Gen 026 — deep stagnation strategy: X12=Crossover(HoF,best), X23=Crossover(HoF,2nd). X12-g026 has PROD=13.81 (near HoF's 14.82).
+
+### Run 26: Gen 026 tournament — best_fitness=30 (DISCARD — below HoF 34, but best in 5 gens!)
+- Timestamp: 2026-05-27
+- What changed: Elite=wide-explore(σ=0.30) X12-g025; X12=Crossover(HoF,X12-g025); X23=Crossover(HoF,Elite-g025 survival specialist); stagnation_count=11
+- Result: X23-g026=30 (6W/3L 2p, 4W 4p, top2=4); Elite=22; Mut2=17; X12=9
+- Insight: HoF×2nd crossover (X23=30) worked well — combining HoF's production strategy with Elite-g025's orbit survival produced a balanced 30. HoF×1st crossover (X12=9) failed — mixing HoF with 2p-specialist X12-g025 destroyed both strengths. X23-g026 config: PROD=11.72, ENEMY=13.17 (high), SHIPS=0.434 (too high vs HoF 0.103), PROX_DIST=50. SHIPS still drifting high from population contamination.
+- Next: Gen 027 — deep stagnation continues; X12=Crossover(HoF, X23-g026), X23=Crossover(HoF, Elite-g026). X12 has PROD=13.84. SHIPS still high (0.515-0.565 range).
+
+### Run 27: Gen 027 tournament — best_fitness=28 (DISCARD — HoF crossovers failed again)
+- Timestamp: 2026-05-27
+- What changed: Elite=wide-explore of X23-g026; X12=HoF×X23-g026; X23=HoF×Elite-g026; stagnation_count=12
+- Result: Mut2-g027=28 (7W/2L 2p, 2W 4p, top2=3); Elite=22; X23=16; X12=12
+- Insight: HoF crossovers AGAIN failed (X12=12, X23=16). SHIPS_MULT contamination from population (0.515-0.565) makes crossovers inherit wrong values. Mut2 (pure pop mutant) scored 28 — pure population evolution outperforms HoF crossovers. Changed strategy: deep stagnation now injects HoF near-clone (σ=0.05) as X12 to preserve SHIPS/PROD correlation, plus Crossover(HoF,1st) as X23.
+- Next: Gen 028 — X12=HoF near-clone (PROD=15.38, SHIPS=0.104, PROX=43.8); X23=Crossover(HoF,Mut2-g027). Tests if HoF reproduces near-34 on new seed.
+
+### Run 28: Gen 028 tournament — best_fitness=30 (DISCARD — seed variance holds HoF back)
+- Timestamp: 2026-05-27
+- What changed: X12=HoF near-clone (PROD=15.38, SHIPS=0.104, PROX=43.8); X23=HoF×Mut2-g027; stagnation_count=13
+- Result: X12-g028=30 (8W/1L 2p!, 2W 4p, top2=2); Mut2-g028=30 tied; Elite=9 (ENEMY=19.88 failed); X23=9
+- Insight: HoF near-clone dominates 2p (8/9!) confirming PROD+low-SHIPS is genuinely strong. But 4p limited to 2W — seed variance is the barrier (original HoF got 3-4W 4p). Mut2-g028 (mutated Elite-g027) also 30 with 7W 2p + 3W 4p — more balanced. Gen 029: Mut2 of HoF near-clone got PROD=18.41, SHIPS=0.098 — highest PROD ever! Three agents with SHIPS<0.105.
+- Next: Gen 029 — PROD=18.41+SHIPS=0.098 (Mut2), HoF near-clone (X12), HoF×Mut2-g028 (X23). Best gen setup yet for low-SHIPS territory.
+
+
+
+
+

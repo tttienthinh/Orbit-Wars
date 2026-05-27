@@ -1,6 +1,6 @@
 # Autoresearch Dashboard: orbit-wars-agent-evolution
 
-**Runs:** 15 | **Kept:** 3 | **Discarded:** 12 | **Crashed:** 0
+**Runs:** 28 | **Kept:** 3 | **Discarded:** 25 | **Crashed:** 0
 **Baseline:** best_fitness: 27pts (gen 000 OrbDom, seed=16)
 **Best:** best_fitness: **34pts** (#15, +25.9% vs baseline) — X23-g015
 
@@ -21,6 +21,19 @@
 | 13 | edeb0b5 | 28 (+3.7%) | 7 | discard | gen 013: wide-explore Elite failed; X23=28 — high COMPOUND_MULT |
 | 14 | a228bb2 | 33 (+22.2%) | 7 | discard | gen 014: X12 ties HoF=33 via PROXIMITY_DIST=44.9, low ENEMY_MULT |
 | 15 | f87d874 | **34 (+25.9%)** | 7 | **keep** | gen 015: X23-g015 new HoF=34; PROD_MULT=14.82, SHIPS_MULT=0.103 |
+| 16 | 9da2f41 | 31 (+14.8%) | 7 | discard | gen 016: HoF clone 0W/9L collapse; X23=31 |
+| 17 | af8fcb8 | 22 (-18.5%) | 6 | discard | gen 017: sharp regression; all 16-22 |
+| 18 | 67d8634 | 24 (-11.1%) | 7 | discard | gen 018: Mut2=24; stagnation_count=3 fires wide-explore |
+| 19 | 5d6a2aa | 31 (+14.8%) | 8 | discard | gen 019: X23=31 (8W/1L 2p); wide-explore |
+| 20 | ffd1638 | 22 (-18.5%) | 6 | discard | gen 020: Elite 5W/6 4p but 2W 2p; tradeoff maximally visible |
+| 21 | 355076d | 30 (+11.1%) | 7 | discard | gen 021: Elite=30 balanced (ORBIT_BONUS=22.67 archetype) |
+| 22 | 776c296 | 27 (+0%) | 6 | discard | gen 022: X12=27; stagnation_count=7 |
+| 23 | 9d53978 | 30 (+11.1%) | 6 | discard | gen 023: X23=30 (6W/3L 2p, 4W 4p, top2=4); stagnation_count=8 |
+| 24 | 97e2496 | 24 (-11.1%) | 6 | discard | gen 024: X23=24 (6W/3L 2p, 2W 4p); Elite survival top2=6 but low wins; stagnation_count=9 |
+| 25 | ec2ba5b | 24 (-11.1%) | 7 | discard | gen 025: X12=24 (7W/2L 2p, 1W 4p); Elite ORBIT=34 survives 4p; 10 gens stagnation → deep strategy |
+| 26 | af40e6a | 30 (+11.1%) | 6 | discard | gen 026: X23(HoF×2nd)=30 (6W/3L 2p, 4W 4p, top2=4); HoF crossover works; X12(HoF×1st)=9 failed |
+| 27 | ac0e0ea | 28 (+3.7%) | 7 | discard | gen 027: Mut2=28 (7W/2L 2p, 2W 4p); HoF crossovers fail (SHIPS contamination); strategy → HoF injection |
+| 28 | e0642da | 30 (+11.1%) | 8 | discard | gen 028: HoF near-clone=30 (8W/1L 2p!); Mut2=30; tied but 4p limited by seed variance |
 
 ## Gen Standings
 
