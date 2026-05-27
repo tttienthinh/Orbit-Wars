@@ -442,3 +442,10 @@ Key observations:
 - Result: 3-way tie at 22 — Elite(5W/4L 2p, 1W 4p); Mut2(6W/3L 2p — best 2p, 1W 4p); X12(5W/4L 2p, 2W 4p); X23=12 (2W/7L — ENEMY=4.50 too passive)
 - Insight: SHIPS clamp to 0.20 prevented Elite catastrophe (0.479 would have been disaster). 3-way tie at 22 suggests seed is limiting all agents equally — the tournament seed constrains maximum achievable fitness. Mut2 (ORBIT=27, SHIPS=0.098, ENEMY=5.53) got best 2p at 6W/3L — close to HoF archetype but ENEMY=5.53 slightly low. HoF near-clone (X12) tied at 22 with 2W 4p — good 4p but mediocre 2p on this seed. X23 confirmed: ENEMY<5 = 2W/7L disaster. stagnation=11, next deep-stagnation gen. Ultra-stagnation (15) approaching.
 - Next: Gen 041 — stagnation=11; deep strategy continues. Ultra-stagnation at 15 will bring HoF×vice-HoF crossover.
+
+### Run 56: Gen 041 — best_fitness=24 (DISCARD — stagnation=12; PROD=26 high but 6W/3L 2p)
+- Timestamp: 2026-05-28
+- What changed: Elite-g041=wide-explore(Elite-g040,PROD=26.24,ENEMY=5.68,ORBIT=32.25,SHIPS=0.20↓clamped,PROX=44.4); Mut2-g041=mutate(Mut2-g040,PROD=14.55,ENEMY=4.82,ORBIT=34.19,SHIPS=0.104,PROX=50); X12-g041=HoF near-clone(PROD=16.07,ENEMY=6.86,ORBIT=28.91,SHIPS=0.088,PROX=49.4); X23-g041=Crossover(Elite,Mut2,PROD=11.47,ENEMY=6.24,ORBIT=35,SHIPS=0.113,PROX=44)
+- Result: Elite-g041=24 (6W/3L 2p, 0W 4p top2=6); X12-g041=21 (4W/5L 2p, 3W 4p!); X23-g041=18 (3W/6L 2p, 3W 4p!); Mut2-g041=15 (5W/4L 2p, 0W 4p)
+- Insight: X12 and X23 both got 3W 4p — strong 4p performance from HoF-archetype configs but weak 2p on this seed. PROD=26.24 (Elite) didn't kill 2p (6W/3L) — high PROD tolerable when ORBIT is also high (32.25) and PROX=44+. Mut2 (ENEMY=4.82, PROX=50) got 0 4p wins — very low ENEMY doesn't help 4p either. Ultra-stagnation (15) approaching in 3 more gens.
+- Next: Gen 042 — stagnation=12; deep strategy. Ultra-stagnation (HOF×vice-HoF crossover) triggers at stagnation=15.
