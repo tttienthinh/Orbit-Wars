@@ -190,8 +190,9 @@ def main():
             break
 
     # JSONL fallback: if fewer than 5 past tournaments visible, read from autoresearch.jsonl
+    # Skip if current gen just beat HoF (stagnation resets to 0 by definition)
     JSONL_PATH = PROJECT_ROOT / "autoresearch.jsonl"
-    if stagnation_count < 5 and JSONL_PATH.exists():
+    if stagnation_count < 5 and current_best_fitness < hof_fitness and JSONL_PATH.exists():
         jsonl_stagnation = 0
         runs = []
         with open(JSONL_PATH, encoding="utf-8") as f:
@@ -210,7 +211,7 @@ def main():
             else:
                 break
         if jsonl_stagnation > stagnation_count:
-            print(f"  [JSONL fallback] stagnation_count overridden: {stagnation_count} → {jsonl_stagnation}")
+            print(f"  [JSONL fallback] stagnation_count overridden: {stagnation_count} -> {jsonl_stagnation}")
             stagnation_count = jsonl_stagnation
     HOF_STAGNATION_LIMIT = 3
     HOF_DEEP_STAGNATION = 6   # wide-explore Elite + HoF near-clone strategy
@@ -294,12 +295,10 @@ def main():
         },
     }
 
-    # In deep stagnation, clamp PROXIMITY_DIST >= 44 for all configs to stay in proven zone
-    # (PROX<40 is catastrophic; PROX 44-50 is the proven high-performance range)
-    if stagnation_count >= HOF_DEEP_STAGNATION and hof_fitness > current_best_fitness:
-        for cfg in new_configs.values():
-            if cfg.get("PROXIMITY_DIST", 50.0) < 44.0:
-                cfg["PROXIMITY_DIST"] = 44.0
+    # Always clamp PROXIMITY_DIST >= 44 — PROX<40 is catastrophic in 2p, 44-50 is proven range
+    for cfg in new_configs.values():
+        if cfg.get("PROXIMITY_DIST", 50.0) < 44.0:
+            cfg["PROXIMITY_DIST"] = 44.0
 
     # Write configs
     next_folder.mkdir(parents=True)
