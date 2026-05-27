@@ -323,3 +323,10 @@ Key observations:
 
 
 
+
+### Run 39: Gen 024 (new session re-run) — best_fitness=33 (DISCARD — 1 below HoF=34!)
+- Timestamp: 2026-05-27
+- What changed: Elite=wide-explore(σ=0.30) of Mut2-g023 (PROX=50.0,ORBIT=18.24,PROD=11.83); Mut2=mutated X23-g023; X12=HoF near-clone(σ=0.05); X23=Crossover(Mut2-g023,X23-g023); deep stagnation=9
+- Result: Elite-g024=33 (7W/2L 2p, 3W 4p, top2=6); X23-g024=25; Mut2-g024=14; X12-g024=6 (HoF near-clone COLLAPSED again)
+- Insight: CLOSEST TO HOF SINCE GEN 015! Elite achieved 33 via wide-explore with PROX=50.0 — full-board proximity. The 3W 4p + top2=6 shows excellent survival. HoF near-clone (X12) again failed (6) — PROD=14.5,SHIPS=0.1 archetype cannot reproduce HoF=34 reliably on different seeds. Wide-explore of pop best continues to be the most productive operator.
+- Next: Gen 025 — deep stagnation continues; Elite=wide-explore of Elite-g024 (PROX=50.0 strategy), HoF near-clone attempted again, crossovers from g024 top-2.
