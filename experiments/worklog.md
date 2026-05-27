@@ -414,3 +414,10 @@ Key observations:
 - Result: X12-g036=25 (8W/1L 2p, 0W 4p, top2=1); Elite-g036=19 (3W/6L 2p, 2W 4p); X23-g036=18 (4W/5L 2p, 2W 4p); Mut2-g036=16 (3W/6L 2p, 2W 4p)
 - Insight: HoF near-clone (X12-g036) won 2p with 8W/1L but scored 0 4p wins → pure 2p specialist, not good enough overall. SHIPS=0.238 (Elite) confirmed toxic: 3W/6L 2p. ENEMY=4.39 (X23) — too aggressive in 2p? 4W/5L suggests ENEMY too low is bad (doesn't attack enough?). Wide-explore keeps generating SHIPS>0.15 and PROD>20 — danger zone. 7 consecutive gens below HoF=36; stagnation stays deep.
 - Next: Gen 037 — stagnation=7 (still deep); wide-explore Elite + HoF near-clone (X12) + Crossover(1st,2nd) archetype fusion. Consider tightening SHIPS upper bound in evolve.py.
+
+### Run 52: Gen 037 — best_fitness=30 (DISCARD — stagnation=8; X23 surprise winner, SHIPS=0.186 worked)
+- Timestamp: 2026-05-27
+- What changed: Elite-g037=wide-explore(X12-g036,sigma=0.30,PROD=6.01,ENEMY=9.07,ORBIT=27.96,SHIPS=0.063,PROX=50); Mut2-g037=mutate(Elite-g036,PROD=25.34,SHIPS=0.241,ORBIT=35,ENEMY=6.15,PROX=50); X12-g037=HoF near-clone(sigma=0.05,ENEMY=6.85,ORBIT=27.65,SHIPS=0.087,PROX=49.89); X23-g037=Crossover(X12-g036,Elite-g036,PROD=19.78,SHIPS=0.186,ORBIT=33.77,ENEMY=7.18,PROX=44)
+- Result: X23-g037=30 (7W/2L 2p, 3W 4p top2=3); Elite-g037=20 (5W/4L 2p, 0W 4p); X12-g037=18 (5W/4L 2p, 1W 4p); Mut2-g037=10 (1W/8L — SHIPS=0.24 toxic)
+- Insight: X23 (SHIPS=0.186, ORBIT=33.77, ENEMY=7.18, PROX=44) won — surprising given SHIPS>0.15 and PROX=44 are usually danger signals. BUT: 3W 4p + 7W 2p = solid combined performance. SHIPS can be higher when ENEMY is moderate (7.18) and ORBIT is very high (33.77). HoF near-clone (X12) only scored 18 despite ideal params — seed variance again. Wide-explore Elite (PROD=6.01, ENEMY=9.07) scored 20 with PROD very low — interesting that low PROD + moderate ENEMY still worked OK. Stagnation=8, deep stagnation continues.
+- Next: Gen 038 — stagnation=8; deep stagnation strategy; wide-explore of X23-g037 + HoF near-clone + Crossover(1st,2nd) fusion.
