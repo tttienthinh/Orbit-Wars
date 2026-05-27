@@ -386,3 +386,10 @@ Key observations:
 - Result: Elite-g032=27 (7W/2L 2p, 0W 4p, top2=6); X23-g032=24 (5W/4L 2p, 3W 4p); Mut2-g032=18; X12-g032=9 (2W/7L 2p, ORBIT=35)
 - Insight: ORBIT=35.0 (max bound) confirmed HARMFUL — 2W/7L 2p. Agent over-values orbiting planets, ignores closer expansion targets. Optimal ORBIT range appears to be 20-30 (HoF=27.75). HoF clone variance: 36/32/29/27 across 4 seeds — mean ~31, so true fitness is ~31, peak of 36 was partly luck. stagnation=3 hits HOF_STAGNATION_LIMIT → gen 033 uses wide-explore (σ=0.30) of current best instead of bare HoF clone. X23 (ENEMY=5.37+PROX=44) got decent 3W 4p — very low ENEMY works for 4p.
 - Next: Gen 033 — stagnation=3, HOF_STAGNATION_LIMIT reached; wide-explore σ=0.30 of HoF config; crossovers from gen 032 top-2 (Elite+X23).
+
+### Run 48: Gen 033 — best_fitness=22 (DISCARD — wide-explore drifted, ORBIT 20-27 sweet spot)
+- Timestamp: 2026-05-27
+- What changed: Elite-g033=wide-explore(Elite-g032,σ=0.30,ORBIT=34.28,PROD=22.94); Mut2=mutate(X23-g032,PROX=44,ENEMY=5.15,PROD=11.85,ORBIT=22.44); X12=Crossover(Elite-g032,X23-g032,PROX=50,ORBIT=24.27); X23=Crossover(X23-g032,Mut2-g032,PROX=44.85,ENEMY=7.74); stagnation=4
+- Result: X12-g033=22 (7W/2L 2p, PROX=50,ORBIT=24); Elite-g033=21 (4W/5L 2p, ORBIT=34,PROD=23); X23-g033=19 (6W/3L 2p); Mut2-g033=16 (1W/8L 2p, 4W 4p RECORD tie!)
+- Insight: ORBIT sweet spot confirmed at 20-27 — ORBIT=24 (X12) beat ORBIT=34 (Elite) in 2p. PROD=22.94 too high (over-invests in far planets). Mut2 (PROD=11.85,ENEMY=5.15) got 4W 4p — tied the 4p record! Low ENEMY+PROD in 4p means less aggression = better survival. Wide-explore from σ=0.30 drifted to extremes (ORBIT>30, PROD>20) that hurt performance. Gen 034 will wide-explore X12-g033 (the best recent config, ORBIT=24, closer to HoF=27).
+- Next: Gen 034 — stagnation=4; wide-explore (σ=0.30) of X12-g033 (PROX=50, ORBIT=24, ENEMY=6.47); crossovers from Elite+X23 of gen 033.

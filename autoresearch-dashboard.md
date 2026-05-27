@@ -1,6 +1,6 @@
 # Autoresearch Dashboard: orbit-wars-agent-evolution
 
-**Runs:** 47 | **Kept:** 4 | **Discarded:** 43 | **Crashed:** 0
+**Runs:** 48 | **Kept:** 4 | **Discarded:** 44 | **Crashed:** 0
 **Baseline:** best_fitness: 25pts (#1)
 **Best:** best_fitness: 36pts (#44, +44.0%)
 **HoF target:** 36 (gen 029 Elite-g029)
@@ -35,3 +35,4 @@
 | 45 | ece341f | 32pts (+28.0%) | discard | gen 030 (stagnation=1): Elite(HoF clone)=32 (8W/1L 2p, seed variance drop); X12(PROD=23.7)=7 (0W/9L 2p); X23=21; Mut2=18 |
 | 46 | 983a167 | 29pts (+16.0%) | discard | gen 031 (stagnation=2): Elite(HoF clone)=29 (7W/2L 2p); X12=21; Mut2=19 (3W 4p); X23=9 — HoF variance 36/32/29 |
 | 47 | 989342e | 27pts (+8.0%) | discard | gen 032 (stagnation=3): Elite(HoF clone)=27 (7W/2L 2p, 0W 4p); X23=24 (3W 4p); X12(ORBIT=35)=9 (2W/7L — too extreme) |
+| 48 | c59ecb8 | 22pts (-12.0%) | discard | gen 033 (stagnation=4): X12(ORBIT=24,PROX=50)=22 (7W/2L 2p); Elite(ORBIT=34,PROD=23)=21 (4W/5L 2p); Mut2=16 (4W 4p!) |
