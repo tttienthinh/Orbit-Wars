@@ -435,3 +435,10 @@ Key observations:
 - Result: Elite-g039=22 (4W/5L 2p, SHIPS=0.239 toxic); Mut2-g039=22 tied (5W/4L 2p, ENEMY=4.66); X23-g039=19; X12-g039=15 (HoF near-clone underperformed!)
 - Insight: SHIPS=0.239 confirmed toxic — same failure mode as gen 036 Elite (0.238). SHIPS ceiling for high-ORBIT archetype is ~0.175-0.18, not 0.24. ENEMY<5 (4.66-4.85) also hurt: very passive agents lose territory to moderate-aggression opponents. HoF near-clone scored only 15 (4W/5L 2p) — seed variance or the gen 039 seed is unfavorable to ORBIT=24.9. Gen 038 Elite (SHIPS=0.175, ORBIT=35, ENEMY=7.18, PROX=44) remains the best high-ORBIT config found. Confirmed refined SHIPS ceiling: 0.12-0.18 range for high-ORBIT archetype, 0.08-0.10 for HoF archetype.
 - Next: Gen 040 — stagnation=10; deep strategy; wide-explore of Elite-g038 (best recent non-HoF config); focus on ENEMY 6-8 range, SHIPS 0.10-0.18.
+
+### Run 55: Gen 040 — best_fitness=22 (DISCARD — stagnation=11; 3-way tie, SHIPS clamp validated)
+- Timestamp: 2026-05-28
+- What changed: Elite-g040=wide-explore(Elite-g039,SHIPS=0.479→CLAMPED=0.20,ORBIT=35,ENEMY=6.07,PROX=50); Mut2-g040=mutate(Mut2-g039,SHIPS=0.098,ORBIT=27.16,ENEMY=5.53,PROX=44); X12-g040=HoF near-clone(sigma=0.05,SHIPS=0.083,ENEMY=7.04,ORBIT=29.91,PROX=47); X23-g040=Crossover(Elite,Mut2,SHIPS=0.074,ENEMY=4.50,ORBIT=29.30,PROX=44.7)
+- Result: 3-way tie at 22 — Elite(5W/4L 2p, 1W 4p); Mut2(6W/3L 2p — best 2p, 1W 4p); X12(5W/4L 2p, 2W 4p); X23=12 (2W/7L — ENEMY=4.50 too passive)
+- Insight: SHIPS clamp to 0.20 prevented Elite catastrophe (0.479 would have been disaster). 3-way tie at 22 suggests seed is limiting all agents equally — the tournament seed constrains maximum achievable fitness. Mut2 (ORBIT=27, SHIPS=0.098, ENEMY=5.53) got best 2p at 6W/3L — close to HoF archetype but ENEMY=5.53 slightly low. HoF near-clone (X12) tied at 22 with 2W 4p — good 4p but mediocre 2p on this seed. X23 confirmed: ENEMY<5 = 2W/7L disaster. stagnation=11, next deep-stagnation gen. Ultra-stagnation (15) approaching.
+- Next: Gen 041 — stagnation=11; deep strategy continues. Ultra-stagnation at 15 will bring HoF×vice-HoF crossover.
