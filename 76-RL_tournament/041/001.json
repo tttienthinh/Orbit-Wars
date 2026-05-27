@@ -1,0 +1,18 @@
+{
+  "_name": "Elite-g041",
+  "_description": "Elite: wide-explore mutation of gen 040 best (stagnation=11)",
+  "PROD_MULT": 26.2354,
+  "TIME_PROD_MULT": 0.1,
+  "ENEMY_MULT": 5.6764,
+  "COMPOUND_MULT": 13.017,
+  "MINE_NEAR_TGT_MULT": 6.2067,
+  "ENEMY_NEAR_TGT_MULT": 6.4255,
+  "PROD_SRC_MULT": 5.6619,
+  "ORBIT_BONUS": 32.2474,
+  "PROXIMITY_MULT": 25.0,
+  "DIST_MULT": 1.6147,
+  "SHIPS_MULT": 0.2,
+  "ETA_MULT": 0.2332,
+  "OVEREXTEND_MULT": 0.3138,
+  "PROXIMITY_DIST": 44.3667
+}
