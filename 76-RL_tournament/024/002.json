@@ -1,0 +1,18 @@
+{
+  "_name": "Mut2-g024",
+  "_description": "Mutant of 2nd place from gen 023 (sigma=0.12)",
+  "PROD_MULT": 12.2736,
+  "TIME_PROD_MULT": 0.2511,
+  "ENEMY_MULT": 8.3507,
+  "COMPOUND_MULT": 6.1086,
+  "MINE_NEAR_TGT_MULT": 4.67,
+  "ENEMY_NEAR_TGT_MULT": 2.1504,
+  "PROD_SRC_MULT": 6.2817,
+  "ORBIT_BONUS": 15.0815,
+  "PROXIMITY_MULT": 10.1669,
+  "DIST_MULT": 0.3203,
+  "SHIPS_MULT": 0.0882,
+  "ETA_MULT": 0.593,
+  "OVEREXTEND_MULT": 0.3338,
+  "PROXIMITY_DIST": 40.0
+}
