@@ -300,8 +300,19 @@ Key observations:
 - Insight: MAJOR DISCOVERY — if you combine Elite's 2p dominance + Mut2's 4p dominance: 7×3 + 5×2 + 5 = 36 > HoF=34! The two complementary archetypes TOGETHER would beat HoF. Modified evolve.py: X23 now = Crossover(1st,2nd) directly to fuse the archetypes. Gen 037: X23-g037 fusion has SHIPS=0.062 (from 0.057) + ENEMY=10.15 (between 8.52 and 16.21) + PROX=40.7. Elite SHIPS=0.044 (lowest ever).
 - Next: Gen 037 — archetype fusion: X23(SHIPS=0.062,ENEMY=10.15) directly tries to combine 2p+4p strengths.
 
+### Run 37: Gen 037 tournament — best_fitness=29 (DISCARD — fusion collapsed, ENEMY must stay low)
+- Timestamp: 2026-05-27
+- What changed: Elite=wide-explore(Elite-g036,σ=0.30,PROX≥40)→SHIPS=0.044,PROD=18.08; X12=HoF near-clone(σ=0.05); X23=Crossover(Elite-g036,Mut2-g036)→SHIPS=0.062,ENEMY=10.15,PROX=40.7; stagnation=22
+- Result: Elite-g037=29 (7W/2L 2p, 1W 4p, top2=6); X12-g037=24 (7W/2L 2p, 1W 4p, top2=1); Mut2=19; X23=6 (0W/9L 2p, 2W 4p)
+- Insight: FUSION FAILED — X23(SHIPS=0.062,ENEMY=10.15) collapsed 0W/9L 2p. ENEMY=10.15 too high: in 1v1 it attacks enemy planets instead of expanding neutrals, losing production race. Critical constraint: ENEMY must stay ≤7 for 2p viability. Two 7W/2L agents (Elite+X12) coexisted by sharing wins from weak opponents. Gen 038: X23 fuses Elite-g037(7W/2L) × X12-g037(7W/2L) — both ENEMY-safe (8.58 vs 6.28 blend ≈7).
+- Next: Gen 038 — more aligned fusion parents; ENEMY will blend to ~7 (safe zone).
 
-
+### Run 38: Gen 038 tournament — best_fitness=28 (DISCARD — PROX<40 kills X23 again)
+- Timestamp: 2026-05-27
+- What changed: Elite=wide-explore(Elite-g037,σ=0.30)→ORBIT=31.93,SHIPS=0.042; X12=HoF near-clone(σ=0.05,PROX=49.61); Mut2=mutate(X12-g037,σ=0.12); X23=Crossover(Elite-g037,X12-g037)→SHIPS=0.034,ENEMY=4.01,PROX=37.24; stagnation=23
+- Result: Elite-g038=28 (6W/3L 2p, 2W 4p, top2=6 PERFECT 4p survival); X12-g038=22 (6W/3L 2p, 1W 4p); Mut2-g038=21 (6W/3L 2p, 1W 4p); X23-g038=7 (0W/9L 2p, 2W 4p)
+- Insight: X23 PROX=37.24 (below 40) → 0W/9L 2p again. The PROX≥40 clamp on wide-explore didn't help X23 from crossover drift below 40. Need to clamp PROX≥40 in crossover too when deep stagnation. Elite's ORBIT_BONUS=31.93 (record!) gave 2W 4p + top2=6 — maximum 4p survival. X12(PROX=49.61) showed PROX can go above HoF's 44.49 safely. Gen 039: X23 will inherit from Elite(ORBIT=31.93,PROX=40) × X12(PROX=49.61) — need to clamp PROX≥40 in crossover too.
+- Next: Gen 039 — consider clamping PROX≥40 in crossover for deep stagnation to prevent PROX drift.
 
 
 

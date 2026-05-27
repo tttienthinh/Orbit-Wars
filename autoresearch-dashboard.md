@@ -1,6 +1,6 @@
 # Autoresearch Dashboard: orbit-wars-agent-evolution
 
-**Runs:** 36 | **Kept:** 3 | **Discarded:** 33 | **Crashed:** 0
+**Runs:** 38 | **Kept:** 3 | **Discarded:** 35 | **Crashed:** 0
 **Baseline:** best_fitness: 27pts (gen 000 OrbDom, seed=16)
 **Best:** best_fitness: **34pts** (#15, +25.9% vs baseline) — X23-g015
 
@@ -42,6 +42,8 @@
 | 34 | 96d909c | 22 (-18.5%) | 6 | discard | gen 034: Mut2=X23=22; PROX<35 again crippled Elite; PROX≥40 clamp added to wide-explore |
 | 35 | 1cb84be | 28 (+3.7%) | 9 | discard | gen 035: X12 PERFECT 9W/0L 2p! but 0W 4p — ultimate 2p specialist; PROX clamp working |
 | 36 | f2ef72b | 26 (-3.7%) | 7 | discard | gen 036: Elite(SHIPS=0.057)=26 2p; Mut2(ENEMY=16.21)=24 5W 4p RECORD! fusion=36 if combined |
+| 37 | 07d8d53 | 29 (+7.4%) | 7 | discard | gen 037: Elite(SHIPS=0.044,PROD=18.08)=29 (7W/2L 2p, 1W 4p, top2=6); X12(HoF near-clone)=24; fusion X23(ENEMY=10.15) collapsed 0W/9L |
+| 38 | 6e9879b | 28 (+3.7%) | 6 | discard | gen 038: Elite(ORBIT=31.93)=28 (6W/3L 2p, 2W 4p top2=6); all 3 tied 6W/3L; X23(SHIPS=0.034,PROX=37.24) 0W/9L — PROX<40 fatal |
 
 ## Gen Standings
 

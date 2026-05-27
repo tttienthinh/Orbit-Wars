@@ -239,6 +239,12 @@ def main():
         },
     }
 
+    # In deep stagnation, clamp PROXIMITY_DIST >= 40 for all configs to prevent short-range regressions
+    if stagnation_count >= HOF_DEEP_STAGNATION and hof_fitness > current_best_fitness:
+        for cfg in new_configs.values():
+            if cfg.get("PROXIMITY_DIST", 50.0) < 40.0:
+                cfg["PROXIMITY_DIST"] = 40.0
+
     # Write configs
     next_folder.mkdir(parents=True)
     for pid, cfg in new_configs.items():
