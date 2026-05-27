@@ -351,3 +351,10 @@ Key observations:
 - Result: X23-g027=25 (6W/3L 2p, 2W 4p, top2=3); Elite-g027=21 (3W/6L 2p, 3W 4p); Mut2-g027=19 (6W/3L 2p, 0W 4p); X12-g027=13 (3W/6L 2p, 1W 4p)
 - Insight: Elite-g027 PROX=40.0 (exactly at old clamp minimum) suffered severe 2p penalty (3W/6L) — confirms PROX≥44 needed, PROX=40 is a danger zone. X23 won with PROX=44.59 + ENEMY=7.99 (moderate). evolve.py already updated to clamp PROX≥44 for future gens. HoF near-clone (X12) again fails in 2p (3W/6L) despite ENEMY=6.89 matching HoF archetype — confirms that HoF config doesn't reproduce on different seeds. Ultra-stagnation strategy (HoF×vice-HoF crossover) will activate at stagnation=15 (gen 030).
 - Next: Gen 028 — stagnation=12, deep stagnation strategy continues; all configs PROX≥44; X23 winner becomes Mut2 parent; vice-HoF crossover 3 gens away.
+
+### Run 43: Gen 028 — best_fitness=26 (DISCARD — Elite PROX=44 baseline, X23 ENEMY=9 weak)
+- Timestamp: 2026-05-27
+- What changed: Elite-g028=wide-explore(X23-g027,σ=0.30,PROX=44.0,ENEMY=7.59,SHIPS=0.065,PROD=14.95); Mut2=mutate(Elite-g027,σ=0.12,PROX=44.0,SHIPS=0.044); X12=HoF near-clone(σ=0.05,PROX=44.0,ENEMY=6.55,SHIPS=0.100); X23=Crossover(X23-g027,Elite-g027,PROX=44.0,ENEMY=9.23); stagnation=13
+- Result: Elite-g028=26 (6W/3L 2p, 1W 4p, top2=6); X12-g028=19 (4W/5L 2p, 2W 4p); Mut2-g028=18 (4W/5L 2p); X23-g028=15 (4W/5L 2p, ENEMY=9.23)
+- Insight: PROX=44.0 (minimum clamp) is less robust than PROX=48-50 — agents with PROX just at 44 tend to have mediocre 2p results. X23 at ENEMY=9.23+PROX=44 confirmed weak (4W/5L 2p) — consistent with ENEMY>8 needing PROX≥48. HoF near-clone X12 again 4W/5L — cannot reproduce HoF=34. Elite's top2=6 (perfect 4p survival) with only 1W 4p shows high ORBIT_BONUS (13.1) = good survival but not aggressive enough. Ultra-stagnation strategy activates next gen (stagnation=14, threshold=15 → gen 030 if gen 029 also fails).
+- Next: Gen 029 — stagnation=13, deep stagnation strategy; Ultra-stagnation at stagnation=15 triggers gen 030 if needed.
