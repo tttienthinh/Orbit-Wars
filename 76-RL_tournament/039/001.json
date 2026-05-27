@@ -1,0 +1,18 @@
+{
+  "_name": "Elite-g039",
+  "_description": "Elite: wide-explore mutation of gen 038 best (stagnation=9)",
+  "PROD_MULT": 15.7334,
+  "TIME_PROD_MULT": 0.1511,
+  "ENEMY_MULT": 4.8547,
+  "COMPOUND_MULT": 11.4936,
+  "MINE_NEAR_TGT_MULT": 7.6152,
+  "ENEMY_NEAR_TGT_MULT": 2.8955,
+  "PROD_SRC_MULT": 7.1672,
+  "ORBIT_BONUS": 35.0,
+  "PROXIMITY_MULT": 23.5353,
+  "DIST_MULT": 1.0965,
+  "SHIPS_MULT": 0.2394,
+  "ETA_MULT": 0.2223,
+  "OVEREXTEND_MULT": 0.2517,
+  "PROXIMITY_DIST": 49.9934
+}
