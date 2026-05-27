@@ -372,3 +372,10 @@ Key observations:
 - Result: Elite-g030=32 (8W/1L 2p, 1W 4p, top2=6); X23-g030=21 (6W/3L 2p, 1W 4p); Mut2-g030=18 (4W/5L 2p, 2W 4p); X12-g030=7 (0W/9L 2p, 2W 4p, PROD=23.7)
 - Insight: SEED VARIANCE CONFIRMED — exact HoF clone went 8W/1L (32) instead of 9W/0L (36). The fitness=36 in gen 029 may partly be seed luck. X12 with PROD=23.7 went 0W/9L in 2p — confirms PROD>20 is harmful (over-invests in distant planets). Clamped PROX fix worked: X12 at PROX=44 didn't collapse from PROX alone, just PROD issue. X23 (PROX=50) second-best at 21.
 - Next: Gen 031 — HoF still elite (36>32, stagnation=1); standard evolution from gen 030 top-2; try to find configs that replicate or exceed HoF=36 on different seeds.
+
+### Run 46: Gen 031 — best_fitness=29 (DISCARD — HoF clone variance, stagnation=2)
+- Timestamp: 2026-05-27
+- What changed: Elite-g031=exact HoF clone (PROX=50,ENEMY=6.81,ORBIT=27.75); Mut2=mutate(X23-g030,σ=0.12,PROX=45.9,SHIPS=0.110); X12=Crossover(HoF,X23-g030,PROX=44.27,ORBIT=21.67); X23=Crossover(X23-g030,Mut2-g030,PROX=50,ENEMY=5.10)
+- Result: Elite-g031=29 (7W/2L 2p, 1W 4p, top2=6); X12-g031=21 (6W/3L 2p, 1W 4p); Mut2-g031=19 (3W/6L 2p, 3W 4p); X23-g031=9 (2W/7L 2p)
+- Insight: HoF config variance across seeds: 36 (gen029), 32 (gen030), 29 (gen031). Average ~32, peak=36. Seed variance is ~±4pts. X23 with ENEMY=5.10 (very low) + PROX=50 went 2W/7L 2p — confirms ENEMY can't be TOO low either; range 6-8 seems optimal. Mut2 got 3W 4p (strong 4p) with SHIPS=0.110 + PROX=45.9. Stagnation=2, one more gen before wide-explore kicks in. Key: need to find configs that reliably outperform HoF=36 on average, not just lucky seeds.
+- Next: Gen 032 — stagnation=2, at limit; if gen 032 fails, stagnation=3 triggers wide-explore of current best instead of HoF clone.
