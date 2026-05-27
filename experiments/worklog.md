@@ -456,3 +456,10 @@ Key observations:
 - Result: X12-g042=24 (6W/3L 2p, 2W 4p); Elite-g042=20 (4W/5L 2p, 1W 4p); Mut2-g042=18 (3W/6L 2p, 3W 4p); X23-g042=16 (5W/4L 2p, 0W 4p)
 - Insight: HoF near-clone (X12) wins again at 24 — consistent but capped. ENEMY=7.64 slightly higher than HoF=6.81 but still works. Mut2 (ORBIT=34) got 3W 4p but only 3W/6L 2p — high ORBIT hurts 2p head-to-head. Elite ENEMY=3.82 (very passive) = 4W/5L 2p + only 1W 4p — too passive even for 4p. SHIPS=0.192 (X23) worked for 2p (5W/4L) but 0W 4p. Stagnation=13 — ultra-stagnation (15) triggers in 2 more gens if stuck.
 - Next: Gen 043 — stagnation=13; deep strategy. Ultra-stagnation (HoF×vice-HoF crossover) at stagnation=15.
+
+### Run 58: Gen 043 — best_fitness=31 (DISCARD — stagnation=14; X23 surprise 8W/1L 2p!)
+- Timestamp: 2026-05-28
+- What changed: Elite-g043=wide-explore(X12-g042,PROD=9.11,ENEMY=8.28,ORBIT=33.91,SHIPS=0.105,PROX=50); Mut2-g043=mutate(Elite-g042,PROD=27.96,ENEMY=4.10,ORBIT=21.93,SHIPS=0.20↓,PROX=44); X12-g043=HoF near-clone(PROD=15.56,ENEMY=6.43,ORBIT=25.50,SHIPS=0.085,PROX=47.6); X23-g043=Crossover(X12-g042,Mut2-g042,PROD=12.89,ENEMY=4.02,ORBIT=24.27,SHIPS=0.189,PROX=46.5)
+- Result: X23-g043=31 (8W/1L 2p, 2W 4p top2=3); X12-g043=21 (5W/4L 2p, 2W 4p); Elite-g043=19 (3W/6L 2p, ENEMY=8.28 hurts); Mut2-g043=7 (PROD=27.96+SHIPS=0.20 = disaster)
+- Insight: ENEMY=4.02 + SHIPS=0.189 + ORBIT=24.27 + PROX=46.5 = 31 (8W/1L 2p!)! REVISES earlier "ENEMY<5 always bad" rule — with SHIPS~0.19 + moderate ORBIT=24 + PROX=46+, very low ENEMY can dominate 2p. Hypothesis: low ENEMY means agent doesn't overvalue defending, attacks faster (lower fear of retaliation), captures territory quickly. This archetype differs from vice-HoF (high ENEMY=13.94) and HoF (ENEMY=6.81) — a third archetype. PROD=27.96+SHIPS=0.20 confirmed catastrophic (Mut2). Ultra-stagnation (HOF×vice-HoF crossover) triggers next gen if this fails... but 31 is promising!
+- Next: Gen 044 — stagnation=14; THIS IS ULTRA-STAGNATION THRESHOLD. evolve.py will trigger ultra-stagnation strategy if stagnation reaches 15. But X23-g043 archetype (ENEMY~4, SHIPS~0.18, ORBIT~24, PROX~47) is exciting — explore it further.
