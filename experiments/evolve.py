@@ -98,18 +98,30 @@ def extract_constants(agent_dict):
 
 def find_hall_of_fame(completed):
     """
-    Scan all completed tournaments and return (best_fitness, best_cfg).
+    Scan all completed tournaments and return (best_fitness, best_cfg, second_cfg).
     Ties broken by most recent tournament.
+    second_cfg is the best agent EXCLUDING the HoF tournament (vice-HoF).
     """
     best_fitness = -1
     best_cfg = None
-    for _, _, data in completed:
+    best_gen = -1
+    vice_fitness = -1
+    vice_cfg = None
+    for gen_num, _, data in completed:
         for pid in data["agents"]:
             fit = fitness(data["summary"], pid)
             if fit > best_fitness:
+                # Old best becomes vice-HoF candidate
+                if best_fitness > vice_fitness:
+                    vice_fitness = best_fitness
+                    vice_cfg = best_cfg
                 best_fitness = fit
                 best_cfg = extract_constants(data["agents"][pid])
-    return best_fitness, best_cfg
+                best_gen = gen_num
+            elif fit > vice_fitness:
+                vice_fitness = fit
+                vice_cfg = extract_constants(data["agents"][pid])
+    return best_fitness, best_cfg, vice_cfg
 
 
 def highest_folder_number():
@@ -162,7 +174,7 @@ def main():
     third_cfg   = extract_constants(agents[ranked[2]])
 
     # Hall of fame check with stagnation detection
-    hof_fitness, hof_cfg = find_hall_of_fame(completed)
+    hof_fitness, hof_cfg, vice_hof_cfg = find_hall_of_fame(completed)
     current_best_fitness = fitness(summary, ranked[0])
 
     # Count consecutive recent gens where current-gen best did NOT beat HoF.
@@ -201,7 +213,8 @@ def main():
             print(f"  [JSONL fallback] stagnation_count overridden: {stagnation_count} → {jsonl_stagnation}")
             stagnation_count = jsonl_stagnation
     HOF_STAGNATION_LIMIT = 3
-    HOF_DEEP_STAGNATION = 6  # after this many gens, use HoF in crossovers directly
+    HOF_DEEP_STAGNATION = 6   # wide-explore Elite + HoF near-clone strategy
+    HOF_ULTRA_STAGNATION = 15  # vice-HoF crossover strategy to break deeper ruts
 
     if hof_fitness > current_best_fitness and stagnation_count < HOF_STAGNATION_LIMIT:
         print(f"\nHall-of-fame (fitness={hof_fitness}) beats current best ({current_best_fitness}) — using as Elite")
@@ -210,13 +223,30 @@ def main():
         crossover_a, crossover_b, crossover_c = elite_cfg, second_cfg, third_cfg
         x12_desc = f"Crossover(HoF,2nd) from gen {latest_num:03d} + mutation (sigma=0.18)"
         x23_desc = f"Crossover(2nd,3rd) from gen {latest_num:03d} + mutation (sigma=0.18)"
+    elif hof_fitness > current_best_fitness and stagnation_count >= HOF_ULTRA_STAGNATION and vice_hof_cfg is not None:
+        # Ultra-deep stagnation: try HoF×vice-HoF crossover to escape the local optimum.
+        # vice-HoF is the best agent from any gen OTHER than the HoF gen — e.g. gen 024 Elite
+        # at fitness=33 with very different params (ENEMY=14, PROX=50, SHIPS=0.05, PROD=12).
+        # Crossover of two top configs explores a novel region of parameter space.
+        print(f"\nUltra-deep stagnation ({stagnation_count} gens) — HoF×vice-HoF crossover + wide-explore")
+        # Elite: wide-explore of current best, PROX clamped >= 44
+        candidate = mutate(best_cfg, sigma=0.30)
+        candidate["PROXIMITY_DIST"] = max(44.0, candidate["PROXIMITY_DIST"])
+        elite_cfg = candidate
+        elite_desc = f"ultra-explore of gen {latest_num:03d} best, PROX≥44 (stagnation={stagnation_count})"
+        # X12: vice-HoF near-clone (σ=0.05)
+        crossover_a = vice_hof_cfg
+        x12_desc = f"vice-HoF near-clone (sigma=0.05, stagnation={stagnation_count})"
+        # X23: crossover HoF × vice-HoF (bridges the two elite archetypes)
+        crossover_b, crossover_c = hof_cfg, vice_hof_cfg
+        x23_desc = f"Crossover(HoF,vice-HoF) — bridge elite archetypes (stagnation={stagnation_count})"
     elif hof_fitness > current_best_fitness and stagnation_count >= HOF_DEEP_STAGNATION:
         # Deep stagnation: wide-explore Elite + HoF near-clone + direct 1st×2nd crossover
-        # Clamp PROXIMITY_DIST >= 40 on wide-explore to prevent short-range regressions
+        # Clamp PROXIMITY_DIST >= 44 on wide-explore to stay in the proven PROX≥44 zone
         # X23 now crosses 1st×2nd to fuse complementary 2p/4p archetypes
         print(f"\nHoF deep stagnation ({stagnation_count} gens) — wide-explore Elite + HoF injection + 1st×2nd")
         candidate = mutate(best_cfg, sigma=0.30)
-        candidate["PROXIMITY_DIST"] = max(40.0, candidate["PROXIMITY_DIST"])
+        candidate["PROXIMITY_DIST"] = max(44.0, candidate["PROXIMITY_DIST"])
         elite_cfg = candidate
         elite_desc = f"wide-explore mutation of gen {latest_num:03d} best (stagnation={stagnation_count})"
         crossover_a, crossover_b, crossover_c = hof_cfg, best_cfg, second_cfg
@@ -254,7 +284,7 @@ def main():
             "_name": f"X12-{gen_tag}",
             "_description": x12_desc,
             **(mutate(crossover_a, sigma=0.05)
-               if x12_desc.startswith("HoF near-clone")
+               if "near-clone" in x12_desc
                else crossover(crossover_a, crossover_b, sigma=0.18)),
         },
         "004": {
@@ -264,11 +294,12 @@ def main():
         },
     }
 
-    # In deep stagnation, clamp PROXIMITY_DIST >= 40 for all configs to prevent short-range regressions
+    # In deep stagnation, clamp PROXIMITY_DIST >= 44 for all configs to stay in proven zone
+    # (PROX<40 is catastrophic; PROX 44-50 is the proven high-performance range)
     if stagnation_count >= HOF_DEEP_STAGNATION and hof_fitness > current_best_fitness:
         for cfg in new_configs.values():
-            if cfg.get("PROXIMITY_DIST", 50.0) < 40.0:
-                cfg["PROXIMITY_DIST"] = 40.0
+            if cfg.get("PROXIMITY_DIST", 50.0) < 44.0:
+                cfg["PROXIMITY_DIST"] = 44.0
 
     # Write configs
     next_folder.mkdir(parents=True)
