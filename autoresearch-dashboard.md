@@ -1,6 +1,6 @@
 # Autoresearch Dashboard: orbit-wars-agent-evolution
 
-**Runs:** 41 | **Kept:** 3 | **Discarded:** 38 | **Crashed:** 0
+**Runs:** 42 | **Kept:** 3 | **Discarded:** 39 | **Crashed:** 0
 **Baseline:** best_fitness: 25pts (#1)
 **Best:** best_fitness: 34pts (#15, +36.0%)
 **HoF target:** 34 (gen 015 X23-g015)
@@ -29,3 +29,4 @@
 | 39 | c899754 | 33pts (+32.0%) | discard | gen 024 (new run, deep stagnation=9): Elite-g024=33 (7W/2L 2 |
 | 40 | eb66de6 | 26pts (+4.0%) | discard | gen 025 (deep stagnation=10): Elite-g025=26 (7W/2L 2p, 0W 4p); X23=19; X12=18; Mut2=15 |
 | 41 | e470331 | 27pts (+8.0%) | discard | gen 026 (stagnation=11): Elite-g026=27 (6W/3L 2p, 2W 4p, ENEMY=8.35,PROX=50); X12 near-clone=14; Mut2=19; X23=18 |
+| 42 | dff479e | 25pts (+0.0%) | discard | gen 027 (stagnation=12): X23-g027=25 (6W/3L 2p, 2W 4p); Elite-g027=21 (PROX=40 crippled 2p); X12 HoF near-clone=13; Mut2=19 |
