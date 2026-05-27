@@ -1,0 +1,18 @@
+{
+  "_name": "X23-g028",
+  "_description": "Crossover(1st,2nd) from gen 027 + mutation (sigma=0.18) \u2014 fuse archetypes",
+  "PROD_MULT": 18.6287,
+  "TIME_PROD_MULT": 0.2205,
+  "ENEMY_MULT": 9.233,
+  "COMPOUND_MULT": 5.8562,
+  "MINE_NEAR_TGT_MULT": 1.8536,
+  "ENEMY_NEAR_TGT_MULT": 4.0166,
+  "PROD_SRC_MULT": 7.3031,
+  "ORBIT_BONUS": 25.982,
+  "PROXIMITY_MULT": 11.6749,
+  "DIST_MULT": 0.3503,
+  "SHIPS_MULT": 0.0434,
+  "ETA_MULT": 0.2557,
+  "OVEREXTEND_MULT": 0.4338,
+  "PROXIMITY_DIST": 44.0
+}
