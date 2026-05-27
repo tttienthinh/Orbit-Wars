@@ -1,0 +1,18 @@
+{
+  "_name": "Elite-g030",
+  "_description": "Elite: best from gen 029 (fitness=36)",
+  "PROD_MULT": 15.971,
+  "TIME_PROD_MULT": 0.1148,
+  "ENEMY_MULT": 6.8109,
+  "COMPOUND_MULT": 17.7291,
+  "MINE_NEAR_TGT_MULT": 1.6994,
+  "ENEMY_NEAR_TGT_MULT": 1.7729,
+  "PROD_SRC_MULT": 6.0616,
+  "ORBIT_BONUS": 27.7483,
+  "PROXIMITY_MULT": 25.0,
+  "DIST_MULT": 0.5007,
+  "SHIPS_MULT": 0.0868,
+  "ETA_MULT": 0.4488,
+  "OVEREXTEND_MULT": 0.4763,
+  "PROXIMITY_DIST": 50.0
+}
