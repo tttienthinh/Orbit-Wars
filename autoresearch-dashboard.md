@@ -1,6 +1,6 @@
 # Autoresearch Dashboard: orbit-wars-agent-evolution
 
-**Runs:** 39 | **Kept:** 3 | **Discarded:** 36 | **Crashed:** 0
+**Runs:** 40 | **Kept:** 3 | **Discarded:** 37 | **Crashed:** 0
 **Baseline:** best_fitness: 25pts (#1)
 **Best:** best_fitness: 34pts (#15, +36.0%)
 **HoF target:** 34 (gen 015 X23-g015)
@@ -13,7 +13,7 @@
 | 23 | 9d53978 | 30pts (+20.0%) | discard | gen 023: X23-g023=30 (6W/3L 2p, 4W 4p, top2=4); X12=25; Elit |
 | 24 | 97e2496 | 24pts (-4.0%) | discard | gen 024: X23-g024=24 (6W/3L 2p, 2W 4p, top2=2); Elite=20 (1W |
 | 25 | ec2ba5b | 24pts (-4.0%) | discard | gen 025: X12=24 (7W/2L 2p, 1W 4p, top2=1); 2p specialist aga |
-| 26 | af40e6a | 30pts (+20.0%) | discard | gen 026: X23-g026=30 (6W/3L 2p, 4W 4p, top2=4); HoF×2nd cros |
+| 26 | af40e6a | 30pts (+20.0%) | discard | gen 026: X23-g026=30 (6W/3L 2p, 4W 4p, top2=4); HoFï¿½2nd cros |
 | 27 | ac0e0ea | 28pts (+12.0%) | discard | gen 027: Mut2=28 (7W/2L 2p, 2W 4p, top2=3); HoF crossovers f |
 | 28 | e0642da | 30pts (+20.0%) | discard | gen 028: HoF near-clone(X12)=30 (8W/1L 2p, 2W 4p); Mut2=30 ( |
 | 29 | 464571b | 28pts (+12.0%) | discard | gen 029: Elite=28 (6W/3L 2p, 2W 4p, top2=6); 3 low-SHIPS age |
@@ -27,3 +27,4 @@
 | 37 | 07d8d53 | 29pts (+16.0%) | discard | gen 037: Elite(SHIPS=0.044,PROD=18.08)=29 (7W/2L 2p, 1W 4p,  |
 | 38 | 6e9879b | 28pts (+12.0%) | discard | gen 038: Elite(ORBIT=31.93,SHIPS=0.042)=28 (6W/3L 2p, 2W 4p, |
 | 39 | c899754 | 33pts (+32.0%) | discard | gen 024 (new run, deep stagnation=9): Elite-g024=33 (7W/2L 2 |
+| 40 | eb66de6 | 26pts (+4.0%) | discard | gen 025 (deep stagnation=10): Elite-g025=26 (7W/2L 2p, 0W 4p); X23=19; X12=18; Mut2=15 |

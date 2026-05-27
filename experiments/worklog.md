@@ -324,6 +324,13 @@ Key observations:
 
 
 
+### Run 40: Gen 025 — best_fitness=26 (DISCARD — Elite lost 4p edge vs gen024)
+- Timestamp: 2026-05-27
+- What changed: Elite=wide-explore(Elite-g024,σ=0.30,PROX=45.41,ORBIT=20.83,PROD=9.14); Mut2=mutate(X23-g024,σ=0.12,PROX=48.80); X12=HoF near-clone(σ=0.05,PROX=45.90,PROD=14.24); X23=crossover(Elite-g024,X23-g024,σ=0.18,PROX=48.81); deep stagnation=10
+- Result: Elite-g025=26 (7W/2L 2p, 0W 4p, top2=5); X23-g025=19 (5W/4L 2p, 1W 4p); X12-g025=18 (3W/6L 2p, 3W 4p); Mut2-g025=15 (3W/6L 2p, 2W 4p)
+- Insight: Elite's 2p performance held (7W/2L) but lost all 4p wins (vs gen024 Elite: 3W 4p). Random seed variance likely — different 4p opponents. X12-g025 (HoF near-clone) got 3W 4p but only 3W/6L 2p, confirming low-SHIPS-MULT archetype is 4p-only. Wide-explore of pop-1 → pop-1 mutation chain is losing variance — each gen just clones Elite with noise.
+- Next: Gen 026 — evolve.py creating fresh wide-explore of Elite-g025 + Mut2 from X23-g025 + HoF near-clone + crossover(Elite,X23).
+
 ### Run 39: Gen 024 (new session re-run) — best_fitness=33 (DISCARD — 1 below HoF=34!)
 - Timestamp: 2026-05-27
 - What changed: Elite=wide-explore(σ=0.30) of Mut2-g023 (PROX=50.0,ORBIT=18.24,PROD=11.83); Mut2=mutated X23-g023; X12=HoF near-clone(σ=0.05); X23=Crossover(Mut2-g023,X23-g023); deep stagnation=9
