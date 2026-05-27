@@ -1,0 +1,18 @@
+{
+  "_name": "X12-g036",
+  "_description": "HoF near-clone (sigma=0.05, stagnation=6)",
+  "PROD_MULT": 16.75,
+  "TIME_PROD_MULT": 0.1114,
+  "ENEMY_MULT": 7.4562,
+  "COMPOUND_MULT": 18.3269,
+  "MINE_NEAR_TGT_MULT": 1.7067,
+  "ENEMY_NEAR_TGT_MULT": 2.0146,
+  "PROD_SRC_MULT": 5.9159,
+  "ORBIT_BONUS": 29.4346,
+  "PROXIMITY_MULT": 25.0,
+  "DIST_MULT": 0.5132,
+  "SHIPS_MULT": 0.0833,
+  "ETA_MULT": 0.4151,
+  "OVEREXTEND_MULT": 0.5354,
+  "PROXIMITY_DIST": 49.1417
+}
