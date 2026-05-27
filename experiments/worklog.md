@@ -286,6 +286,22 @@ Key observations:
 - Insight: Confirmed: PROX<35 consistently underperforms. Wide-explore keeps generating PROX=27-35 because lognormal mutation of PROX=43-45 with σ=0.30 can hit PROX≈32 (exp(-0.30)≈0.74 → 45*0.74=33). Fixed evolve.py to clamp PROX≥40 in wide-explore. Gen 035: Elite clamped to PROX=40.0; X12=near-perfect HoF match (PROD=14.76,SHIPS=0.095,ENEMY=6.72,OVER=0.262 — exact HoF values!).
 - Next: Gen 035 — PROX clamp active; X12 best HoF replica yet with exact ENEMY+OVER match.
 
+### Run 35: Gen 035 tournament — best_fitness=28 (DISCARD — perfect 2p, zero 4p)
+- Timestamp: 2026-05-27
+- What changed: Elite=PROX clamped to 40.0; X12=near-perfect HoF clone(PROD=14.76,SHIPS=0.095,ENEMY=6.72,OVER=0.262); stagnation_count=20
+- Result: X12-g035=28 (9W/0L 2p PERFECT, 0W 4p top2=1); Mut2=24 (3W 4p); Elite=11 (ENEMY=13 killed 2p); X23=15
+- Insight: X12 went 9/9 in 2p — the most dominant 2p result ever. ENEMY=6.72 (HoF-exact) + SHIPS=0.095 (lower than HoF 0.103) = pure 2p dominance. But 0/6 4p wins — extreme 2p specialist pathology. With multiple enemies in 4p, ENEMY=6.72 (low) means the agent doesn't prioritize taking enemy planets fast enough. The 4p dynamic requires some ENEMY aggression to eliminate opponents. Gen 036: Elite SHIPS=0.057 (lowest ever!); X12=PROD=16.65,SHIPS=0.101,PROX=43.6.
+- Next: Gen 036 — all agents PROX≥39.8; Elite SHIPS=0.057 explores sub-0.1 territory.
+
+### Run 36: Gen 036 tournament — best_fitness=26 (DISCARD — complementary split discovered)
+- Timestamp: 2026-05-27
+- What changed: Elite=SHIPS=0.057 (ultra-low); X12=HoF near-clone; stagnation_count=21
+- Result: Elite=26 (7W/2L 2p, 0W 4p, SHIPS=0.057); Mut2=24 (3W 2p, 5W 4p RECORD!, ENEMY=16.21); X12=16; X23=12
+- Insight: MAJOR DISCOVERY — if you combine Elite's 2p dominance + Mut2's 4p dominance: 7×3 + 5×2 + 5 = 36 > HoF=34! The two complementary archetypes TOGETHER would beat HoF. Modified evolve.py: X23 now = Crossover(1st,2nd) directly to fuse the archetypes. Gen 037: X23-g037 fusion has SHIPS=0.062 (from 0.057) + ENEMY=10.15 (between 8.52 and 16.21) + PROX=40.7. Elite SHIPS=0.044 (lowest ever).
+- Next: Gen 037 — archetype fusion: X23(SHIPS=0.062,ENEMY=10.15) directly tries to combine 2p+4p strengths.
+
+
+
 
 
 

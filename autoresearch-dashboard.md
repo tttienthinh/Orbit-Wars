@@ -1,6 +1,6 @@
 # Autoresearch Dashboard: orbit-wars-agent-evolution
 
-**Runs:** 34 | **Kept:** 3 | **Discarded:** 31 | **Crashed:** 0
+**Runs:** 36 | **Kept:** 3 | **Discarded:** 33 | **Crashed:** 0
 **Baseline:** best_fitness: 27pts (gen 000 OrbDom, seed=16)
 **Best:** best_fitness: **34pts** (#15, +25.9% vs baseline) — X23-g015
 
@@ -40,6 +40,8 @@
 | 32 | 359aff2 | 28 (+3.7%) | 7 | discard | gen 032: Elite(PROD=20.69)=28 (7W 2p); HoF near-clone crushed at 9; high PROD beats HoF in head-to-head |
 | 33 | dbd9093 | 25 (-7.4%) | 7 | discard | gen 033: HoF near-clone=25 (7W 2p) when PROD=26.88+PROX=27.6 collapsed; PROX as critical as PROD |
 | 34 | 96d909c | 22 (-18.5%) | 6 | discard | gen 034: Mut2=X23=22; PROX<35 again crippled Elite; PROX≥40 clamp added to wide-explore |
+| 35 | 1cb84be | 28 (+3.7%) | 9 | discard | gen 035: X12 PERFECT 9W/0L 2p! but 0W 4p — ultimate 2p specialist; PROX clamp working |
+| 36 | f2ef72b | 26 (-3.7%) | 7 | discard | gen 036: Elite(SHIPS=0.057)=26 2p; Mut2(ENEMY=16.21)=24 5W 4p RECORD! fusion=36 if combined |
 
 ## Gen Standings
 
