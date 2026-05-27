@@ -379,3 +379,10 @@ Key observations:
 - Result: Elite-g031=29 (7W/2L 2p, 1W 4p, top2=6); X12-g031=21 (6W/3L 2p, 1W 4p); Mut2-g031=19 (3W/6L 2p, 3W 4p); X23-g031=9 (2W/7L 2p)
 - Insight: HoF config variance across seeds: 36 (gen029), 32 (gen030), 29 (gen031). Average ~32, peak=36. Seed variance is ~±4pts. X23 with ENEMY=5.10 (very low) + PROX=50 went 2W/7L 2p — confirms ENEMY can't be TOO low either; range 6-8 seems optimal. Mut2 got 3W 4p (strong 4p) with SHIPS=0.110 + PROX=45.9. Stagnation=2, one more gen before wide-explore kicks in. Key: need to find configs that reliably outperform HoF=36 on average, not just lucky seeds.
 - Next: Gen 032 — stagnation=2, at limit; if gen 032 fails, stagnation=3 triggers wide-explore of current best instead of HoF clone.
+
+### Run 47: Gen 032 — best_fitness=27 (DISCARD — HoF clone declining, ORBIT=35 failed)
+- Timestamp: 2026-05-27
+- What changed: Elite-g032=exact HoF clone (4th test); Mut2=mutate(X12-g031,σ=0.12,PROX=50,ORBIT=25.73); X12=Crossover(HoF,X12-g031,ORBIT=35.0 MAX,PROX=50); X23=Crossover(X12-g031,Mut2-g031,PROX=44,ENEMY=5.37)
+- Result: Elite-g032=27 (7W/2L 2p, 0W 4p, top2=6); X23-g032=24 (5W/4L 2p, 3W 4p); Mut2-g032=18; X12-g032=9 (2W/7L 2p, ORBIT=35)
+- Insight: ORBIT=35.0 (max bound) confirmed HARMFUL — 2W/7L 2p. Agent over-values orbiting planets, ignores closer expansion targets. Optimal ORBIT range appears to be 20-30 (HoF=27.75). HoF clone variance: 36/32/29/27 across 4 seeds — mean ~31, so true fitness is ~31, peak of 36 was partly luck. stagnation=3 hits HOF_STAGNATION_LIMIT → gen 033 uses wide-explore (σ=0.30) of current best instead of bare HoF clone. X23 (ENEMY=5.37+PROX=44) got decent 3W 4p — very low ENEMY works for 4p.
+- Next: Gen 033 — stagnation=3, HOF_STAGNATION_LIMIT reached; wide-explore σ=0.30 of HoF config; crossovers from gen 032 top-2 (Elite+X23).
