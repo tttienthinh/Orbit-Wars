@@ -165,8 +165,9 @@ def main():
     hof_fitness, hof_cfg = find_hall_of_fame(completed)
     current_best_fitness = fitness(summary, ranked[0])
 
-    # Count consecutive recent gens where current-gen best did NOT beat HoF
-    # (i.e. HoF kept being used as Elite but the population didn't improve past it)
+    # Count consecutive recent gens where current-gen best did NOT beat HoF.
+    # Primary: scan tournament results. Fallback: read JSONL when results are missing
+    # (git clean -fd removes untracked results.json, breaking tournament-only detection).
     stagnation_count = 0
     for _, _, past_data in reversed(completed[1:]):  # skip gen 000-test seed
         past_pids = sorted(past_data["agents"].keys())
@@ -175,6 +176,30 @@ def main():
             stagnation_count += 1
         else:
             break
+
+    # JSONL fallback: if fewer than 5 past tournaments visible, read from autoresearch.jsonl
+    JSONL_PATH = PROJECT_ROOT / "autoresearch.jsonl"
+    if stagnation_count < 5 and JSONL_PATH.exists():
+        jsonl_stagnation = 0
+        runs = []
+        with open(JSONL_PATH, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                obj = json.loads(line)
+                if obj.get("type") == "config":
+                    continue
+                runs.append(obj)
+        # Count consecutive recent runs (excluding current) below hof_fitness
+        for run in reversed(runs[:-1]):  # skip the last run (current gen already counted)
+            if run["metric"] < hof_fitness:
+                jsonl_stagnation += 1
+            else:
+                break
+        if jsonl_stagnation > stagnation_count:
+            print(f"  [JSONL fallback] stagnation_count overridden: {stagnation_count} → {jsonl_stagnation}")
+            stagnation_count = jsonl_stagnation
     HOF_STAGNATION_LIMIT = 3
     HOF_DEEP_STAGNATION = 6  # after this many gens, use HoF in crossovers directly
 
