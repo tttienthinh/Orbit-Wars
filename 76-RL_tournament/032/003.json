@@ -1,0 +1,18 @@
+{
+  "_name": "X12-g032",
+  "_description": "Crossover(HoF,2nd) from gen 031 + mutation (sigma=0.18)",
+  "PROD_MULT": 13.6603,
+  "TIME_PROD_MULT": 0.1511,
+  "ENEMY_MULT": 6.9509,
+  "COMPOUND_MULT": 8.3345,
+  "MINE_NEAR_TGT_MULT": 2.3267,
+  "ENEMY_NEAR_TGT_MULT": 1.868,
+  "PROD_SRC_MULT": 4.4799,
+  "ORBIT_BONUS": 35.0,
+  "PROXIMITY_MULT": 3.8796,
+  "DIST_MULT": 0.3637,
+  "SHIPS_MULT": 0.0997,
+  "ETA_MULT": 0.4912,
+  "OVEREXTEND_MULT": 0.3691,
+  "PROXIMITY_DIST": 50.0
+}
