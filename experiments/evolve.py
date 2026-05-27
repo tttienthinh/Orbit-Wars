@@ -296,9 +296,12 @@ def main():
     }
 
     # Always clamp PROXIMITY_DIST >= 44 — PROX<40 is catastrophic in 2p, 44-50 is proven range
+    # Always clamp SHIPS_MULT <= 0.20 — SHIPS>0.20 is consistently toxic across 5+ experiments
     for cfg in new_configs.values():
         if cfg.get("PROXIMITY_DIST", 50.0) < 44.0:
             cfg["PROXIMITY_DIST"] = 44.0
+        if cfg.get("SHIPS_MULT", 0.1) > 0.20:
+            cfg["SHIPS_MULT"] = 0.20
 
     # Write configs
     next_folder.mkdir(parents=True)
