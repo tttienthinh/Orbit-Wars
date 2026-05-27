@@ -1,0 +1,18 @@
+{
+  "_name": "X23-g036",
+  "_description": "Crossover(HoF,1st) from gen 035 + mutation (sigma=0.18)",
+  "PROD_MULT": 17.1928,
+  "TIME_PROD_MULT": 1.3236,
+  "ENEMY_MULT": 13.8447,
+  "COMPOUND_MULT": 5.7471,
+  "MINE_NEAR_TGT_MULT": 2.0237,
+  "ENEMY_NEAR_TGT_MULT": 1.2039,
+  "PROD_SRC_MULT": 6.6403,
+  "ORBIT_BONUS": 14.6526,
+  "PROXIMITY_MULT": 5.4963,
+  "DIST_MULT": 0.5085,
+  "SHIPS_MULT": 0.1893,
+  "ETA_MULT": 0.5578,
+  "OVEREXTEND_MULT": 0.3908,
+  "PROXIMITY_DIST": 39.8163
+}
