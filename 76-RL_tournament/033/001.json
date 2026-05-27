@@ -1,0 +1,18 @@
+{
+  "_name": "Elite-g033",
+  "_description": "Elite: wide-explore mutation of gen 032 best (stagnation=3)",
+  "PROD_MULT": 22.9408,
+  "TIME_PROD_MULT": 0.1,
+  "ENEMY_MULT": 7.3098,
+  "COMPOUND_MULT": 25.0,
+  "MINE_NEAR_TGT_MULT": 2.4033,
+  "ENEMY_NEAR_TGT_MULT": 1.7512,
+  "PROD_SRC_MULT": 6.6349,
+  "ORBIT_BONUS": 34.2819,
+  "PROXIMITY_MULT": 22.9507,
+  "DIST_MULT": 0.3878,
+  "SHIPS_MULT": 0.0847,
+  "ETA_MULT": 0.5351,
+  "OVEREXTEND_MULT": 0.7592,
+  "PROXIMITY_DIST": 50.0
+}
