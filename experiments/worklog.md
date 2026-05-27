@@ -365,3 +365,10 @@ Key observations:
 - Result: Elite-g029=36 PERFECT 9W/0L 2p + 2W 4p top2=5; X23-g029=19 (3W/6L 2p, 3W 4p); Mut2-g029=12; X12-g029=11
 - Insight: NEW HOF (36 > old 34)! PERFECT 2p record — never seen before in this session. Key config: PROX=50.0 (max board reach), ENEMY=6.81 (low — no wasted attacks on enemy planets), ORBIT=27.75 (HIGH — prizes orbiting planets), SHIPS=0.087 (moderate expansion rate), PROD=15.97 (moderate-high). COMPOUND_MULT=17.73 (HIGH) may help coordinate multi-fleet attacks. Wide-explore of Elite-g028 with σ=0.30 jumped PROX from 44→50, ORBIT from 13.1→27.75. The ORBIT jump is significant — orbiting planets generate continuous production, and high ORBIT_BONUS incentivizes capturing them. Stagnation counter resets to 0. Vice-HoF archetype (gen 024, ENEMY=13.94) still held for comparison.
 - Next: Gen 030 — stagnation=0 (new HoF!); Elite=Elite-g029 (fitness=36); standard evolution: Mut2+crossovers from gen 029 top agents. Goal: push past 36.
+
+### Run 45: Gen 030 — best_fitness=32 (DISCARD — HoF clone dropped, seed variance)
+- Timestamp: 2026-05-27
+- What changed: Elite-g030=exact clone of Elite-g029 (HoF: PROX=50,ENEMY=6.81,ORBIT=27.75,SHIPS=0.087,PROD=15.97); Mut2=mutate(X23-g029,σ=0.12,PROX=44.0); X12=Crossover(Elite-g029,X23-g029,σ=0.18,PROX=44.0 clamped,PROD=23.7); X23=Crossover(X23-g029,Mut2-g029,σ=0.18,PROX=50); stagnation=1
+- Result: Elite-g030=32 (8W/1L 2p, 1W 4p, top2=6); X23-g030=21 (6W/3L 2p, 1W 4p); Mut2-g030=18 (4W/5L 2p, 2W 4p); X12-g030=7 (0W/9L 2p, 2W 4p, PROD=23.7)
+- Insight: SEED VARIANCE CONFIRMED — exact HoF clone went 8W/1L (32) instead of 9W/0L (36). The fitness=36 in gen 029 may partly be seed luck. X12 with PROD=23.7 went 0W/9L in 2p — confirms PROD>20 is harmful (over-invests in distant planets). Clamped PROX fix worked: X12 at PROX=44 didn't collapse from PROX alone, just PROD issue. X23 (PROX=50) second-best at 21.
+- Next: Gen 031 — HoF still elite (36>32, stagnation=1); standard evolution from gen 030 top-2; try to find configs that replicate or exceed HoF=36 on different seeds.
