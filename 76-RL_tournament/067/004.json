@@ -1,0 +1,18 @@
+{
+  "_name": "X23-g067",
+  "_description": "Crossover(HoF,vice-HoF) \u2014 bridge elite archetypes (stagnation=37)",
+  "PROD_MULT": 16.4928,
+  "TIME_PROD_MULT": 0.1,
+  "ENEMY_MULT": 3.3682,
+  "COMPOUND_MULT": 19.2311,
+  "MINE_NEAR_TGT_MULT": 1.3618,
+  "ENEMY_NEAR_TGT_MULT": 2.1202,
+  "PROD_SRC_MULT": 8.3177,
+  "ORBIT_BONUS": 32.0,
+  "PROXIMITY_MULT": 25.0,
+  "DIST_MULT": 0.4173,
+  "SHIPS_MULT": 0.123,
+  "ETA_MULT": 0.4138,
+  "OVEREXTEND_MULT": 0.3502,
+  "PROXIMITY_DIST": 49.7283
+}
