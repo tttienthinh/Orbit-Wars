@@ -610,3 +610,10 @@ Key observations:
 - Result: Elite=30 (6W/3L 2p, 3W 4p, top2=ALL 6 = 11th ALL-TOP2 occurrence!); Mut2=22 (6W 2p, 1W 4p); X12=14; X23=12 (2W/7L 2p). Best stagnation-period score so far.
 - Insight: Elite-g064 (ORBIT=21.50, ENEMY=3.28 VERY LOW) achieved 3W 4p + ALL-TOP2 which is unusual. Low ENEMY (3.28) didn't hurt 2p as much as expected (6W/3L). High COMPOUND (23.72) on Mut2 didn't help — 22pts only. The ALL-TOP2 pattern dominates but X23 with high ORBIT collapsed to 2W/7L 2p. Still can't break stagnation ceiling.
 - Next: Gen 065 will use Elite-g064 (fitness=30) as parent. Stagnation=35 → ultra-deep mode. Need to keep exploring low-ORBIT + low-ENEMY territory or diversify with novel gene combos.
+
+### Run 80: gen 065 — fitness=21, stagnation=36 (DISCARD)
+- Timestamp: 2026-05-28
+- What changed: Ultra-deep stagnation (36): Elite=wide-explore of gen 064 best (σ=0.30, ORBIT=26.46, ENEMY=3.14); Mut2=mutant of 064 2nd (COMPOUND=24.27 highest ever); X12=vice-HoF near-clone (ORBIT=29.49, σ=0.05); X23=HoF×vice-HoF crossover (ORBIT=29.99, ENEMY=4.36, SHIPS=0.070)
+- Result: Elite=21 (4W/5L 2p, 2W 4p top2=5); X23=21 (tied); Mut2=18; X12=18. root_seed=9. Sharp drop from gen 064's 30pts.
+- Insight: Seed=9 was unfavorable. Vice-HoF near-clone (X12) only got 18pts — same params as before, inconsistent. HoF×vice-HoF crossover (X23) only 21pts despite ORBIT=30, SHIPS=0.07 (near-HoF territory). COMPOUND=24.27 again didn't help Mut2. Low ENEMY (3.14) Elite got 4W/5L 2p — worse than gen 064's 6W/3L with same params, pure seed luck.
+- Next: Gen 066 — evolve.py will use ultra-deep stagnation (36 gens). Keep exploring. Cannot predict which seeds will cooperate.
