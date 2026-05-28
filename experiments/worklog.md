@@ -596,3 +596,10 @@ Key observations:
 - Result: Elite-g062=28 (7W/2L 2p, 1W 4p top2=5); Mut2-g062=20; X12-g062=15 (4W 2p, low 4p); X23-g062=15 (2W/7L 2p — ORBIT=32 + ENEMY=4.63 is bad combo). Best=28, stagnation=33
 - Insight: Elite-g062 (ORBIT=32, ENEMY=7.05) showed ORBIT=32 is OK for 2p when ENEMY is ~7 (not ~5). But X23 with same ORBIT=32 but ENEMY=4.63 went 2W/7L. This confirms ENEMY matters a lot at high ORBIT: ENEMY~7 is needed to maintain 2p competitiveness when ORBIT~32. The ORBIT cap at 32 is working — no more runaway ORBIT=35 configs. Stagnation=33.
 - Next: Gen 063 — stagnation=33. Elite-g062 (ORBIT=32, ENEMY=7) is the new best of gen. Need configs that can combine 7-8W 2p with 3+W 4p. The persistent 4p weakness (only 1-2W per gen) remains the main bottleneck. ORBIT=27-30, ENEMY=7-10 might be the best zone to explore deeper.
+
+### Run 78: gen 063 — Mut2(6W/3L 2p)=22 (DISCARD)
+- Timestamp: 2026-05-28 20:38
+- What changed: Elite-g063=ultra-explore(Elite-g062,ORBIT=32,ENEMY=9.75,SHIPS=0.200 MAX,PROX=45.8); Mut2-g063=mutate(ORBIT=21.92,ENEMY=5.68,SHIPS=0.137); X12-g063=vice-HoF near-clone(ORBIT=30.17,ENEMY=6.29,SHIPS=0.116); X23-g063=Crossover(HoF,vice-HoF,ORBIT=27.63,ENEMY=6.01,SHIPS=0.122)
+- Result: Mut2-g063=22 (6W/3L 2p, 1W 4p); Elite-g063=20 (ALL TOP2 4p 10th time! SHIPS=0.200 MAX confirmed useless); X12/X23=18 each. Near-HoF X23 (ORBIT=27.63, ENEMY=6.01) again failed (4W/5L 2p). Best=22, stagnation=34
+- Insight: 10th consecutive occurrence of the ALL-TOP2 4p pattern (ORBIT~21-32, ENEMY~8-15 → always 2nd in 4p). SHIPS=0.200 MAX (Elite) didn't help at all. Near-HoF clones continue to underperform — the HoF=36 was truly a lucky seed alignment. At stagnation=34, updating autoresearch.md with major insights. The algorithm is stuck in a 22-28pt range and cannot break through 36. Needs structural insight or lucky seed.
+- Next: Gen 064 — stagnation=34. Should update autoresearch.md "What's Been Tried" with all learnings. Core pattern: 2p-optimal = ORBIT=27-32, ENEMY=5-10; 4p-specialist = ORBIT<25, ENEMY>10 (always 2nd not 1st!). HoF combination was seed-dependent.
