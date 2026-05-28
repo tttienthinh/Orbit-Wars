@@ -1,0 +1,18 @@
+{
+  "_name": "X12-g056",
+  "_description": "vice-HoF near-clone (sigma=0.05, stagnation=26)",
+  "PROD_MULT": 10.0325,
+  "TIME_PROD_MULT": 0.106,
+  "ENEMY_MULT": 5.6818,
+  "COMPOUND_MULT": 10.1453,
+  "MINE_NEAR_TGT_MULT": 0.6019,
+  "ENEMY_NEAR_TGT_MULT": 4.315,
+  "PROD_SRC_MULT": 11.3874,
+  "ORBIT_BONUS": 29.3187,
+  "PROXIMITY_MULT": 8.4335,
+  "DIST_MULT": 0.4554,
+  "SHIPS_MULT": 0.1175,
+  "ETA_MULT": 0.3093,
+  "OVEREXTEND_MULT": 0.4875,
+  "PROXIMITY_DIST": 45.5679
+}
