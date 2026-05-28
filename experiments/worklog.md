@@ -603,3 +603,10 @@ Key observations:
 - Result: Mut2-g063=22 (6W/3L 2p, 1W 4p); Elite-g063=20 (ALL TOP2 4p 10th time! SHIPS=0.200 MAX confirmed useless); X12/X23=18 each. Near-HoF X23 (ORBIT=27.63, ENEMY=6.01) again failed (4W/5L 2p). Best=22, stagnation=34
 - Insight: 10th consecutive occurrence of the ALL-TOP2 4p pattern (ORBIT~21-32, ENEMY~8-15 → always 2nd in 4p). SHIPS=0.200 MAX (Elite) didn't help at all. Near-HoF clones continue to underperform — the HoF=36 was truly a lucky seed alignment. At stagnation=34, updating autoresearch.md with major insights. The algorithm is stuck in a 22-28pt range and cannot break through 36. Needs structural insight or lucky seed.
 - Next: Gen 064 — stagnation=34. Should update autoresearch.md "What's Been Tried" with all learnings. Core pattern: 2p-optimal = ORBIT=27-32, ENEMY=5-10; 4p-specialist = ORBIT<25, ENEMY>10 (always 2nd not 1st!). HoF combination was seed-dependent.
+
+### Run 79: gen 064 — fitness=30, stagnation=35 (DISCARD)
+- Timestamp: 2026-05-28 
+- What changed: Ultra-deep stagnation (35): Elite=wide-explore of gen 063 best (ORBIT=21.50, ENEMY=3.28, SHIPS=0.112, COMPOUND=7.38 low); Mut2 had COMPOUND=23.72 (highest ever tried); X12/X23 near-HoF zone
+- Result: Elite=30 (6W/3L 2p, 3W 4p, top2=ALL 6 = 11th ALL-TOP2 occurrence!); Mut2=22 (6W 2p, 1W 4p); X12=14; X23=12 (2W/7L 2p). Best stagnation-period score so far.
+- Insight: Elite-g064 (ORBIT=21.50, ENEMY=3.28 VERY LOW) achieved 3W 4p + ALL-TOP2 which is unusual. Low ENEMY (3.28) didn't hurt 2p as much as expected (6W/3L). High COMPOUND (23.72) on Mut2 didn't help — 22pts only. The ALL-TOP2 pattern dominates but X23 with high ORBIT collapsed to 2W/7L 2p. Still can't break stagnation ceiling.
+- Next: Gen 065 will use Elite-g064 (fitness=30) as parent. Stagnation=35 → ultra-deep mode. Need to keep exploring low-ORBIT + low-ENEMY territory or diversify with novel gene combos.
