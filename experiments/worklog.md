@@ -617,3 +617,10 @@ Key observations:
 - Result: Elite=21 (4W/5L 2p, 2W 4p top2=5); X23=21 (tied); Mut2=18; X12=18. root_seed=9. Sharp drop from gen 064's 30pts.
 - Insight: Seed=9 was unfavorable. Vice-HoF near-clone (X12) only got 18pts — same params as before, inconsistent. HoF×vice-HoF crossover (X23) only 21pts despite ORBIT=30, SHIPS=0.07 (near-HoF territory). COMPOUND=24.27 again didn't help Mut2. Low ENEMY (3.14) Elite got 4W/5L 2p — worse than gen 064's 6W/3L with same params, pure seed luck.
 - Next: Gen 066 — evolve.py will use ultra-deep stagnation (36 gens). Keep exploring. Cannot predict which seeds will cooperate.
+
+### Run 81: gen 066 — fitness=34, stagnation=37 (DISCARD — vice-HoF tier!)
+- Timestamp: 2026-05-28
+- What changed: Ultra-deep (37): Elite=ultra-explore of 065 best (σ=0.30 — resulted in ORBIT=20, ENEMY=2.33 too extreme); Mut2=mutant of 065 2nd (ORBIT=32, ENEMY=4.14, SHIPS=0.097); X12=vice-HoF near-clone; X23=HoF×vice-HoF crossover (COMPOUND=21.19)
+- Result: Mut2(ORBIT=32,ENEMY=4.14,SHIPS=0.097,PROX=48.3,COMPOUND=11.26)=34 — VICE-HOF TIER! 8W/1L 2p, 3W 4p, top2=4. X12=24 (7W/2L 2p, 1W 4p). X23=12. Elite=8 (ultra-low ENEMY=2.33 devastating).
+- Insight: ORBIT=32 (max) + ENEMY=4.14 (low-medium) + SHIPS=0.097 is the sweet spot again. This echoes vice-HoF gen 049 (ORBIT=28.96, ENEMY=5.67, fitness=34). 3W 4p is rare — this is truly balanced! Elite collapse with ENEMY=2.33 confirms ENEMY<3 is catastrophic. High COMPOUND (21.19 on X23) again underperformed.
+- Next: Gen 067 — Mut2-g066 (fitness=34) becomes new best. Evolve will use it as parent. ORBIT=32, ENEMY~4 direction promising. Need to get 4p wins from 3→4+ while keeping 2p≥8W.
