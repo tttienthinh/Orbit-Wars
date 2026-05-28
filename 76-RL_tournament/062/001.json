@@ -1,0 +1,18 @@
+{
+  "_name": "Elite-g062",
+  "_description": "Elite: ultra-explore of gen 061 best, PROX\u226544 (stagnation=32)",
+  "PROD_MULT": 15.4426,
+  "TIME_PROD_MULT": 0.1,
+  "ENEMY_MULT": 7.0547,
+  "COMPOUND_MULT": 16.1328,
+  "MINE_NEAR_TGT_MULT": 0.6437,
+  "ENEMY_NEAR_TGT_MULT": 9.0885,
+  "PROD_SRC_MULT": 4.6952,
+  "ORBIT_BONUS": 32.0,
+  "PROXIMITY_MULT": 7.2807,
+  "DIST_MULT": 0.4124,
+  "SHIPS_MULT": 0.1469,
+  "ETA_MULT": 0.3409,
+  "OVEREXTEND_MULT": 0.2364,
+  "PROXIMITY_DIST": 44.0
+}
