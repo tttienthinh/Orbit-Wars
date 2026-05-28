@@ -89,12 +89,42 @@ The fitness metric is dominated by seed luck. Same ORBIT=35 config:
 - Gen 061: 8W/1L 2p (good seed)
 The HoF=36 required an exceptional seed alignment that gives 9W 2p + 2W 4p simultaneously.
 
-### Current Stagnation: 34 gens (gens 030-063)
-Best reachable without HoF seed: ~28pts (gen 027/028/055/059/062)
-The algorithm generates good configs (22-28pts typical) but cannot reproduce HoF=36 seed luck.
+### New Vice-HoF (gen 066 Mut2, fitness=34)
+ORBIT=32.00, ENEMY=4.14, SHIPS=0.097, PROX=48.3, COMPOUND=11.26
+- 8W/1L 2p + 3W 4p top2=4 — exceptional combined 2p+4p performance
+- Ties gen 049 Elite (old vice-HoF) at 34pts but with different params (higher ORBIT, lower ENEMY)
+- Emerged from ultra-deep stagnation (37 gens) via Mut2 of X23-g065
 
-### Next Directions to Try
-- Focus ORBIT=27-30 + ENEMY=7-9 zone more tightly (the balanced archetype)
-- Try COMPOUND_MULT exploration (HoF has 17.73 — much higher than typical ~5-10)
-- Try ETA_MULT and OVEREXTEND_MULT exploration (rarely explored)
-- Possible that a fundamentally different gene combination unlocks the 4p wins needed
+### Current Stagnation: 37 gens (gens 030-066)
+Best reachable without HoF seed: ~34pts (gen 066 Mut2) — new ceiling found!
+Previous ceiling was 28-30pts; gen 066 shows the algorithm CAN approach HoF territory.
+
+### Hard Rules (updated through gen 081, 81 experiments)
+- PROXIMITY_DIST ≥ 44 always (clamped); PROX=48-50 optimal
+- SHIPS_MULT ≤ 0.20 always (clamped); 0.087-0.13 optimal range
+- ORBIT_BONUS max = 32 (capped; ORBIT>32 = extreme seed variance)
+- ENEMY_MULT < 3: CATASTROPHIC (gen 066 Elite ENEMY=2.33 → 1W/8L 2p, fitness=8)
+- ENEMY_MULT 4-5 with ORBIT=32 works well (gen 066 Mut2 ENEMY=4.14 → 8W/1L)
+- COMPOUND_MULT > 20: consistently underperforms despite being explored 5+ times
+- ORBIT=32 + ENEMY~4 + SHIPS~0.10 is an emerging sweet spot (fitness=34)
+
+### Failed Directions
+- Near-HoF clones (ORBIT~28, ENEMY~6-7): 6W 2p but 0-1W 4p on every non-HoF seed
+- HIGH PROD (>19): no benefit
+- HIGH SHIPS (0.20 MAX): no benefit
+- ORBIT>32: consistently bad in 2p
+- ENEMY < 3: catastrophic (1W/8L 2p confirmed gen 066)
+- HIGH COMPOUND (>20): underperforms consistently despite many attempts
+- Vice-HoF clones (ORBIT~28-30, ENEMY~5-6): 5-7W 2p but 0W 4p wins
+
+### Seed Variance Problem
+The fitness metric is dominated by seed luck. Examples:
+- Gen 064 Elite (ORBIT=21.5, ENEMY=3.28): 6W/3L 2p on seed=84
+- Gen 065 Elite (same params): 4W/5L 2p on seed=9
+The HoF=36 required an exceptional seed alignment. Gen 066 Mut2=34 also benefited from seed=22.
+
+### Next Directions to Try (if resuming)
+- Focus ORBIT=30-32 + ENEMY=4-6 + SHIPS=0.08-0.12 (new sweet spot from gen 066)
+- Keep exploring gen 067+ which evolves from gen 066's vice-HoF Mut2
+- ETA_MULT and OVEREXTEND_MULT rarely explored — unknown territory
+- Gen 067 configs already created, tournament was in progress when stopped
