@@ -470,3 +470,10 @@ Key observations:
 - Result: Elite-g044=23 (6W/3L 2p, 0W 4p top2=5); X23-g044=21 (4W/5L 2p, 3W 4p); X12-g044=19 (4W/5L 2p, 2W 4p); Mut2-g044=15
 - Insight: ENEMY=2.18 (Elite) got 6W/3L 2p with 0W 4p — very low ENEMY is 2p-only specialist, no 4p wins. X12 (HoF near-clone: ENEMY=6.20, ORBIT=28.06) only 4W/5L 2p on this seed — consistent variance. HoF near-clone consistently scores 19-24 across seeds, never reaching 36 peak. Ultra-stagnation (15 gens) triggers gen 045: vice-HoF near-clone + HoF×vice-HoF crossover strategy to escape local optimum. vice-HoF (gen 024 Elite: ENEMY=13.94, PROX=50, SHIPS=0.053, PROD=11.83, ORBIT=18.24) — completely different archetype.
 - Next: Gen 045 — ULTRA-STAGNATION! evolve.py triggers: Elite=ultra-explore(current best,PROX≥44), X12=vice-HoF near-clone(sigma=0.05), X23=Crossover(HoF×vice-HoF).
+
+### Run 60: Gen 045 — best_fitness=27 (DISCARD — stagnation=16; 4W 4p RECORD from Mut2!)
+- Timestamp: 2026-05-28
+- What changed: Elite-g045=ultra-explore(Elite-g044,ENEMY=1.75,ORBIT=35,SHIPS=0.20↓,PROX=49.4); Mut2-g045=mutate(X23-g044,ENEMY=10.01,ORBIT=23.03,SHIPS=0.085,PROX=50); X12-g045=vice-HoF near-clone(ENEMY=6.94,ORBIT=14.99,SHIPS=0.103,PROX=44); X23-g045=Crossover(HoF,vice-HoF,ENEMY=6.71,ORBIT=20.81,SHIPS=0.096,PROX=50)
+- Result: Elite-g045=27 (7W/2L 2p, 0W 4p top2=6 — 2p specialist); Mut2-g045=27 tied (5W/4L 2p, 4W 4p RECORD! top2=4); X12-g045=15 (ORBIT=15 too low); X23-g045=9 (bad)
+- Insight: TWO NEW ARCHETYPES compete: (1) Ultra-low ENEMY=1.75+ORBIT=35+SHIPS=0.20 → 7W/2L 2p but 0W 4p — pure 2p specialist. (2) High ENEMY=10.01+ORBIT=23+SHIPS=0.085 → 5W/4L 2p + 4W 4p RECORD (8pts from 4p alone!) — best 4p performance ever seen. ORBIT=15 (X12) confirmed too low. The HoF×vice-HoF crossover (X23) failed completely (ORBIT=20.81+ENEMY=6.71=9pts). High-ENEMY (10.01) archetype produces exceptional 4p: 4 wins out of 6 games! Combining high-ENEMY for 4p defense + low-ENEMY for 2p aggression is the key tension. Stagnation=16.
+- Next: Gen 046 — stagnation=16; ultra-stagnation continues; explore high-ENEMY archetype (ENEMY~10, ORBIT~23, SHIPS~0.085) for 4p dominance.
