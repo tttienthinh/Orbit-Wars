@@ -1,6 +1,6 @@
 # Autoresearch Dashboard: orbit-wars-agent-evolution
 
-**Runs:** 67 | **Kept:** 4 | **Discarded:** 63 | **Crashed:** 0
+**Runs:** 68 | **Kept:** 4 | **Discarded:** 64 | **Crashed:** 0
 **Baseline:** best_fitness: 25pts (#1)
 **Best:** best_fitness: 36pts (#44, +44.0%)
 **HoF target:** 36 (gen 029 Elite-g029)
@@ -55,3 +55,4 @@
 | 65 | 77adc9e | 27pts (+8.0%) | discard | gen 050 (stagnation=21): Mut2(ORBIT=8.93,ENEMY=7.74,SHIPS=0.179,PROX=44)=27 (6W/3L 2p, 3W 4p top2=3); X23(ORBIT=22.06)=20; Elite(ORBIT=35)=19 (1W 4p top2=5); X12(near-Elite-g049 ORBIT=28.12)=12 (0W 4p — seed variance killed it) |
 | 66 | 1f981cb | 25pts (+0.0%) | discard | gen 051 (stagnation=22): Elite(ORBIT=10.67,ENEMY=12.93,SHIPS=0.20↓)=25 (5W/4L 2p, 2W 4p top2=6 ALL TOP2!); Mut2/X12 tied=19; X23(ORBIT=32.79,SHIPS=0.085)=15 (near-HoF on paper, flopped) |
 | 67 | 527718f | 25pts (+0.0%) | discard | gen 052 (stagnation=23): X23(ORBIT=34.01,ENEMY=6.57,SHIPS=0.085)=25 (5W/4L 2p, 3W 4p top2=4); Elite(ORBIT=6.78,ENEMY=17.82)=24 (4W/5L 2p, 3W 4p top2=6 ALL TOP2!); X12(near-Elite049 ORBIT=28.85)=18 (6W 2p, 0W 4p); Mut2=11 |
+| 68 | 90af7d5 | 26pts (+4.0%) | discard | gen 053 (stagnation=24): Elite(ORBIT=25.94,ENEMY=5.88,SHIPS=0.111,PROX=50)=26 (5W/4L 2p, 3W 4p top2=5); X23(ORBIT=28.96,ENEMY=7.29,SHIPS=0.074)=20; Mut2=18 (2W 4p); X12(ORBIT=28.67)=14 (0W 4p) |
