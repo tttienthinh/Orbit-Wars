@@ -1,6 +1,6 @@
 # Autoresearch Dashboard: orbit-wars-agent-evolution
 
-**Runs:** 69 | **Kept:** 4 | **Discarded:** 65 | **Crashed:** 0
+**Runs:** 70 | **Kept:** 4 | **Discarded:** 66 | **Crashed:** 0
 **Baseline:** best_fitness: 25pts (#1)
 **Best:** best_fitness: 36pts (#44, +44.0%)
 **HoF target:** 36 (gen 029 Elite-g029)
@@ -57,3 +57,4 @@
 | 67 | 527718f | 25pts (+0.0%) | discard | gen 052 (stagnation=23): X23(ORBIT=34.01,ENEMY=6.57,SHIPS=0.085)=25 (5W/4L 2p, 3W 4p top2=4); Elite(ORBIT=6.78,ENEMY=17.82)=24 (4W/5L 2p, 3W 4p top2=6 ALL TOP2!); X12(near-Elite049 ORBIT=28.85)=18 (6W 2p, 0W 4p); Mut2=11 |
 | 68 | 90af7d5 | 26pts (+4.0%) | discard | gen 053 (stagnation=24): Elite(ORBIT=25.94,ENEMY=5.88,SHIPS=0.111,PROX=50)=26 (5W/4L 2p, 3W 4p top2=5); X23(ORBIT=28.96,ENEMY=7.29,SHIPS=0.074)=20; Mut2=18 (2W 4p); X12(ORBIT=28.67)=14 (0W 4p) |
 | 69 | e9d9afc | 25pts (+0.0%) | discard | gen 054 (stagnation=25): Mut2(7W/2L 2p, 1W 4p)=25; Elite(ORBIT=20.27,ENEMY=8.70)=24 (5W 2p, 2W 4p top2=5); X12(ORBIT=30.84)=17; X23(ORBIT=35 MAX)=12 (2W/7L 2p — max ORBIT kills 2p) |
+| 70 | 63ab849 | 28pts (+12.0%) | discard | gen 055 (stagnation=26): Mut2(7W/2L 2p, 2W 4p top2=3)=28; Elite(ORBIT=25.97,ENEMY=11.98,PROX=44)=19 (3W/6L 2p, 2W 4p top2=6 ALL TOP2!); X12(ORBIT=30.06,ENEMY=5.34)=16; X23(ORBIT=25.16,ENEMY=8.84)=15 |
