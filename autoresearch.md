@@ -52,35 +52,49 @@ Hall of fame: the single best-ever agent config across all completed tournaments
 If hall-of-fame fitness > current-best fitness, use hall-of-fame as Elite.
 
 ## What's Been Tried
-- **NEW HoF** (gen 029 Elite, fitness=36): PROD=15.97, SHIPS=0.087, PROX=50.0, ENEMY=6.81, ORBIT=27.75, COMPOUND=17.73, OVER=0.476
-  - PERFECT 9W/0L 2p + 2W 4p + top2=5 — best result ever, stagnation resets to 0
-  - Key: PROX=50 (max board reach) + LOW ENEMY=6.81 + HIGH ORBIT=27.75 + HIGH COMPOUND=17.73
 
-- **Old HoF** (gen 015, fitness=34): PROD=14.82, SHIPS=0.103, PROX=44.49, ENEMY=6.72, OVER=0.256, ORBIT=~12
-  - Superseded by gen 029
+### HoF (gen 029, fitness=36) — UNREPRODUCIBLE
+ORBIT=27.75, ENEMY=6.81, SHIPS=0.087, PROX=50, PROD=15.97, COMPOUND=17.73
+- PERFECT 9W/0L 2p + 2W 4p + top2=5 — seed-dependent, cannot be reproduced on different seeds
+- 34 consecutive gens (030-063) below this — all near-HoF clones fail 4p on different seeds
 
-- **Vice-HoF** (gen 024 Elite, fitness=33): PROD=11.83, SHIPS=0.053, PROX=50, ENEMY=13.94, ORBIT=18.24
-  - Still useful as a diverse archetype (HIGH ENEMY vs LOW ENEMY)
+### Vice-HoF (gen 049 Elite, fitness=34)
+ORBIT=28.96, ENEMY=5.67, SHIPS=0.125, PROX=50
+- 9W/0L 2p + 1W 4p top2=5 — best 2p record since HoF but 4p weaker
 
-- **Critical constraints** (hard rules from 44 experiments):
-  - PROXIMITY_DIST MUST be ≥ 44; PROX<40 = catastrophic 0-win collapse in 2p
-  - PROXIMITY_DIST = 50 optimal — used in both HoF (gen 029) and vice-HoF (gen 024)
-  - ENEMY_MULT ≤ 7 strongly preferred for 2p; higher ENEMY only works with PROX=50 AND abundant neutrals
-  - ORBIT_BONUS 27+ appears highly beneficial — gen 029 HoF has ORBIT=27.75 (highest yet in a winner)
-  - COMPOUND_MULT 17+ may help coordinate multi-fleet captures
-  - SHIPS_MULT 0.04-0.11 is the working range; 0.087 optimal for combined 2p+4p
-  - PROD_MULT 15-16 works well; combined with low ENEMY and high ORBIT
+### Confirmed Archetypes (3 distinct behaviors)
+1. **2p-specialist** (ORBIT=27-32, ENEMY=5-8, PROX=48-50): 6-8W 2p, 0-2W 4p → 15-28pts
+2. **4p-ALL-TOP2** (ORBIT=20-32, ENEMY=8-16, SHIPS<0.10): 3-6W 2p, 0W but top2=ALL 6 4p → 17-28pts
+   - Occurred 10+ consecutive times — these configs finish 2nd in every 4p game but never win
+3. **Balanced** (ORBIT=25-30, ENEMY=6-9): 4-6W 2p, 1-3W 4p → 18-25pts
 
-- **Failed strategies** (dead ends):
-  - HoF near-clone (σ=0.05): consistently fails to reproduce HoF=34/36 on different seeds
-  - High ENEMY (10-16) with PROX<45: 0W/9L 2p pattern
-  - Ultra-wide exploration (σ=0.30) without PROX clamp: generates PROX=25-35 → catastrophe
-  - Crossover of 2p-specialist × 4p-specialist: if ENEMY blends to 8-10+, 2p collapses
+### Hard Rules (confirmed by 78 experiments)
+- PROXIMITY_DIST ≥ 44 always (clamped in evolve.py); PROX=50 optimal
+- SHIPS_MULT ≤ 0.20 always (clamped); HoF used 0.087
+- ORBIT_BONUS max = 32 (capped; ORBIT>32 = extreme seed variance, often kills 2p)
+- ENEMY_MULT < 5 with ORBIT>30 = 2p collapse (confirmed gen 062 X23)
+- ORBIT=35: extreme variance — 8W/1L one seed, 2W/7L another seed
 
-- **Promising directions**:
-  - Wide-explore (σ=0.30) of recent winners with PROX=50: produced new HoF=36!
-  - High ORBIT_BONUS (27+) + low ENEMY (≤7) + PROX=50: the new champion archetype
-  - Explore COMPOUND_MULT further (17.73 in HoF — is higher better?)
-  - Push fitness above 36: theoretical max = 45; currently at 80% of max
+### Failed Directions
+- Near-HoF clones (ORBIT~28, ENEMY~6-7): 6W 2p but 0-1W 4p on every non-HoF seed
+- HIGH PROD (>19): no benefit (confirmed gen 060 X23)
+- HIGH SHIPS (0.20 MAX): no benefit (confirmed gen 063 Elite)
+- ORBIT>33: consistently bad in 2p (~2-3W/7-6L)
+- Very low ENEMY (<5) + high ORBIT: 2p collapse
+- Vice-HoF direction (ORBIT~28-30, ENEMY~5-6): 5-7W 2p but 0W 4p wins
 
-- **Stagnation tracking**: HoF=36 (gen 029), stagnation=0 (just reset)
+### Seed Variance Problem
+The fitness metric is dominated by seed luck. Same ORBIT=35 config:
+- Gen 054: 2W/7L 2p (bad seed)
+- Gen 061: 8W/1L 2p (good seed)
+The HoF=36 required an exceptional seed alignment that gives 9W 2p + 2W 4p simultaneously.
+
+### Current Stagnation: 34 gens (gens 030-063)
+Best reachable without HoF seed: ~28pts (gen 027/028/055/059/062)
+The algorithm generates good configs (22-28pts typical) but cannot reproduce HoF=36 seed luck.
+
+### Next Directions to Try
+- Focus ORBIT=27-30 + ENEMY=7-9 zone more tightly (the balanced archetype)
+- Try COMPOUND_MULT exploration (HoF has 17.73 — much higher than typical ~5-10)
+- Try ETA_MULT and OVEREXTEND_MULT exploration (rarely explored)
+- Possible that a fundamentally different gene combination unlocks the 4p wins needed
