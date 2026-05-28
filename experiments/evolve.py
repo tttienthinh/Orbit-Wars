@@ -30,7 +30,7 @@ BOUNDS = {
     "MINE_NEAR_TGT_MULT":  (0.5,  25.0),
     "ENEMY_NEAR_TGT_MULT": (0.5,  20.0),
     "PROD_SRC_MULT":       (0.5,  12.0),
-    "ORBIT_BONUS":         (0.5,  35.0),
+    "ORBIT_BONUS":         (0.5,  32.0),
     "PROXIMITY_MULT":      (0.5,  25.0),
     "DIST_MULT":           (0.01,  5.0),
     "SHIPS_MULT":          (0.01,  3.0),
