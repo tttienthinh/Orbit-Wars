@@ -1,6 +1,6 @@
 # Autoresearch Dashboard: orbit-wars-agent-evolution
 
-**Runs:** 72 | **Kept:** 4 | **Discarded:** 68 | **Crashed:** 0
+**Runs:** 73 | **Kept:** 4 | **Discarded:** 69 | **Crashed:** 0
 **Baseline:** best_fitness: 25pts (#1)
 **Best:** best_fitness: 36pts (#44, +44.0%)
 **HoF target:** 36 (gen 029 Elite-g029)
@@ -60,3 +60,4 @@
 | 70 | 63ab849 | 28pts (+12.0%) | discard | gen 055 (stagnation=26): Mut2(7W/2L 2p, 2W 4p top2=3)=28; Elite(ORBIT=25.97,ENEMY=11.98,PROX=44)=19 (3W/6L 2p, 2W 4p top2=6 ALL TOP2!); X12(ORBIT=30.06,ENEMY=5.34)=16; X23(ORBIT=25.16,ENEMY=8.84)=15 |
 | 71 | 6ef6eb6 | 28pts (+12.0%) | discard | gen 056 (stagnation=27): Elite(ORBIT=20.12,ENEMY=13.00,PROX=50)=28 (6W/3L 2p, 2W 4p top2=6 ALL TOP2! 5th time!); X23(ORBIT=22.83,ENEMY=7.04)=19; Mut2(ORBIT=24.58,ENEMY=12.95)=16 (high ENEMY hurts 2p); X12(ORBIT=29.32,ENEMY=5.68)=15 (0W 4p) |
 | 72 | 149729e | 24pts (-4.0%) | discard | gen 057 (stagnation=28): X23(ORBIT=33.08,ENEMY=7.82)=24 (5W 2p, 3W 4p); Elite(ORBIT=24.92,ENEMY=14.59,SHIPS=0.078)=21 (5W 2p, 0W 4p top2=ALL 6 = 2nd place every game!); Mut2(ORBIT=21.12,ENEMY=7.48,SHIPS=0.069)=21; X12(ORBIT=27.86,ENEMY=5.82)=12 (3W/6L 2p) |
+| 73 | dbd88d1 | 25pts (+0.0%) | discard | gen 058 (stagnation=29): Mut2(ORBIT=26.57,ENEMY=16.45,SHIPS=0.079)=25 (6W/3L 2p, 2W 4p); X23(ORBIT=27.30,ENEMY=5.82 near-HoF!)=21 (6W/3L 2p, 1W 4p — HoF params don't reproduce 4p); Elite(ORBIT=30.81,ENEMY=9.50,PROD=21.51)=19 (ALL TOP2 4p 7th time!); X12=13 |
