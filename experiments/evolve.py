@@ -118,7 +118,8 @@ def find_hall_of_fame(completed):
                 best_fitness = fit
                 best_cfg = extract_constants(data["agents"][pid])
                 best_gen = gen_num
-            elif fit > vice_fitness:
+            elif fit >= vice_fitness:
+                # >= so ties update to the most recent config (later gens iterate last)
                 vice_fitness = fit
                 vice_cfg = extract_constants(data["agents"][pid])
     return best_fitness, best_cfg, vice_cfg
