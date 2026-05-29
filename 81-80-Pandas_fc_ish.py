@@ -728,3 +728,31 @@ class StrategyPipeline:
 
         moves += attacks[["id_src", "final_angle", "ships_sent"]].values.tolist()
         return moves
+
+
+# ── Entry point ───────────────────────────────────────────────────────────────
+step = 0
+num_agents = None
+player_id = None
+
+
+def agent(obs):
+    global step, num_agents, player_id
+
+    if num_agents is None:
+        initial = (
+            obs.initial_planets if hasattr(obs, "initial_planets")
+            else obs["initial_planets"]
+        )
+        owners = {p[1] for p in initial if p[1] != -1}
+        num_agents = 4 if len(owners) > 2 else 2
+    if player_id is None:
+        player_id = obs.get("player", 0) if isinstance(obs, dict) else obs.player
+
+    df_s, planet_disp = StrategyPipeline._01_get_obs_dataframe(obs, step, num_agents)
+    pa = StrategyPipeline._02_get_all_opportunities(df_s, planet_disp, player_id)
+    safe_attacks = StrategyPipeline._03_filter_collision(pa)
+    moves = StrategyPipeline._04_score_and_decide(safe_attacks, player_id)
+
+    step += 1
+    return moves
