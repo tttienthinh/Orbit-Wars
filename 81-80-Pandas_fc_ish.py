@@ -2,7 +2,6 @@ import math
 import copy
 import pandas as pd
 import numpy as np
-from collections import namedtuple
 
 
 # ── Configuration ─────────────────────────────────────────────────────────────
@@ -67,9 +66,6 @@ CENTER = GameConfig.CENTER
 SUN_RADIUS = GameConfig.SUN_RADIUS
 MAX_SPEED = GameConfig.MAX_SPEED
 ROTATION_RADIUS_LIMIT = GameConfig.ROTATION_RADIUS_LIMIT
-distance = PhysicsEngine.distance
-point_to_segment_distance = PhysicsEngine.point_to_segment_distance
-swept_pair_hit = PhysicsEngine.swept_pair_hit
 
 from collections import namedtuple
 
