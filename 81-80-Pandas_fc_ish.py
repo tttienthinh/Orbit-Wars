@@ -600,3 +600,51 @@ class StrategyPipeline:
         )
 
         return pa
+
+    @staticmethod
+    def _03_filter_collision(pa: pd.DataFrame) -> pd.DataFrame:
+        if pa.empty:
+            return pa
+
+        pa_left = pa[["id_src", "ships_sent", "step", "id", "angle", "angle_min", "angle_max"]].copy()
+        pa_obs = (
+            pa[["id_src", "ships_sent", "step", "id", "angle_min", "angle_max"]]
+            .rename(columns={
+                "step": "step_obs", "id": "id_obs",
+                "angle_min": "angle_min_obs", "angle_max": "angle_max_obs",
+            })
+        )
+
+        blocked_joined = (
+            pa_left
+            .merge(pa_obs, on=["id_src", "ships_sent"])
+            .loc[lambda d: (d["step_obs"] < d["step"]) & (d["id_obs"] != d["id"])]
+            .reset_index(drop=True)
+        )
+
+        if not blocked_joined.empty:
+            _anorm = blocked_joined["angle"].values % (2 * math.pi)
+            _wraps = (blocked_joined["angle_min_obs"] > blocked_joined["angle_max_obs"]).values
+            _in_cone = np.where(
+                _wraps,
+                (_anorm >= blocked_joined["angle_min_obs"].values) | (_anorm <= blocked_joined["angle_max_obs"].values),
+                (_anorm >= blocked_joined["angle_min_obs"].values) & (_anorm <= blocked_joined["angle_max_obs"].values),
+            )
+            blocked = (
+                blocked_joined[_in_cone]
+                [["id_src", "ships_sent", "step", "id"]]
+                .drop_duplicates()
+            )
+        else:
+            blocked = pd.DataFrame(columns=["id_src", "ships_sent", "step", "id"])
+
+        attacks_with_angle = (
+            pa
+            .merge(blocked.assign(_blocked=True), on=["id_src", "ships_sent", "step", "id"], how="left")
+            .loc[lambda d: d["_blocked"].isna()]
+            .drop(columns="_blocked")
+            .assign(final_angle=lambda d: d["angle"])
+            .reset_index(drop=True)
+        )
+
+        return attacks_with_angle
