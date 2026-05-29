@@ -329,3 +329,57 @@ def interpreter(obs, actions, step, num_agents=2):
         terminated = True
 
     return obs1
+
+
+# ── Strategy Pipeline ─────────────────────────────────────────────────────────
+class StrategyPipeline:
+
+    @staticmethod
+    def _01_get_obs_dataframe(obs, step: int, num_agents: int) -> tuple:
+        sim = copy.deepcopy(obs)
+        no_actions = [[] for _ in range(num_agents)]
+        rows = []
+        for i in range(GameConfig.NB_STEPS_SIM + 1):
+            for p in sim.planets:
+                pid, owner, x, y, radius, ships, production = (
+                    p[0], p[1], p[2], p[3], p[4], p[5], p[6]
+                )
+                r = math.hypot(x - GameConfig.CENTER, y - GameConfig.CENTER)
+                if pid in sim.comet_planet_ids:
+                    nature = "comet"
+                elif r + radius < GameConfig.ROTATION_RADIUS_LIMIT:
+                    nature = "moving"
+                else:
+                    nature = "fix"
+                rows.append({
+                    "step": step + i,
+                    "id": pid,
+                    "x": x,
+                    "y": y,
+                    "radius": radius,
+                    "ships": ships,
+                    "production": production,
+                    "owner": owner,
+                    "nature": nature,
+                })
+            interpreter(sim, no_actions, step + i, num_agents)
+
+        df_s = pd.DataFrame(rows).sort_values("step").reset_index(drop=True)
+
+        prev_pos = (
+            df_s[["id", "step", "x", "y"]]
+            .assign(step=lambda d: d["step"] + 1)
+            .rename(columns={"x": "x_prev", "y": "y_prev"})
+        )
+        planet_disp = (
+            df_s[["id", "step", "x", "y"]]
+            .merge(prev_pos, on=["id", "step"], how="left")
+            .assign(
+                planet_disp=lambda d: np.sqrt(
+                    (d["x"] - d["x_prev"].fillna(d["x"])) ** 2 +
+                    (d["y"] - d["y_prev"].fillna(d["y"])) ** 2
+                )
+            )
+            [["id", "step", "planet_disp"]]
+        )
+        return df_s, planet_disp
