@@ -648,3 +648,83 @@ class StrategyPipeline:
         )
 
         return attacks_with_angle
+
+    @staticmethod
+    def _04_score_and_decide(attacks_with_angle: pd.DataFrame, player_id: int) -> list:
+        if attacks_with_angle.empty:
+            return []
+
+        moves = []
+
+        # Comet evasion
+        awa_comets = attacks_with_angle[attacks_with_angle["nature_src"] == "comet"]
+        if not awa_comets.empty:
+            x_off = (awa_comets["x_src"] - GameConfig.CENTER).abs().max() or 0
+            y_off = (awa_comets["y_src"] - GameConfig.CENTER).abs().max() or 0
+            if max(x_off, y_off) > 45:
+                moves += (
+                    awa_comets[awa_comets["ships_sent"] <= awa_comets["ships_min"]]
+                    .sort_values(["ships_sent", "step"], ascending=[False, True])
+                    .groupby("id_src", sort=False)
+                    .first()
+                    .reset_index()
+                    [["id_src", "final_angle", "ships_sent"]]
+                    .values.tolist()
+                )
+                id_to_avoid = awa_comets["id_src"].unique().tolist()
+                attacks_with_angle = attacks_with_angle[~attacks_with_angle["id_src"].isin(id_to_avoid)]
+
+        planet_id_top_5 = (
+            attacks_with_angle
+            .sort_values(["step", "ships_sent"])
+            .groupby(["id_src", "id"], sort=False)
+            .first()
+            .reset_index()
+            .sort_values(["step", "ships_sent"])
+            .groupby("id_src", sort=False)
+            .head(5)
+            [["id_src", "id"]]
+        )
+
+        attacks_joined = (
+            planet_id_top_5
+            .merge(attacks_with_angle, on=["id_src", "id"], how="left")
+            .loc[lambda d: d["owner"] != player_id]
+            .assign(
+                ships_needed=lambda d: np.where(d["owner"] == -1, d["ships"], d["ships"] + d["production"])
+            )
+            .loc[lambda d:
+                (d["ships_needed"] + 1 <= d["ships_sent"]) &
+                (d["ships_sent"] <= d["ships_needed"] + d["production_src"] + 1)
+            ]
+            .sort_values(["step", "ships_sent"])
+            .groupby(["id_src", "id"], sort=False)
+            .first()
+            .reset_index()
+            .assign(time_cost=lambda d: d["ships_needed"] / d["production_src"])
+        )
+
+        if attacks_joined.empty:
+            return moves
+
+        attacks_joined = attacks_joined.assign(
+            total_time_cost=attacks_joined.groupby("id_src")["time_cost"].transform("sum")
+        ).assign(
+            score=lambda d: (d["total_time_cost"] - d["time_cost"] - d["step_diff"]) * d["production"]
+        )
+
+        attacks = (
+            attacks_joined
+            .sort_values("score", ascending=False)
+            .groupby("id_src", sort=False)
+            .first()
+            .reset_index()
+            .loc[lambda d: d["ships_sent"] <= d["ships_min"]]
+        )
+
+        for _, row in attacks.iterrows():
+            print(f"From {row['id_src']}, To {row['id']} at step {row['step']} "
+                  f"with {row['ships_sent']} ships (target has min {row['ships_min']})")
+
+        moves += attacks[["id_src", "final_angle", "ships_sent"]].values.tolist()
+        return moves
