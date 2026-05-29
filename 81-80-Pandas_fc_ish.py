@@ -383,3 +383,220 @@ class StrategyPipeline:
             [["id", "step", "planet_disp"]]
         )
         return df_s, planet_disp
+
+    @staticmethod
+    def _02_get_all_opportunities(
+        df_s: pd.DataFrame,
+        planet_disp: pd.DataFrame,
+        player_id: int,
+    ) -> pd.DataFrame:
+        mine_base = (
+            df_s
+            .assign(is_mine=(df_s["owner"] == player_id).astype(int))
+            .groupby("id", sort=False)
+            .agg(
+                step_src=("step", "first"),
+                x_src=("x", "first"),
+                y_src=("y", "first"),
+                radius_src=("radius", "first"),
+                ships_min=("ships", "min"),
+                production_src=("production", "first"),
+                nature_src=("nature", "first"),
+                owner_src=("owner", "first"),
+                row_count=("id", "count"),
+                is_mine=("is_mine", "sum"),
+            )
+            .reset_index()
+            .loc[lambda d: (d["row_count"] == d["is_mine"]) & (d["owner_src"] == player_id)]
+            .rename(columns={"id": "id_src"})
+            .reset_index(drop=True)
+        )
+
+        if mine_base.empty:
+            return pd.DataFrame()
+
+        # Phase A: planet-level cross join
+        coarse = (
+            mine_base.assign(_key=1)
+            .merge(df_s.assign(_key=1), on="_key")
+            .drop(columns="_key")
+            .loc[lambda d: (d["step"] > d["step_src"]) & (d["id"] != d["id_src"])]
+            .merge(planet_disp, on=["id", "step"], how="left")
+            .reset_index(drop=True)
+            .assign(
+                dist_tgt_src=lambda d: np.sqrt(
+                    (d["x"] - d["x_src"]) ** 2 + (d["y"] - d["y_src"]) ** 2
+                ),
+                step_diff=lambda d: (d["step"] - d["step_src"]).astype(float),
+            )
+        )
+
+        # Sun-crossing filter (vectorised)
+        _dx = coarse["x"].values - coarse["x_src"].values
+        _dy = coarse["y"].values - coarse["y_src"].values
+        _l2 = _dx ** 2 + _dy ** 2
+        _dot = (GameConfig.CENTER - coarse["x_src"].values) * _dx + (GameConfig.CENTER - coarse["y_src"].values) * _dy
+        _t_sun = np.clip(_dot / np.where(_l2 == 0, 1.0, _l2), 0.0, 1.0)
+        _proj = np.sqrt(
+            (GameConfig.CENTER - coarse["x_src"].values - _t_sun * _dx) ** 2 +
+            (GameConfig.CENTER - coarse["y_src"].values - _t_sun * _dy) ** 2
+        )
+        _sun_dist = np.where(
+            _l2 == 0,
+            np.sqrt((GameConfig.CENTER - coarse["x_src"].values) ** 2 + (GameConfig.CENTER - coarse["y_src"].values) ** 2),
+            _proj,
+        )
+        _crossing_sun = _sun_dist < (GameConfig.SUN_RADIUS + GameConfig.PLANET_MARGIN)
+
+        coarse = (
+            coarse
+            .assign(_crossing_sun=_crossing_sun)
+            .loc[lambda d:
+                (d["dist_tgt_src"] <
+                 (d["step_diff"] + 1) * GameConfig.MAX_SPEED
+                 + d["radius_src"] + GameConfig.PLANET_MARGIN + d["radius"]
+                 + d["planet_disp"].fillna(0.0))
+                & ~d["_crossing_sun"]
+            ]
+            .drop(columns="_crossing_sun")
+            .reset_index(drop=True)
+        )
+
+        if coarse.empty:
+            return pd.DataFrame()
+
+        # Ships_sent expansion
+        nb_steps_sim = GameConfig.NB_STEPS_SIM
+        expanded = (
+            coarse
+            .assign(
+                ships_sent=lambda d: [
+                    list(range(1, int(sm) + int(ps) * nb_steps_sim + 1))
+                    for sm, ps in zip(d["ships_min"], d["production_src"])
+                ]
+            )
+            .explode("ships_sent")
+            .assign(ships_sent=lambda d: d["ships_sent"].astype("int64"))
+            .reset_index(drop=True)
+        )
+
+        # Phase B: fleet-speed filter
+        _fs_ratio = np.clip(
+            np.log(expanded["ships_sent"].values.astype(float)) / math.log(1000.0),
+            0, None,
+        )
+        _fleet_speed_b = 1.0 + (GameConfig.MAX_SPEED - 1.0) * _fs_ratio ** 1.5
+        _dist_min_b = expanded["step_diff"].values * _fleet_speed_b + GameConfig.PLANET_MARGIN + expanded["radius_src"].values
+        _dist_prev_b = _dist_min_b - _fleet_speed_b
+
+        prev_pos = (
+            df_s[["id", "step", "x", "y"]]
+            .assign(step=lambda d: d["step"] + 1)
+            .rename(columns={"x": "x_prev", "y": "y_prev"})
+        )
+
+        expanded = (
+            expanded
+            .assign(fleet_speed=_fleet_speed_b, dist_min=_dist_min_b, dist_prev=_dist_prev_b)
+            .loc[lambda d: d["dist_tgt_src"] < d["dist_min"] + d["fleet_speed"] + d["radius"] + GameConfig.PLANET_MOVEMENT_SLACK]
+            .merge(prev_pos, on=["id", "step"], how="left")
+            .reset_index(drop=True)
+        )
+
+        if expanded.empty:
+            return pd.DataFrame()
+
+        # Swept-pair collision (vectorised)
+        _dx2 = expanded["x"].values - expanded["x_src"].values
+        _dy2 = expanded["y"].values - expanded["y_src"].values
+        _dist2 = expanded["dist_tgt_src"].values
+        _ux = _dx2 / np.where(_dist2 < 1e-9, 1.0, _dist2)
+        _uy = _dy2 / np.where(_dist2 < 1e-9, 1.0, _dist2)
+
+        _xpf = expanded["x_prev"].fillna(expanded["x"]).values
+        _ypf = expanded["y_prev"].fillna(expanded["y"]).values
+
+        _fx0 = expanded["x_src"].values + _ux * expanded["dist_prev"].values
+        _fy0 = expanded["y_src"].values + _uy * expanded["dist_prev"].values
+        _pvx = expanded["x"].values - _xpf
+        _pvy = expanded["y"].values - _ypf
+        _dvx = _ux * expanded["fleet_speed"].values - _pvx
+        _dvy = _uy * expanded["fleet_speed"].values - _pvy
+        _d0x = _fx0 - _xpf
+        _d0y = _fy0 - _ypf
+        _a   = _dvx ** 2 + _dvy ** 2
+        _b_  = 2.0 * (_d0x * _dvx + _d0y * _dvy)
+        _c_  = _d0x ** 2 + _d0y ** 2 - expanded["radius"].values ** 2
+        _disc = _b_ ** 2 - 4.0 * _a * _c_
+        _sq  = np.sqrt(np.clip(_disc, 0, None))
+        _t1  = np.where(_a < 1e-12, 0.0, (-_b_ - _sq) / (2.0 * _a))
+        _t2  = np.where(_a < 1e-12, 1.0, (-_b_ + _sq) / (2.0 * _a))
+        _coll = np.where(_a < 1e-12, _c_ <= 0.0, (_disc >= 0.0) & (_t2 >= 0.0) & (_t1 <= 1.0))
+
+        pa = (
+            expanded
+            .assign(t1=_t1, t2=_t2, collision=_coll)
+            .loc[lambda d: d["collision"]]
+            .reset_index(drop=True)
+        )
+
+        if pa.empty:
+            return pa
+
+        # Angle geometry
+        _xpf_pa = pa["x_prev"].fillna(pa["x"]).values
+        _ypf_pa = pa["y_prev"].fillna(pa["y"]).values
+        _t1e = np.clip(pa["t1"].values, 0.0, 1.0)
+        _t2e = np.clip(pa["t2"].values, 0.0, 1.0)
+
+        pa = (
+            pa
+            .assign(
+                t1_eff=_t1e,
+                t2_eff=_t2e,
+                p_t1_x=_xpf_pa + _t1e * (pa["x"].values - _xpf_pa),
+                p_t1_y=_ypf_pa + _t1e * (pa["y"].values - _ypf_pa),
+                p_t2_x=_xpf_pa + _t2e * (pa["x"].values - _xpf_pa),
+                p_t2_y=_ypf_pa + _t2e * (pa["y"].values - _ypf_pa),
+            )
+            .assign(
+                angle_t1=lambda d: np.arctan2(d["p_t1_y"] - d["y_src"], d["p_t1_x"] - d["x_src"]),
+                angle_t2=lambda d: np.arctan2(d["p_t2_y"] - d["y_src"], d["p_t2_x"] - d["x_src"]),
+                d_s_t1=lambda d: np.sqrt((d["p_t1_x"] - d["x_src"]) ** 2 + (d["p_t1_y"] - d["y_src"]) ** 2),
+                d_s_t2=lambda d: np.sqrt((d["p_t2_x"] - d["x_src"]) ** 2 + (d["p_t2_y"] - d["y_src"]) ** 2),
+            )
+            .assign(
+                d_f_t1=lambda d: d["dist_prev"] + d["t1_eff"] * d["fleet_speed"],
+                d_f_t2=lambda d: d["dist_prev"] + d["t2_eff"] * d["fleet_speed"],
+            )
+            .assign(
+                angle_radius_t1=lambda d: np.arccos(np.clip(
+                    (d["d_s_t1"] ** 2 + d["d_f_t1"] ** 2 - d["radius"] ** 2)
+                    / (2.0 * d["d_s_t1"] * d["d_f_t1"]),
+                    -1.0, 1.0,
+                )),
+                angle_radius_t2=lambda d: np.arccos(np.clip(
+                    (d["d_s_t2"] ** 2 + d["d_f_t2"] ** 2 - d["radius"] ** 2)
+                    / (2.0 * d["d_s_t2"] * d["d_f_t2"]),
+                    -1.0, 1.0,
+                )),
+            )
+            .assign(
+                angle_min=lambda d: np.minimum(
+                    d["angle_t1"] - d["angle_radius_t1"],
+                    d["angle_t2"] - d["angle_radius_t2"],
+                ) % (2 * math.pi),
+                angle_max=lambda d: np.maximum(
+                    d["angle_t1"] + d["angle_radius_t1"],
+                    d["angle_t2"] + d["angle_radius_t2"],
+                ) % (2 * math.pi),
+                angle=lambda d: np.arctan2(
+                    np.sin(d["angle_t1"]) + np.sin(d["angle_t2"]),
+                    np.cos(d["angle_t1"]) + np.cos(d["angle_t2"]),
+                ),
+            )
+            .sort_values("step")
+            .reset_index(drop=True)
+        )
+
+        return pa
