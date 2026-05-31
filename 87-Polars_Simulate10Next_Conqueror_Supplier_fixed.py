@@ -685,6 +685,7 @@ class StrategyPipeline:
                     (pl.col("ships_min") * 0.75 < pl.col("ships_sent")) &
                     (pl.col("ships_sent") < pl.col("ships_min"))
                 )
+                .filter(pl.col("id_src").is_not_null())
                 .sort(["all_need", "ships_sent"], descending=[True, False])
                 .group_by("id_src", maintain_order=True)
                 .first()
