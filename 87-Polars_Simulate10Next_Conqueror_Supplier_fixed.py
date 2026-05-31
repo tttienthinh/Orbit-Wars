@@ -698,7 +698,7 @@ class StrategyPipeline:
             return moves
 
         attacks = pl.concat(parts, how="diagonal")
-        print("Currently using testing _04_score_and_decide")
+        # print("Currently using testing _04_score_and_decide")
         for row in attacks.iter_rows(named=True):
             print(f"From {row['id_src']}, To {row['id']} at step {row['step']} "
                   f"with {row['ships_sent']} ships (target has min {row['ships_min']})")
@@ -715,6 +715,7 @@ player_id = None
 
 def agent(obs):
     global step, num_agents, player_id
+    print(f"Agent called step: {step} remainingOverageTime: {obs.get('remainingOverageTime', 0)}")
     if num_agents is None:
         initial = (
             obs.initial_planets if hasattr(obs, "initial_planets")
