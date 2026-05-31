@@ -515,7 +515,36 @@ class StrategyPipeline:
 
     @staticmethod
     def _03_filter_collision(pa_lf: pl.LazyFrame) -> pl.LazyFrame:
-        raise NotImplementedError
+        angle_norm = pl.col("angle") % (2 * math.pi)
+        wraps = pl.col("angle_min_obs") > pl.col("angle_max_obs")
+        in_cone = pl.when(wraps).then(
+            (angle_norm >= pl.col("angle_min_obs")) | (angle_norm <= pl.col("angle_max_obs"))
+        ).otherwise(
+            (angle_norm >= pl.col("angle_min_obs")) & (angle_norm <= pl.col("angle_max_obs"))
+        )
+
+        blocked_lf = (
+            pa_lf.select(["id_src", "ships_sent", "step", "id", "angle", "angle_min", "angle_max"])
+            .join(
+                pa_lf.select(["id_src", "ships_sent", "step", "id", "angle_min", "angle_max"])
+                     .rename({"step": "step_obs", "id": "id_obs",
+                              "angle_min": "angle_min_obs", "angle_max": "angle_max_obs"}),
+                on=["id_src", "ships_sent"],
+                how="inner",
+            )
+            .filter(
+                (pl.col("step_obs") < pl.col("step")) & (pl.col("id_obs") != pl.col("id"))
+            )
+            .filter(in_cone)
+            .select(["id_src", "ships_sent", "step", "id"])
+            .unique()
+        )
+
+        return (
+            pa_lf
+            .join(blocked_lf, on=["id_src", "ships_sent", "step", "id"], how="anti")
+            .with_columns(pl.col("angle").alias("final_angle"))
+        )
 
     @staticmethod
     def _04_score_and_decide(safe_lf: pl.LazyFrame, player_id: int) -> list:
