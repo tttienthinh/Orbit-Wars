@@ -323,8 +323,195 @@ class StrategyPipeline:
         return df_s, planet_disp
 
     @staticmethod
-    def _02_get_all_opportunities(df_s: pl.DataFrame, planet_disp: pl.DataFrame, player_id: int) -> pl.LazyFrame:
-        raise NotImplementedError
+    def _02_get_all_opportunities(
+        df_s: pl.DataFrame,
+        planet_disp: pl.DataFrame,
+        player_id: int,
+    ) -> pl.LazyFrame:
+        df_s_lf = df_s.lazy()
+        planet_disp_lf = planet_disp.lazy()
+
+        mine_base_lf = (
+            df_s_lf
+            .with_columns(
+                pl.when(pl.col("owner") == player_id).then(1).otherwise(0).alias("is_mine")
+            )
+            .group_by("id", maintain_order=True)
+            .agg([
+                pl.first("step").alias("step_src"),
+                pl.first("x").alias("x_src"),
+                pl.first("y").alias("y_src"),
+                pl.first("radius").alias("radius_src"),
+                pl.min("ships").alias("ships_min"),
+                pl.first("production").alias("production_src"),
+                pl.first("nature").alias("nature_src"),
+                pl.first("owner").alias("owner_src"),
+                pl.len().alias("row_count"),
+                pl.sum("is_mine").alias("is_mine"),
+            ])
+            .filter(
+                (pl.col("row_count") == pl.col("is_mine")) & (pl.col("owner_src") == player_id)
+            )
+            .rename({"id": "id_src"})
+        )
+
+        # Phase A: planet-level cross-join with sun-crossing filter
+        dx = pl.col("x") - pl.col("x_src")
+        dy = pl.col("y") - pl.col("y_src")
+        l2 = dx.pow(2) + dy.pow(2)
+        dist_tgt_src = l2.sqrt()
+        step_diff = (pl.col("step") - pl.col("step_src")).cast(pl.Float64)
+
+        dot = (GameConfig.CENTER - pl.col("x_src")) * dx + (GameConfig.CENTER - pl.col("y_src")) * dy
+        t_sun = (dot / pl.when(l2 == 0).then(pl.lit(1.0)).otherwise(l2)).clip(0.0, 1.0)
+        proj_dist_sun = (
+            (GameConfig.CENTER - pl.col("x_src") - t_sun * dx).pow(2) +
+            (GameConfig.CENTER - pl.col("y_src") - t_sun * dy).pow(2)
+        ).sqrt()
+        crossing_sun = pl.when(l2 == 0).then(
+            ((GameConfig.CENTER - pl.col("x_src")).pow(2) +
+             (GameConfig.CENTER - pl.col("y_src")).pow(2)).sqrt()
+        ).otherwise(proj_dist_sun) < (GameConfig.SUN_RADIUS + GameConfig.PLANET_MARGIN)
+
+        coarse_lf = (
+            mine_base_lf
+            .join(df_s_lf, how="cross")
+            .filter(
+                (pl.col("step") > pl.col("step_src")) & (pl.col("id") != pl.col("id_src"))
+            )
+            .join(planet_disp_lf, on=["id", "step"], how="left")
+            .with_columns([
+                dist_tgt_src.alias("dist_tgt_src"),
+                step_diff.alias("step_diff"),
+            ])
+            .filter(
+                (pl.col("dist_tgt_src") <
+                 (pl.col("step_diff") + 1) * GameConfig.MAX_SPEED
+                 + pl.col("radius_src") + GameConfig.PLANET_MARGIN + pl.col("radius")
+                 + pl.col("planet_disp").fill_null(0.0))
+                & ~crossing_sun
+            )
+        )
+
+        # Ships_sent expansion
+        nb_steps_sim = GameConfig.NB_STEPS_SIM
+        expanded_lf = (
+            coarse_lf
+            .with_columns(
+                pl.int_ranges(
+                    1,
+                    pl.col("ships_min") + pl.col("production_src") * nb_steps_sim + 1,
+                    dtype=pl.Int64,
+                ).alias("ships_sent")
+            )
+            .explode("ships_sent")
+        )
+
+        # Phase B: fleet-speed filter
+        fleet_speed_expr = 1.0 + (GameConfig.MAX_SPEED - 1.0) * (
+            pl.col("ships_sent").cast(pl.Float64).log(base=math.e) / math.log(1000.0)
+        ).clip(lower_bound=0.0).pow(1.5)
+        dist_min_expr = pl.col("step_diff") * fleet_speed_expr + GameConfig.PLANET_MARGIN + pl.col("radius_src")
+        dist_prev_expr = dist_min_expr - fleet_speed_expr
+
+        prev_pos_lf = (
+            df_s_lf.select(["id", "step", "x", "y"])
+            .rename({"x": "x_prev", "y": "y_prev"})
+            .with_columns((pl.col("step") + 1).alias("step"))
+        )
+
+        # Swept-pair collision (quadratic discriminant)
+        unit_x = (pl.col("x") - pl.col("x_src")) / pl.when(
+            pl.col("dist_tgt_src") < 1e-9
+        ).then(pl.lit(1.0)).otherwise(pl.col("dist_tgt_src"))
+        unit_y = (pl.col("y") - pl.col("y_src")) / pl.when(
+            pl.col("dist_tgt_src") < 1e-9
+        ).then(pl.lit(1.0)).otherwise(pl.col("dist_tgt_src"))
+        fleet_x0 = pl.col("x_src") + unit_x * pl.col("dist_prev")
+        fleet_y0 = pl.col("y_src") + unit_y * pl.col("dist_prev")
+        planet_vx = pl.col("x") - pl.col("x_prev").fill_null(pl.col("x"))
+        planet_vy = pl.col("y") - pl.col("y_prev").fill_null(pl.col("y"))
+        dvx_sp = unit_x * pl.col("fleet_speed") - planet_vx
+        dvy_sp = unit_y * pl.col("fleet_speed") - planet_vy
+        d0x_sp = fleet_x0 - pl.col("x_prev").fill_null(pl.col("x"))
+        d0y_sp = fleet_y0 - pl.col("y_prev").fill_null(pl.col("y"))
+        a_sp = dvx_sp.pow(2) + dvy_sp.pow(2)
+        b_sp = 2.0 * (d0x_sp * dvx_sp + d0y_sp * dvy_sp)
+        c_sp = d0x_sp.pow(2) + d0y_sp.pow(2) - pl.col("radius").pow(2)
+        disc_sp = b_sp.pow(2) - 4.0 * a_sp * c_sp
+        sq_sp = disc_sp.clip(lower_bound=0.0).sqrt()
+        t1_expr = pl.when(a_sp < 1e-12).then(pl.lit(0.0)).otherwise((-b_sp - sq_sp) / (2.0 * a_sp))
+        t2_expr = pl.when(a_sp < 1e-12).then(pl.lit(1.0)).otherwise((-b_sp + sq_sp) / (2.0 * a_sp))
+        collision = pl.when(a_sp < 1e-12).then(c_sp <= 0.0).otherwise(
+            (disc_sp >= 0.0) & (t2_expr >= 0.0) & (t1_expr <= 1.0)
+        )
+
+        # Angle geometry
+        x_prev_f = pl.col("x_prev").fill_null(pl.col("x"))
+        y_prev_f = pl.col("y_prev").fill_null(pl.col("y"))
+
+        pa_lf = (
+            expanded_lf
+            .with_columns([
+                fleet_speed_expr.alias("fleet_speed"),
+                dist_min_expr.alias("dist_min"),
+                dist_prev_expr.alias("dist_prev"),
+            ])
+            .filter(
+                pl.col("dist_tgt_src") < pl.col("dist_min") + pl.col("fleet_speed")
+                + pl.col("radius") + GameConfig.PLANET_MOVEMENT_SLACK
+            )
+            .join(prev_pos_lf, on=["id", "step"], how="left")
+            .with_columns([
+                t1_expr.alias("t1"),
+                t2_expr.alias("t2"),
+                collision.alias("collision"),
+            ])
+            .filter(pl.col("collision"))
+            .with_columns([
+                pl.col("t1").clip(0.0, 1.0).alias("t1_eff"),
+                pl.col("t2").clip(0.0, 1.0).alias("t2_eff"),
+            ])
+            .with_columns([
+                (x_prev_f + pl.col("t1_eff") * (pl.col("x") - x_prev_f)).alias("p_t1_x"),
+                (y_prev_f + pl.col("t1_eff") * (pl.col("y") - y_prev_f)).alias("p_t1_y"),
+                (x_prev_f + pl.col("t2_eff") * (pl.col("x") - x_prev_f)).alias("p_t2_x"),
+                (y_prev_f + pl.col("t2_eff") * (pl.col("y") - y_prev_f)).alias("p_t2_y"),
+            ])
+            .with_columns([
+                pl.arctan2(pl.col("p_t1_y") - pl.col("y_src"), pl.col("p_t1_x") - pl.col("x_src")).alias("angle_t1"),
+                pl.arctan2(pl.col("p_t2_y") - pl.col("y_src"), pl.col("p_t2_x") - pl.col("x_src")).alias("angle_t2"),
+                ((pl.col("p_t1_x") - pl.col("x_src")).pow(2) + (pl.col("p_t1_y") - pl.col("y_src")).pow(2)).sqrt().alias("d_s_t1"),
+                ((pl.col("p_t2_x") - pl.col("x_src")).pow(2) + (pl.col("p_t2_y") - pl.col("y_src")).pow(2)).sqrt().alias("d_s_t2"),
+            ])
+            .with_columns([
+                (pl.col("dist_prev") + pl.col("t1_eff") * pl.col("fleet_speed")).alias("d_f_t1"),
+                (pl.col("dist_prev") + pl.col("t2_eff") * pl.col("fleet_speed")).alias("d_f_t2"),
+            ])
+            .with_columns([
+                ((pl.col("d_s_t1").pow(2) + pl.col("d_f_t1").pow(2) - pl.col("radius").pow(2))
+                 / (2.0 * pl.col("d_s_t1") * pl.col("d_f_t1"))).clip(-1.0, 1.0).arccos().alias("angle_radius_t1"),
+                ((pl.col("d_s_t2").pow(2) + pl.col("d_f_t2").pow(2) - pl.col("radius").pow(2))
+                 / (2.0 * pl.col("d_s_t2") * pl.col("d_f_t2"))).clip(-1.0, 1.0).arccos().alias("angle_radius_t2"),
+            ])
+            .with_columns([
+                pl.min_horizontal(
+                    pl.col("angle_t1") - pl.col("angle_radius_t1"),
+                    pl.col("angle_t2") - pl.col("angle_radius_t2"),
+                ).mod(2 * math.pi).alias("angle_min"),
+                pl.max_horizontal(
+                    pl.col("angle_t1") + pl.col("angle_radius_t1"),
+                    pl.col("angle_t2") + pl.col("angle_radius_t2"),
+                ).mod(2 * math.pi).alias("angle_max"),
+                pl.arctan2(
+                    pl.col("angle_t1").sin() + pl.col("angle_t2").sin(),
+                    pl.col("angle_t1").cos() + pl.col("angle_t2").cos(),
+                ).alias("angle"),
+            ])
+            .sort("step")
+        )
+
+        return pa_lf
 
     @staticmethod
     def _03_filter_collision(pa_lf: pl.LazyFrame) -> pl.LazyFrame:
