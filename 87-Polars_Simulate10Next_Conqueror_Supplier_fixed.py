@@ -548,7 +548,162 @@ class StrategyPipeline:
 
     @staticmethod
     def _04_score_and_decide(safe_lf: pl.LazyFrame, player_id: int) -> list:
-        raise NotImplementedError
+        attacks_with_angle = safe_lf.collect()
+        if attacks_with_angle.is_empty():
+            return []
+
+        moves = []
+
+        # Comet evasion
+        awa_comets = attacks_with_angle.filter(pl.col("nature_src") == "comet")
+        if not awa_comets.is_empty():
+            x_off = (awa_comets["x_src"] - GameConfig.CENTER).abs().max() or 0
+            y_off = (awa_comets["y_src"] - GameConfig.CENTER).abs().max() or 0
+            if max(x_off, y_off) > 45:
+                moves += [list(r) for r in (
+                    awa_comets
+                    .filter(pl.col("ships_sent") <= pl.col("ships_min"))
+                    .sort(["ships_sent", "step"], descending=[True, False])
+                    .group_by("id_src", maintain_order=True)
+                    .first()
+                    .select(["id_src", "final_angle", "ships_sent"])
+                    .rows()
+                )]
+                id_to_avoid = awa_comets["id_src"].unique().to_list()
+                attacks_with_angle = attacks_with_angle.filter(~pl.col("id_src").is_in(id_to_avoid))
+
+        if attacks_with_angle.is_empty():
+            return moves
+
+        # Top-5 targets per source planet
+        top5_ids = (
+            attacks_with_angle
+            .sort(["step", "ships_sent"])
+            .group_by(["id_src", "id"], maintain_order=True)
+            .first()
+            .sort(["step", "ships_sent"])
+            .group_by("id_src", maintain_order=True)
+            .head(5)
+            .select(["id_src", "id"])
+            .with_columns(pl.lit(True).alias("is_top5"))
+        )
+
+        mine_src_ids = attacks_with_angle["id_src"].unique().to_list()
+
+        # Classify Supplier / Conqueror
+        src_nature = (
+            top5_ids
+            .with_columns(pl.col("id").is_in(mine_src_ids).alias("target_is_mine"))
+            .group_by("id_src")
+            .agg([
+                pl.col("target_is_mine").sum().alias("mine_count"),
+                pl.len().alias("total_count"),
+            ])
+            .with_columns(
+                pl.when(pl.col("mine_count") == pl.col("total_count"))
+                .then(pl.lit("Supplier"))
+                .otherwise(pl.lit("Conqueror"))
+                .alias("status")
+            )
+        )
+        conqueror_ids = src_nature.filter(pl.col("status") == "Conqueror")["id_src"].to_list()
+        supplier_ids = src_nature.filter(pl.col("status") == "Supplier")["id_src"].to_list()
+
+        # ── Conqueror: attack enemy/neutral planets ──────────────────────────────
+        attacks_conqueror = pl.DataFrame()
+        conqueror_needs = None
+        if conqueror_ids:
+            _c = (
+                attacks_with_angle
+                .filter(pl.col("id_src").is_in(conqueror_ids))
+                .join(top5_ids.select(["id_src", "id", "is_top5"]), on=["id_src", "id"], how="left")
+                .with_columns(pl.col("is_top5").fill_null(False))
+                .filter(pl.col("is_top5"))
+                .filter(pl.col("owner") != player_id)
+                .with_columns(
+                    pl.when(pl.col("owner") == -1)
+                    .then(pl.col("ships"))
+                    .otherwise(pl.col("ships") + pl.col("production"))
+                    .alias("ships_needed")
+                )
+                .filter(
+                    (pl.col("ships_needed") + 1 <= pl.col("ships_sent")) &
+                    (pl.col("ships_sent") <= pl.col("ships_needed") + pl.col("production_src") + 1)
+                )
+                .sort(["step", "ships_sent"])
+                .group_by(["id_src", "id"], maintain_order=True)
+                .first()
+                .with_columns(
+                    (pl.col("ships_needed") / pl.col("production_src")).alias("time_cost")
+                )
+            )
+            if not _c.is_empty():
+                conqueror_needs = (
+                    _c
+                    .group_by("id_src", maintain_order=True)
+                    .agg([
+                        pl.col("ships_min").min().alias("ship_min"),
+                        pl.col("ships_sent").sum().alias("all_need"),
+                        pl.col("ships_sent").min().alias("lowest_need"),
+                        pl.len().alias("nb_need"),
+                    ])
+                )
+                total_tc = _c.group_by("id_src").agg(
+                    pl.col("time_cost").sum().alias("total_time_cost")
+                )
+                attacks_conqueror = (
+                    _c
+                    .join(total_tc, on="id_src", how="left")
+                    .with_columns(
+                        ((pl.col("total_time_cost") - pl.col("time_cost") - pl.col("step_diff"))
+                         * pl.col("production")).alias("score")
+                    )
+                    .sort("score", descending=True)
+                    .group_by("id_src", maintain_order=True)
+                    .first()
+                    .filter(pl.col("ships_sent") <= pl.col("ships_min"))
+                )
+
+        # ── Supplier: reinforce own planets ─────────────────────────────────────
+        attacks_supplier = pl.DataFrame()
+        if supplier_ids and conqueror_needs is not None:
+            _s = (
+                attacks_with_angle
+                .filter(pl.col("id_src").is_in(supplier_ids))
+                .join(top5_ids.select(["id_src", "id", "is_top5"]), on=["id_src", "id"], how="left")
+                .with_columns(pl.col("is_top5").fill_null(False))
+                .filter(pl.col("is_top5"))
+                .with_columns(pl.col("id").is_in(supplier_ids).alias("target_is_supplier"))
+                .filter(~pl.col("target_is_supplier"))
+                .join(
+                    conqueror_needs.rename({"id_src": "id"}),
+                    on="id",
+                    how="right",
+                )
+                .filter((pl.col("lowest_need") - pl.col("ships_min")) * 1.5 < pl.col("ships_sent"))
+                .filter(
+                    (pl.col("ships_min") * 0.75 < pl.col("ships_sent")) &
+                    (pl.col("ships_sent") < pl.col("ships_min"))
+                )
+                .sort(["all_need", "ships_sent"], descending=[True, False])
+                .group_by("id_src", maintain_order=True)
+                .first()
+            )
+            attacks_supplier = _s
+
+        # ── Combine and emit ─────────────────────────────────────────────────────
+        parts = [df for df in [attacks_conqueror, attacks_supplier] if not df.is_empty()]
+        if not parts:
+            return moves
+
+        attacks = pl.concat(parts, how="diagonal")
+        print("Currently using testing _04_score_and_decide")
+        for row in attacks.iter_rows(named=True):
+            print(f"From {row['id_src']}, To {row['id']} at step {row['step']} "
+                  f"with {row['ships_sent']} ships (target has min {row['ships_min']})")
+
+        moves += [list(r) for r in attacks.select(["id_src", "final_angle", "ships_sent"]).rows()]
+        return moves
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────
