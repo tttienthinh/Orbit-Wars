@@ -272,7 +272,55 @@ def interpreter(obs, actions, step, num_agents=2):
 class StrategyPipeline:
     @staticmethod
     def _01_get_obs_dataframe(obs, step: int, num_agents: int) -> tuple:
-        raise NotImplementedError
+        sim = copy.deepcopy(obs)
+        no_actions = [[] for _ in range(num_agents)]
+        rows = []
+        for i in range(GameConfig.NB_STEPS_SIM + 1):
+            for p in sim.planets:
+                pid, owner, x, y, radius, ships, production = (
+                    p[0], p[1], p[2], p[3], p[4], p[5], p[6]
+                )
+                r = math.hypot(x - GameConfig.CENTER, y - GameConfig.CENTER)
+                if pid in sim.comet_planet_ids:
+                    nature = "comet"
+                elif r + radius < GameConfig.ROTATION_RADIUS_LIMIT:
+                    nature = "moving"
+                else:
+                    nature = "fix"
+                rows.append({
+                    "step": step + i,
+                    "id": pid,
+                    "x": x,
+                    "y": y,
+                    "radius": radius,
+                    "ships": ships,
+                    "production": production,
+                    "owner": owner,
+                    "nature": nature,
+                })
+            interpreter(sim, no_actions, step + i, num_agents)
+
+        df_s = pl.DataFrame(rows).sort("step")
+
+        prev_pos = (
+            df_s.lazy()
+            .select(["id", "step", "x", "y"])
+            .rename({"x": "x_prev", "y": "y_prev"})
+            .with_columns((pl.col("step") + 1).alias("step"))
+        )
+        planet_disp = (
+            df_s.lazy()
+            .select(["id", "step", "x", "y"])
+            .join(prev_pos, on=["id", "step"], how="left")
+            .with_columns(
+                ((pl.col("x") - pl.col("x_prev").fill_null(pl.col("x"))).pow(2) +
+                 (pl.col("y") - pl.col("y_prev").fill_null(pl.col("y"))).pow(2)
+                ).sqrt().alias("planet_disp")
+            )
+            .select(["id", "step", "planet_disp"])
+            .collect()
+        )
+        return df_s, planet_disp
 
     @staticmethod
     def _02_get_all_opportunities(df_s: pl.DataFrame, planet_disp: pl.DataFrame, player_id: int) -> pl.LazyFrame:
