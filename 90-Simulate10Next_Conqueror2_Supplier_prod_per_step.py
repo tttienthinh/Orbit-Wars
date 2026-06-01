@@ -684,7 +684,10 @@ class StrategyPipeline:
                 ]
                 .sort_values(["step", "ships_sent"])
                 .groupby(["id_src", "id"], sort=False).first().reset_index()
-                .assign(time_cost=lambda d: d["ships_needed"] / d["production_src"])
+                .assign(
+                    time_cost=lambda d: d["ships_needed"] / d["production_src"],
+                    score=lambda d: d["production"] / (d["time_cost"] + d["step_diff"]),
+                )
             )
             if not _c.empty:
                 conqueror_needs = (
@@ -695,44 +698,63 @@ class StrategyPipeline:
                         all_need=("ships_sent", "sum"),
                         lowest_need=("ships_sent", "min"),
                         nb_need=("ships_sent", "count"),
+                        max_score=("score", "max")
                     )
+                    .reset_index()
                 )
                 attacks_conqueror = (
                     _c
-                    .assign(
-                        total_time_cost=_c.groupby("id_src")["time_cost"].transform("sum")
-                    ).assign(
-                        score=lambda d: (
-                            (d["total_time_cost"] - d["time_cost"] - d["step_diff"]) * d["production"]
-                        )
-                    )
+                    # .assign(
+                    #     total_time_cost=_c.groupby("id_src")["time_cost"].transform("sum")
+                    # ).assign(
+                    #     score=lambda d: (
+                    #         (d["total_time_cost"] - d["time_cost"] - d["step_diff"]) * d["production"]
+                    #     )
+                    # )
                     # .loc[lambda d: d["score"] > 0]
                     .sort_values("score", ascending=False)
                     .groupby("id_src", sort=False).first().reset_index()
                     .loc[lambda d: d["ships_sent"] <= d["ships_min"]]
                 )
-            if not _c_1_or_2.empty:
-                attacks_conqueror_2 = (
-                    _c_1_or_2
-                    .merge(
-                        _c_1_or_2,
-                        on="id",
-                        how="inner",
-                        suffixes=("", "_2"), # _2 is the ship to be sent later
+                if not _c_1_or_2.empty:
+                    attacks_conqueror_2 = (
+                        _c_1_or_2
+                        .merge(
+                            _c_1_or_2,
+                            on="id",
+                            how="inner",
+                            suffixes=("", "_2"), # _2 is the ship to be sent later
+                        )
+                        .query("id_src != id_src_2")
+                        .query("step < step_2")
+                        .loc[lambda d:
+                            (np.maximum(d["ships_needed"], d["ships_needed_2"]) + 1 <= d["ships_sent"] + d["ships_sent_2"]) &
+                            (d["ships_sent"] + d["ships_sent_2"] <= np.maximum(d["ships_needed"], d["ships_needed_2"]) + d["production_src_2"] + 1)
+                        ]
+                        .loc[lambda d: d["ships_sent"] <= d["ships_min"]]
+                        .loc[lambda d: d["ships_sent_2"] <= d["ships_min_2"] +  d["production_src_2"]]
+                        .merge(
+                            conqueror_needs[["id_src", "max_score"]],
+                            on="id_src",
+                            how="left"
+                        )
+                        .merge(
+                            conqueror_needs[["id_src", "max_score"]].rename(columns={"id_src": "id_src_2"}),
+                            on="id_src_2",
+                            how="left",
+                            suffixes=("", "_2"),
+                        )
+                        .assign(
+                            time_cost=lambda d: d["ships_sent"] / d["production_src"],
+                            time_cost_2=lambda d: d["ships_sent_2"] / d["production_src_2"],
+                            score=lambda d: d["production"] / (d["step_diff_2"] + (d["time_cost"]**2 + d["time_cost_2"]**2)**0.5),
+                        )
+                        .query("score > max_score and score > max_score_2")
+                        .sort_values(["step_2", "ships_sent_2"])
+                        .groupby(["id_src", "id"], sort=False).first().reset_index()
+                        .sort_values(["step_2", "ships_sent_2"])
+                        .pipe(lambda d: d.head(1) if d is not None and not d.empty else None)
                     )
-                    .query("id_src != id_src_2")
-                    .query("step < step_2")
-                    .loc[lambda d:
-                        (np.maximum(d["ships_needed"], d["ships_needed_2"]) + 1 <= d["ships_sent"] + d["ships_sent_2"]) &
-                        (d["ships_sent"] + d["ships_sent_2"] <= np.maximum(d["ships_needed"], d["ships_needed_2"]) + d["production_src_2"] + 1)
-                    ]
-                    .loc[lambda d: d["ships_sent"] <= d["ships_min"]]
-                    .loc[lambda d: d["ships_sent_2"] <= d["ships_min_2"] +  d["production_src_2"]]
-                    .sort_values(["step_2", "ships_sent_2"])
-                    .groupby(["id_src", "id"], sort=False).first().reset_index()
-                    .sort_values(["step_2", "ships_sent_2"])
-                    .pipe(lambda d: d.head(1) if d is not None and not d.empty else None)
-                )
 
 
         # ── Supplier: reinforce own planets ─────────────────────────────────────
@@ -785,6 +807,7 @@ player_id = None
 
 def agent(obs):
     global step, num_agents, player_id
+    print(f"Agent called step: {step} remainingOverageTime: {obs.get('remainingOverageTime', 0)}")
 
     if num_agents is None:
         initial = (

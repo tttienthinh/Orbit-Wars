@@ -10,7 +10,7 @@ class GameConfig:
     SUN_RADIUS = 10.0
     ROTATION_RADIUS_LIMIT = 50.0
     MAX_SPEED = 6.0
-    NB_STEPS_SIM = 10
+    NB_STEPS_SIM = 15
     PLANET_MARGIN = 0.1
     PLANET_MOVEMENT_SLACK = 3.0
 
@@ -612,8 +612,7 @@ class StrategyPipeline:
                 id_to_avoid = awa_comets["id_src"].unique().tolist()
                 attacks_with_angle = attacks_with_angle[~attacks_with_angle["id_src"].isin(id_to_avoid)]
 
-        # Top-5 targets per source planet (cheapest by step then ships_sent)
-        top5_ids = (
+        planet_id_top_5 = (
             attacks_with_angle
             .sort_values(["step", "ships_sent"])
             .groupby(["id_src", "id"], sort=False)
@@ -623,158 +622,50 @@ class StrategyPipeline:
             .groupby("id_src", sort=False)
             .head(5)
             [["id_src", "id"]]
-            .assign(is_top5=True)
         )
 
-        # Source planet IDs owned by player (id_src is already filtered to player's planets)
-        mine_src_ids = set(attacks_with_angle["id_src"].unique())
-
-        # Classify each source as Supplier (all top5 targets are own planets) or Conqueror
-        top5_with_mine = top5_ids.copy()
-        top5_with_mine["target_is_mine"] = top5_with_mine["id"].isin(mine_src_ids)
-        src_nature = (
-            top5_with_mine
-            .groupby("id_src")
-            .agg(mine_count=("target_is_mine", "sum"), total_count=("target_is_mine", "count"))
+        attacks_joined = (
+            planet_id_top_5
+            .merge(attacks_with_angle, on=["id_src", "id"], how="left")
+            .loc[lambda d: d["owner"] != player_id]
+            .assign(
+                ships_needed=lambda d: np.where(d["owner"] == -1, d["ships"], d["ships"] + d["production"])
+            )
+            .loc[lambda d:
+                (d["ships_needed"] + 1 <= d["ships_sent"]) &
+                (d["ships_sent"] <= d["ships_needed"] + d["production_src"] + 1)
+            ]
+            .sort_values(["step", "ships_sent"])
+            .groupby(["id_src", "id"], sort=False)
+            .first()
             .reset_index()
+            .assign(time_cost=lambda d: d["ships_needed"] / d["production_src"])
         )
-        src_nature["status"] = np.where(
-            src_nature["mine_count"] == src_nature["total_count"], "Supplier", "Conqueror"
-        )
-        conqueror_ids = set(src_nature.loc[src_nature["status"] == "Conqueror", "id_src"])
-        supplier_ids  = set(src_nature.loc[src_nature["status"] == "Supplier",  "id_src"])
 
-        # ── Conqueror: attack enemy/neutral planets ──────────────────────────────
-        attacks_conqueror = pd.DataFrame()
-        conqueror_needs = None
-        if conqueror_ids:
-
-            _c_1_or_2 = (
-                attacks_with_angle[attacks_with_angle["id_src"].isin(conqueror_ids)]
-                .merge(top5_ids[["id_src", "id", "is_top5"]], on=["id_src", "id"], how="left")
-                .assign(is_top5=lambda d: d["is_top5"].fillna(False))
-                .query("is_top5")
-                .loc[lambda d: d["owner"] != player_id]
-                .assign(ships_needed=lambda d: np.where(
-                    d["owner"] == -1, d["ships"], d["ships"] + d["production"]
-                ))
-                # .loc[lambda d:
-                #     (d["ships_needed"] + 1 <= d["ships_sent"]) &
-                #     (d["ships_sent"] <= d["ships_needed"] + d["production_src"] + 1)
-                # ]
-                # .sort_values(["step", "ships_sent"])
-                # .groupby(["id_src", "id"], sort=False).first().reset_index()
-                # .assign(time_cost=lambda d: d["ships_needed"] / d["production_src"])
-            )
-
-
-            _c = (
-                _c_1_or_2
-                # attacks_with_angle[attacks_with_angle["id_src"].isin(conqueror_ids)]
-                # .merge(top5_ids[["id_src", "id", "is_top5"]], on=["id_src", "id"], how="left")
-                # .assign(is_top5=lambda d: d["is_top5"].fillna(False))
-                # .query("is_top5")
-                # .loc[lambda d: d["owner"] != player_id]
-                # .assign(ships_needed=lambda d: np.where(
-                #     d["owner"] == -1, d["ships"], d["ships"] + d["production"]
-                # ))
-                .loc[lambda d:
-                    (d["ships_needed"] + 1 <= d["ships_sent"]) &
-                    (d["ships_sent"] <= d["ships_needed"] + d["production_src"] + 1)
-                ]
-                .sort_values(["step", "ships_sent"])
-                .groupby(["id_src", "id"], sort=False).first().reset_index()
-                .assign(time_cost=lambda d: d["ships_needed"] / d["production_src"])
-            )
-            if not _c.empty:
-                conqueror_needs = (
-                    _c
-                    .groupby("id_src", sort=False)
-                    .agg(
-                        ship_min=("ships_min", "min"),
-                        all_need=("ships_sent", "sum"),
-                        lowest_need=("ships_sent", "min"),
-                        nb_need=("ships_sent", "count"),
-                    )
-                )
-                attacks_conqueror = (
-                    _c
-                    .assign(
-                        total_time_cost=_c.groupby("id_src")["time_cost"].transform("sum")
-                    ).assign(
-                        score=lambda d: (
-                            (d["total_time_cost"] - d["time_cost"] - d["step_diff"]) * d["production"]
-                        )
-                    )
-                    # .loc[lambda d: d["score"] > 0]
-                    .sort_values("score", ascending=False)
-                    .groupby("id_src", sort=False).first().reset_index()
-                    .loc[lambda d: d["ships_sent"] <= d["ships_min"]]
-                )
-            if not _c_1_or_2.empty:
-                attacks_conqueror_2 = (
-                    _c_1_or_2
-                    .merge(
-                        _c_1_or_2,
-                        on="id",
-                        how="inner",
-                        suffixes=("", "_2"), # _2 is the ship to be sent later
-                    )
-                    .query("id_src != id_src_2")
-                    .query("step < step_2")
-                    .loc[lambda d:
-                        (np.maximum(d["ships_needed"], d["ships_needed_2"]) + 1 <= d["ships_sent"] + d["ships_sent_2"]) &
-                        (d["ships_sent"] + d["ships_sent_2"] <= np.maximum(d["ships_needed"], d["ships_needed_2"]) + d["production_src_2"] + 1)
-                    ]
-                    .loc[lambda d: d["ships_sent"] <= d["ships_min"]]
-                    .loc[lambda d: d["ships_sent_2"] <= d["ships_min_2"] +  d["production_src_2"]]
-                    .sort_values(["step_2", "ships_sent_2"])
-                    .groupby(["id_src", "id"], sort=False).first().reset_index()
-                    .sort_values(["step_2", "ships_sent_2"])
-                    .pipe(lambda d: d.head(1) if d is not None and not d.empty else None)
-                )
-
-
-        # ── Supplier: reinforce own planets ─────────────────────────────────────
-        attacks_supplier = pd.DataFrame()
-        if supplier_ids and conqueror_needs is not None:
-            _s = (
-                attacks_with_angle[attacks_with_angle["id_src"].isin(supplier_ids)]
-                .merge(top5_ids[["id_src", "id", "is_top5"]], on=["id_src", "id"], how="left")
-                .assign(is_top5=lambda d: d["is_top5"].fillna(False))
-                .loc[lambda d: d["is_top5"]]
-                .assign(target_is_supplier=lambda d: d["id"].isin(supplier_ids))
-                .query("not target_is_supplier")
-                .merge(
-                    conqueror_needs,
-                    left_on="id",
-                    right_on="id_src",
-                    how="right"
-                )
-                .query("(lowest_need - ships_min) * 1.5 < ships_sent")
-                .query("ships_min * 0.75 < ships_sent < ships_min")
-                .sort_values(["all_need", "ships_sent"], ascending=[False, True])
-                .groupby(["id_src"], sort=False).first().reset_index()
-            )
-            attacks_supplier = _s
-
-        # ── Combine and emit ─────────────────────────────────────────────────────
-        parts = [df for df in [attacks_conqueror, attacks_conqueror_2, attacks_supplier] if df is not None and not df.empty]
-        if not parts:
+        if attacks_joined.empty:
             return moves
 
-        attacks = pd.concat(parts, ignore_index=True)
-        print("Currently using testing _04_score_and_decide")
+        attacks_joined = attacks_joined.assign(
+            total_time_cost=attacks_joined.groupby("id_src")["time_cost"].transform("sum")
+        ).assign(
+            score=lambda d: (d["total_time_cost"] - d["time_cost"] - d["step_diff"]) * d["production"]
+        )
+
+        attacks = (
+            attacks_joined
+            .sort_values("score", ascending=False)
+            .groupby("id_src", sort=False)
+            .first()
+            .reset_index()
+            .loc[lambda d: d["ships_sent"] <= d["ships_min"]]
+        )
+
         for _, row in attacks.iterrows():
             print(f"From {row['id_src']}, To {row['id']} at step {row['step']} "
-                f"with {row['ships_sent']} ships (target has min {row['ships_min']})")
+                  f"with {row['ships_sent']} ships (target has min {row['ships_min']})")
 
         moves += attacks[["id_src", "final_angle", "ships_sent"]].values.tolist()
         return moves
-
-
-
-
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────
@@ -785,6 +676,7 @@ player_id = None
 
 def agent(obs):
     global step, num_agents, player_id
+    print(f"Agent called step: {step} remainingOverageTime: {obs.get('remainingOverageTime', 0)}")
 
     if num_agents is None:
         initial = (
