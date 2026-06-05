@@ -646,6 +646,7 @@ class StrategyPipeline:
 
         # ── Conqueror: attack enemy/neutral planets ──────────────────────────────
         attacks_conqueror = pd.DataFrame()
+        attacks_conqueror_2 = pd.DataFrame()
         conqueror_needs = None
         if conqueror_ids:
 
@@ -771,7 +772,8 @@ class StrategyPipeline:
                     conqueror_needs,
                     left_on="id",
                     right_on="id_src",
-                    how="right"
+                    how="right",
+                    suffixes=("_left", "")
                 )
                 .query("(lowest_need - ships_min) * 1.5 < ships_sent")
                 .query("ships_min * 0.75 < ships_sent < ships_min")
