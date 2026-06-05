@@ -191,3 +191,163 @@ def label_action_nodes(action_nodes: list, heuristic_moves: list,
                 break  # first matching eta bucket wins
 
     return labels, ships_targets
+
+
+def build_hetero_data_97(obs, step: int = 0, player_id: int = 0):
+    """Build HeteroData with action nodes labelled by heuristic.
+
+    Returns (HeteroData, action_index) where action_index[k] = (src_id, dst_id, eta).
+    """
+    df_s, planet_disp = get_obs_dataframe(obs, step)
+
+    # Heuristic labels via 90-Simulate StrategyPipeline
+    # _02_get_all_opportunities produces angle/angle_min/angle_max required by _03
+    pa   = StrategyPipeline._02_get_all_opportunities(df_s, planet_disp, player_id)
+    safe = StrategyPipeline._03_filter_collision(pa)
+    heuristic_moves = StrategyPipeline._04_score_and_decide(safe, player_id)
+
+    # Action nodes
+    action_nodes = enumerate_action_nodes(obs, df_s, player_id, base_step=step)
+    action_index = [(an[0], an[1], an[2]) for an in action_nodes]
+
+    labels, ships_targets = label_action_nodes(action_nodes, heuristic_moves, obs, df_s, base_step=step)
+
+    # ── Planet node features (22-dim) ────────────────────────────────────────
+    planets    = obs.planets
+    planet_ids = [p[0] for p in planets]
+    pid_to_idx = {pid: i for i, pid in enumerate(planet_ids)}
+
+    ships_pivot = (
+        df_s[df_s['step'].isin(range(step, step + 11))]
+        .pivot_table(index='id', columns='step', values='ships', aggfunc='first')
+        .reindex(index=planet_ids, columns=range(step, step + 11), fill_value=0)
+    )
+    nature_at0 = df_s[df_s['step'] == step].set_index('id')['nature']
+
+    planet_feats = []
+    for p in planets:
+        pid, owner, x, y, radius, _, production = p
+        nat = nature_at0.get(pid, 'fix')
+        owner_oh = [0.0] * 5
+        if owner == -1:
+            owner_oh[0] = 1.0
+        elif 0 <= owner <= 3:
+            owner_oh[owner + 1] = 1.0
+        ships_ts = ships_pivot.loc[pid].values.tolist()
+        ships_feats = [math.log(max(min(float(s), 1024.0), 1.0)) / _LOG1024 for s in ships_ts]
+        planet_feats.append([
+            x / 100.0, y / 100.0,
+            1.0 if nat == 'fix' else 0.0,
+            1.0 if nat == 'moving' else 0.0,
+            1.0 if nat == 'comet' else 0.0,
+            production / 5.0,
+        ] + owner_oh + ships_feats)
+
+    # ── Master node features (6-dim) ─────────────────────────────────────────
+    total_ships = sum(max(p[5], 0) for p in planets) or 1.0
+    proportions = [sum(max(p[5], 0) for p in planets if p[1] == pid_) / total_ships
+                   for pid_ in range(4)]
+    master_feat = [step / 500.0, (obs.angular_velocity - 0.025) / (0.05 - 0.025)] + proportions
+
+    # ── Action node features (2-dim) ─────────────────────────────────────────
+    action_feats = [
+        [math.log(max(an[3], 1)) / _LOG1024, math.log(max(an[4], 1)) / _LOG1024]
+        for an in action_nodes
+    ]
+
+    # ── Assemble HeteroData ───────────────────────────────────────────────────
+    data = HeteroData()
+    data['master'].x = torch.tensor([master_feat], dtype=torch.float)
+    data['planet'].x = torch.tensor(planet_feats, dtype=torch.float)
+
+    n_planets = len(planet_ids)
+    data['planet', 'to_master', 'master'].edge_index = torch.tensor(
+        [list(range(n_planets)), [0] * n_planets], dtype=torch.long)
+    data['master', 'to_planet', 'planet'].edge_index = torch.tensor(
+        [[0] * n_planets, list(range(n_planets))], dtype=torch.long)
+
+    if action_nodes:
+        data['action'].x = torch.tensor(action_feats, dtype=torch.float)
+        data['action'].y = torch.tensor(labels, dtype=torch.float)
+        data['action'].ships_target = torch.tensor(ships_targets, dtype=torch.float)
+
+        spawns_src   = [pid_to_idx[an[0]] for an in action_nodes]
+        attacks_dst  = [pid_to_idx[an[1]] for an in action_nodes]
+        n_actions    = len(action_nodes)
+        action_range = list(range(n_actions))
+
+        data['planet', 'spawns', 'action'].edge_index = torch.tensor(
+            [spawns_src, action_range], dtype=torch.long)
+        data['action', 'attacks', 'planet'].edge_index = torch.tensor(
+            [action_range, attacks_dst], dtype=torch.long)
+    else:
+        data['action'].x = torch.zeros((0, 2), dtype=torch.float)
+        data['action'].y = torch.zeros(0, dtype=torch.float)
+        data['action'].ships_target = torch.zeros(0, dtype=torch.float)
+        data['planet', 'spawns', 'action'].edge_index = torch.zeros((2, 0), dtype=torch.long)
+        data['action', 'attacks', 'planet'].edge_index = torch.zeros((2, 0), dtype=torch.long)
+
+    return data, action_index
+
+
+def _place_planets_randomly(rng, n_owned, n_enemy, n_neutral, player_id=0):
+    """Place planets on the board, avoiding sun and each other."""
+    planets = []
+    pid = 0
+
+    def try_add(owner, attempts=500):
+        nonlocal pid
+        for _ in range(attempts):
+            x = float(rng.uniform(10, 90))
+            y = float(rng.uniform(10, 90))
+            if math.hypot(x - 50, y - 50) < 15:
+                continue
+            prod = int(rng.integers(1, 6))
+            radius = 1.0 + math.log(prod)
+            if any(math.hypot(x - p[2], y - p[3]) < radius + p[4] + 1.0 for p in planets):
+                continue
+            ships = int(rng.integers(10, 101))
+            planets.append([pid, owner, x, y, radius, ships, prod])
+            pid += 1
+            return True
+        return False
+
+    for _ in range(n_owned):
+        try_add(player_id)
+    for _ in range(n_enemy):
+        try_add(1)
+    for _ in range(n_neutral):
+        try_add(-1)
+    return planets
+
+
+def generate_sample_97(seed: int, player_id: int = 0):
+    """Returns (HeteroData, snapshots, action_index).
+
+    snapshots: 11 dicts {step, planets, fleets} for make_animation.
+    action_index: list[(src_id, dst_id, eta)] mapping action node k to game action.
+    """
+    rng = np.random.default_rng(seed)
+    angular_velocity = float(rng.uniform(0.025, 0.05))
+
+    n_total   = int(rng.integers(5, 21))
+    n_owned   = int(rng.integers(2, min(5, n_total - 2) + 1))
+    n_enemy   = int(rng.integers(1, min(3, n_total - n_owned - 1) + 1))
+    n_neutral = n_total - n_owned - n_enemy
+
+    planets = _place_planets_randomly(rng, n_owned, n_enemy, n_neutral, player_id)
+    obs = Obs(planets=planets, angular_velocity=angular_velocity)
+
+    # Snapshots for animation
+    sim = copy.deepcopy(obs)
+    snapshots = []
+    for i in range(11):
+        snapshots.append({
+            'step':    i,
+            'planets': [p[:] for p in sim.planets],
+            'fleets':  [f[:] for f in sim.fleets],
+        })
+        interpreter(sim, [[], []], i)
+
+    data, action_index = build_hetero_data_97(obs, step=0, player_id=player_id)
+    return data, snapshots, action_index
