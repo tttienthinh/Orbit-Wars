@@ -4,12 +4,66 @@ import pandas as pd
 import torch
 from torch_geometric.data import HeteroData
 
-# Pull in all symbols from 96 and 90 (interpreter, PhysicsEngine, Obs, GameConfig,
-# get_obs_dataframe, get_opportunities, StrategyPipeline, etc.)
-exec(open('96-library.py').read())
-exec(open('90-Simulate10Next_Conqueror2_Supplier_prod_per_step.py').read())
+exec(open('90-Simulate10Next_Conqueror2_Supplier_prod_per_step.py').read(), globals())
+
+
+class Obs:
+    def __init__(self, planets, initial_planets=None, fleets=None,
+                 next_fleet_id=100, comets=None, comet_planet_ids=None,
+                 angular_velocity=0.0):
+        self.planets          = [list(p) for p in planets]
+        self.initial_planets  = [list(p) for p in (initial_planets if initial_planets is not None else planets)]
+        self.fleets           = [list(f) for f in (fleets or [])]
+        self.next_fleet_id    = next_fleet_id
+        self.comets           = comets or []
+        self.comet_planet_ids = comet_planet_ids or []
+        self.angular_velocity = angular_velocity
+
 
 _LOG1024 = math.log(1024.0)
+
+
+def get_obs_dataframe(obs, step: int, num_agents: int = 2):
+    sim = copy.deepcopy(obs)
+    no_actions = [[] for _ in range(num_agents)]
+    rows = []
+    for i in range(GameConfig.NB_STEPS_SIM + 1):
+        for p in sim.planets:
+            pid, owner, x, y, radius, ships, production = p[0], p[1], p[2], p[3], p[4], p[5], p[6]
+            r = math.hypot(x - GameConfig.CENTER, y - GameConfig.CENTER)
+            if pid in sim.comet_planet_ids:
+                nature = "comet"
+            elif r + radius < GameConfig.ROTATION_RADIUS_LIMIT:
+                nature = "moving"
+            else:
+                nature = "fix"
+            rows.append({"step": step+i, "id": pid, "x": x, "y": y,
+                         "radius": radius, "ships": ships,
+                         "production": production, "owner": owner, "nature": nature})
+        interpreter(sim, no_actions, step+i, num_agents)
+
+    df_s = pd.DataFrame(rows).sort_values("step").reset_index(drop=True)
+
+    prev_pos = (
+        df_s[["id","step","x","y"]]
+        .assign(step=lambda d: d["step"]+1)
+        .rename(columns={"x":"x_prev","y":"y_prev"})
+    )
+    planet_disp = (
+        df_s[["id","step","x","y"]]
+        .merge(prev_pos, on=["id","step"], how="left")
+        .assign(planet_disp=lambda d: np.sqrt(
+            (d["x"]-d["x_prev"].fillna(d["x"]))**2 +
+            (d["y"]-d["y_prev"].fillna(d["y"]))**2))
+        [["id","step","planet_disp"]]
+    )
+    return df_s, planet_disp
+
+
+def _path_clears_sun(x0, y0, x1, y1):
+    return PhysicsEngine.point_to_segment_distance(
+        (GameConfig.CENTER, GameConfig.CENTER), (x0, y0), (x1, y1)
+    ) > GameConfig.SUN_RADIUS + GameConfig.PLANET_MARGIN
 _MAX_SHIPS_SEARCH = 1024
 
 
