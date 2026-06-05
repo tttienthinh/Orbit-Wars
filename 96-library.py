@@ -554,3 +554,58 @@ def build_hetero_data(obs, step: int, label: int, player_id: int = 0) -> HeteroD
 
     data.y = torch.tensor([float(label)], dtype=torch.float)
     return data
+
+
+def generate_sample(seed: int, player_id: int = 0):
+    """Returns (HeteroData, snapshots).
+
+    snapshots is a list of 11 dicts {step, planets, fleets} for make_animation.
+    label = 1 if my_planet.ships > neutral_planet.ships at step 0.
+    """
+    rng = np.random.default_rng(seed)
+    angular_velocity = float(rng.uniform(0.025, 0.05))
+
+    # Place my planet — reject if too close to sun at (50,50)
+    while True:
+        x0 = float(rng.uniform(10, 90))
+        y0 = float(rng.uniform(10, 90))
+        if math.hypot(x0 - 50, y0 - 50) >= 15:
+            break
+    prod0   = int(rng.integers(1, 6))
+    ships0  = int(rng.integers(10, 101))
+    radius0 = 1.0 + math.log(prod0)
+
+    # Place neutral planet within 5-20 units, reject if too close to sun
+    while True:
+        angle = float(rng.uniform(0, 2 * math.pi))
+        dist  = float(rng.uniform(5, 20))
+        x1 = x0 + dist * math.cos(angle)
+        y1 = y0 + dist * math.sin(angle)
+        if (10 <= x1 <= 90 and 10 <= y1 <= 90
+                and math.hypot(x1 - 50, y1 - 50) >= 15):
+            break
+    prod1   = int(rng.integers(1, 6))
+    ships1  = int(rng.integers(10, 101))
+    radius1 = 1.0 + math.log(prod1)
+
+    planets = [
+        [0, player_id, x0, y0, radius0, ships0, prod0],
+        [1,         -1, x1, y1, radius1, ships1, prod1],
+    ]
+    obs = Obs(planets=planets, angular_velocity=angular_velocity)
+
+    label = 1 if ships0 > ships1 else 0
+
+    # Collect snapshots for animation (11 steps, no actions)
+    sim = copy.deepcopy(obs)
+    snapshots = []
+    for i in range(11):
+        snapshots.append({
+            'step':    i,
+            'planets': [p[:] for p in sim.planets],
+            'fleets':  [f[:] for f in sim.fleets],
+        })
+        interpreter(sim, [[], []], i)
+
+    data = build_hetero_data(obs, step=0, label=label, player_id=player_id)
+    return data, snapshots
