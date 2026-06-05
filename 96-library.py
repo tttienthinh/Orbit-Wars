@@ -439,3 +439,118 @@ def get_opportunities(df_s: pd.DataFrame, planet_disp: pd.DataFrame,
         .loc[lambda d: d['collision']]
         .reset_index(drop=True)
     )
+
+
+def build_edge_features(pa: pd.DataFrame) -> dict:
+    """Returns dict[(src_id, dst_id) -> np.ndarray(50, float32)].
+
+    feature[s_idx * 10 + (step_diff-1)] = 1.0
+    where s_idx = index of ships_sent in SHIPS_OPTIONS.
+    """
+    result = {}
+    if pa.empty:
+        return result
+
+    for (src_id, dst_id), grp in pa.groupby(['id_src', 'id']):
+        feat = np.zeros(50, dtype=np.float32)
+        for _, row in grp.iterrows():
+            s_idx = _SHIP_TO_IDX.get(int(row['ships_sent']))
+            if s_idx is None:
+                continue
+            e_idx = int(row['step_diff']) - 1
+            if 0 <= e_idx < 10:
+                feat[s_idx * 10 + e_idx] = 1.0
+        result[(int(src_id), int(dst_id))] = feat
+
+    return result
+
+
+_LOG1024 = math.log(1024)
+
+
+def build_hetero_data(obs, step: int, label: int, player_id: int = 0) -> HeteroData:
+    """Convert an Obs into a PyG HeteroData graph with label."""
+    # simulate snapshots
+    df_s, planet_disp = get_obs_dataframe(obs, step)
+
+    # attack opportunities from player's planets
+    source_ids = {p[0] for p in obs.planets if p[1] == player_id}
+    pa = get_opportunities(df_s, planet_disp, source_ids)
+    edge_feats = build_edge_features(pa)
+
+    # planet node features (22-dim)
+    planets    = obs.planets
+    planet_ids = [p[0] for p in planets]
+    pid_to_idx = {pid: i for i, pid in enumerate(planet_ids)}
+
+    # ships time-series per planet
+    ships_pivot = (
+        df_s[df_s['step'].isin(range(step, step+11))]
+        .pivot_table(index='id', columns='step', values='ships', aggfunc='first')
+        .reindex(index=planet_ids, columns=range(step, step+11), fill_value=0)
+    )
+
+    # nature at step0
+    nature_at0 = df_s[df_s['step'] == step].set_index('id')['nature']
+
+    planet_feats = []
+    for p in planets:
+        pid, owner, x, y, radius, ships0, production = p
+        nat = nature_at0.get(pid, 'fix')
+        is_fix    = 1.0 if nat == 'fix'    else 0.0
+        is_moving = 1.0 if nat == 'moving' else 0.0
+        is_comet  = 1.0 if nat == 'comet'  else 0.0
+
+        # owner one-hot: index 0 = neutral(-1), 1..4 = players 0..3
+        owner_oh = [0.0] * 5
+        if owner == -1:
+            owner_oh[0] = 1.0
+        elif 0 <= owner <= 3:
+            owner_oh[owner + 1] = 1.0
+
+        # log-ships time-series (11 values)
+        ships_ts = ships_pivot.loc[pid].values.tolist()
+        ships_feats = [math.log(max(min(float(s), 1024.0), 1.0)) / _LOG1024
+                       for s in ships_ts]
+
+        planet_feats.append([x/100.0, y/100.0, is_fix, is_moving, is_comet,
+                              production/5.0] + owner_oh + ships_feats)
+
+    # master node features (6-dim)
+    total_ships = sum(max(p[5], 0) for p in planets) or 1.0
+    proportions = [
+        sum(p[5] for p in planets if p[1] == pid_) / total_ships
+        for pid_ in range(4)
+    ]
+    master_feat = [
+        step / 500.0,
+        (obs.angular_velocity - 0.025) / (0.05 - 0.025),
+    ] + proportions
+
+    # assemble HeteroData
+    data = HeteroData()
+    data['master'].x = torch.tensor([master_feat], dtype=torch.float)
+    data['planet'].x = torch.tensor(planet_feats, dtype=torch.float)
+
+    n = len(planet_ids)
+    data['planet', 'to_master', 'master'].edge_index = torch.tensor(
+        [list(range(n)), [0]*n], dtype=torch.long)
+    data['master', 'to_planet', 'planet'].edge_index = torch.tensor(
+        [[0]*n, list(range(n))], dtype=torch.long)
+
+    if edge_feats:
+        srcs  = [pid_to_idx[s] for s, _ in edge_feats]
+        dsts  = [pid_to_idx[d] for _, d in edge_feats]
+        attrs = np.stack(list(edge_feats.values()))
+        data['planet', 'attacks', 'planet'].edge_index = torch.tensor(
+            [srcs, dsts], dtype=torch.long)
+        data['planet', 'attacks', 'planet'].edge_attr = torch.tensor(
+            attrs, dtype=torch.float)
+    else:
+        data['planet', 'attacks', 'planet'].edge_index = torch.zeros(
+            (2, 0), dtype=torch.long)
+        data['planet', 'attacks', 'planet'].edge_attr = torch.zeros(
+            (0, 50), dtype=torch.float)
+
+    data.y = torch.tensor([float(label)], dtype=torch.float)
+    return data
