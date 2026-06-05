@@ -56,3 +56,84 @@ def _fleet_hits_at_step(ships: int, src_x: float, src_y: float, r_src: float,
         p_old = (tgt_x, tgt_y)
 
     return PhysicsEngine.swept_pair_hit(f_old, f_new, p_old, (tgt_x, tgt_y), r_dst)
+
+
+def _find_eta_range(src_x: float, src_y: float, r_src: float,
+                    df_s: pd.DataFrame, dst_id: int, eta: int,
+                    base_step: int = 0):
+    """Return (min_ships, max_ships) for ETA bucket eta, or (None, None) if empty.
+
+    min_ships: fewest ships that arrive at step eta (fast enough).
+    max_ships: most ships that arrive at step eta but NOT step eta-1 (not too fast).
+    Binary search over [1, 1024].  More ships = faster = smaller ETA.
+    """
+    # min_ships: smallest s where fleet hits at step eta
+    if not _fleet_hits_at_step(_MAX_SHIPS_SEARCH, src_x, src_y, r_src, df_s, dst_id, eta, base_step):
+        return None, None  # even max ships can't reach in eta steps
+    if _fleet_hits_at_step(1, src_x, src_y, r_src, df_s, dst_id, eta, base_step):
+        min_ships = 1
+    else:
+        lo, hi = 1, _MAX_SHIPS_SEARCH
+        while lo < hi - 1:
+            mid = (lo + hi) // 2
+            if _fleet_hits_at_step(mid, src_x, src_y, r_src, df_s, dst_id, eta, base_step):
+                hi = mid
+            else:
+                lo = mid
+        min_ships = hi
+
+    # max_ships: largest s that does NOT arrive at step eta-1
+    if eta == 1:
+        max_ships = _MAX_SHIPS_SEARCH
+    else:
+        if _fleet_hits_at_step(1, src_x, src_y, r_src, df_s, dst_id, eta - 1, base_step):
+            return None, None  # slowest fleet already arrives at eta-1; bucket empty
+        if not _fleet_hits_at_step(_MAX_SHIPS_SEARCH, src_x, src_y, r_src, df_s, dst_id, eta - 1, base_step):
+            max_ships = _MAX_SHIPS_SEARCH
+        else:
+            lo2, hi2 = 1, _MAX_SHIPS_SEARCH
+            while lo2 < hi2 - 1:
+                mid = (lo2 + hi2) // 2
+                if _fleet_hits_at_step(mid, src_x, src_y, r_src, df_s, dst_id, eta - 1, base_step):
+                    hi2 = mid
+                else:
+                    lo2 = mid
+            max_ships = lo2  # last that does NOT hit at eta-1
+
+    if min_ships > max_ships:
+        return None, None
+    return min_ships, max_ships
+
+
+def enumerate_action_nodes(obs, df_s: pd.DataFrame, player_id: int = 0,
+                            base_step: int = 0) -> list:
+    """Return list of (src_id, dst_id, eta, min_ships, max_ships) for all
+    feasible attack opportunities owned by player_id.
+
+    One entry per valid ETA bucket (1..9) for each (src, dst) pair.
+    Paths crossing the sun are skipped.
+    """
+    step0_rows = df_s[df_s['step'] == base_step].set_index('id')
+
+    action_nodes = []
+    owned_ids = [p[0] for p in obs.planets if p[1] == player_id]
+
+    for src_id in owned_ids:
+        if src_id not in step0_rows.index:
+            continue
+        src_row = step0_rows.loc[src_id]
+        src_x, src_y, r_src = float(src_row['x']), float(src_row['y']), float(src_row['radius'])
+
+        for dst_id, dst_row in step0_rows.iterrows():
+            if dst_id == src_id:
+                continue
+            dst_x0, dst_y0 = float(dst_row['x']), float(dst_row['y'])
+            if not _path_clears_sun(src_x, src_y, dst_x0, dst_y0):
+                continue
+
+            for eta in range(1, 10):  # 1..9
+                min_s, max_s = _find_eta_range(src_x, src_y, r_src, df_s, dst_id, eta, base_step)
+                if min_s is not None:
+                    action_nodes.append((src_id, dst_id, eta, min_s, max_s))
+
+    return action_nodes
