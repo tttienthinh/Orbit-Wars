@@ -519,7 +519,7 @@ def build_hetero_data(obs, step: int, label: int, player_id: int = 0) -> HeteroD
     # master node features (6-dim)
     total_ships = sum(max(p[5], 0) for p in planets) or 1.0
     proportions = [
-        sum(p[5] for p in planets if p[1] == pid_) / total_ships
+        sum(max(p[5], 0) for p in planets if p[1] == pid_) / total_ships
         for pid_ in range(4)
     ]
     master_feat = [
