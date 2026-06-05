@@ -137,3 +137,57 @@ def enumerate_action_nodes(obs, df_s: pd.DataFrame, player_id: int = 0,
                     action_nodes.append((src_id, dst_id, eta, min_s, max_s))
 
     return action_nodes
+
+
+def label_action_nodes(action_nodes: list, heuristic_moves: list,
+                        obs, df_s: pd.DataFrame, base_step: int = 0):
+    """Label each action node from heuristic_moves.
+
+    heuristic_moves: [[src_id, angle, ships_sent], ...] from StrategyPipeline._04_score_and_decide
+
+    Returns:
+        labels:        np.ndarray shape (N,) float32 — 1.0 if heuristic selected this action
+        ships_targets: np.ndarray shape (N,) float32 — log(ships)/log(1024) normalised
+    """
+    n = len(action_nodes)
+    labels = np.zeros(n, dtype=np.float32)
+    ships_targets = np.array(
+        [math.log(max(an[3], 1)) / _LOG1024 for an in action_nodes],
+        dtype=np.float32,
+    )  # default: log(min_ships) / log(1024)
+
+    if not heuristic_moves:
+        return labels, ships_targets
+
+    step0 = df_s[df_s['step'] == base_step].set_index('id')
+
+    for move in heuristic_moves:
+        src_id, move_angle, ships_sent = int(move[0]), float(move[1]), int(move[2])
+
+        # Find dst: planet with smallest angular difference from move_angle
+        best_dst_id, best_adiff = None, float('inf')
+        if src_id not in step0.index:
+            continue
+        src_row = step0.loc[src_id]
+        sx, sy = float(src_row['x']), float(src_row['y'])
+
+        for pid, row in step0.iterrows():
+            if pid == src_id:
+                continue
+            a = math.atan2(float(row['y']) - sy, float(row['x']) - sx)
+            diff = abs((a - move_angle + math.pi) % (2 * math.pi) - math.pi)
+            if diff < best_adiff:
+                best_adiff, best_dst_id = diff, pid
+
+        if best_dst_id is None:
+            continue
+
+        # Find matching action node: same src, same dst, eta where min<=ships_sent<=max
+        s_norm = math.log(max(ships_sent, 1)) / _LOG1024
+        for k, (asrc, adst, aeta, amin, amax) in enumerate(action_nodes):
+            if asrc == src_id and adst == best_dst_id and amin <= ships_sent <= amax:
+                labels[k] = 1.0
+                ships_targets[k] = s_norm
+                break  # first matching eta bucket wins
+
+    return labels, ships_targets
