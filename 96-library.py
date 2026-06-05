@@ -556,56 +556,74 @@ def build_hetero_data(obs, step: int, label: int, player_id: int = 0) -> HeteroD
     return data
 
 
+def _path_clears_sun(x0, y0, x1, y1):
+    """True iff the line segment (x0,y0)→(x1,y1) stays > SUN_RADIUS+PLANET_MARGIN from (50,50)."""
+    return PhysicsEngine.point_to_segment_distance(
+        (GameConfig.CENTER, GameConfig.CENTER), (x0, y0), (x1, y1)
+    ) > GameConfig.SUN_RADIUS + GameConfig.PLANET_MARGIN
+
+
 def generate_sample(seed: int, player_id: int = 0):
     """Returns (HeteroData, snapshots).
 
     snapshots is a list of 11 dicts {step, planets, fleets} for make_animation.
     label = 1 if my_planet.ships > neutral_planet.ships at step 0.
+    Retries with offset seeds until at least one feasible attack edge is found.
     """
-    rng = np.random.default_rng(seed)
-    angular_velocity = float(rng.uniform(0.025, 0.05))
+    for attempt in range(200):
+        rng = np.random.default_rng(seed + attempt * 97)
+        angular_velocity = float(rng.uniform(0.025, 0.05))
 
-    # Place my planet — reject if too close to sun at (50,50)
-    while True:
-        x0 = float(rng.uniform(10, 90))
-        y0 = float(rng.uniform(10, 90))
-        if math.hypot(x0 - 50, y0 - 50) >= 15:
-            break
-    prod0   = int(rng.integers(1, 6))
-    ships0  = int(rng.integers(10, 101))
-    radius0 = 1.0 + math.log(prod0)
+        # Place my planet — reject if too close to sun at (50,50)
+        while True:
+            x0 = float(rng.uniform(10, 90))
+            y0 = float(rng.uniform(10, 90))
+            if math.hypot(x0 - 50, y0 - 50) >= 15:
+                break
+        prod0   = int(rng.integers(1, 6))
+        ships0  = int(rng.integers(10, 101))
+        radius0 = 1.0 + math.log(prod0)
 
-    # Place neutral planet within 5-20 units, reject if too close to sun
-    while True:
-        angle = float(rng.uniform(0, 2 * math.pi))
-        dist  = float(rng.uniform(5, 20))
-        x1 = x0 + dist * math.cos(angle)
-        y1 = y0 + dist * math.sin(angle)
-        if (10 <= x1 <= 90 and 10 <= y1 <= 90
-                and math.hypot(x1 - 50, y1 - 50) >= 15):
-            break
-    prod1   = int(rng.integers(1, 6))
-    ships1  = int(rng.integers(10, 101))
-    radius1 = 1.0 + math.log(prod1)
+        # Place neutral planet within 5–20 units; reject if too close to sun
+        # or if the direct path from planet0 crosses the sun
+        for _ in range(500):
+            angle = float(rng.uniform(0, 2 * math.pi))
+            dist  = float(rng.uniform(5, 20))
+            x1 = x0 + dist * math.cos(angle)
+            y1 = y0 + dist * math.sin(angle)
+            if (10 <= x1 <= 90 and 10 <= y1 <= 90
+                    and math.hypot(x1 - 50, y1 - 50) >= 15
+                    and _path_clears_sun(x0, y0, x1, y1)):
+                break
+        else:
+            continue  # no valid placement found — try next attempt
 
-    planets = [
-        [0, player_id, x0, y0, radius0, ships0, prod0],
-        [1,         -1, x1, y1, radius1, ships1, prod1],
-    ]
-    obs = Obs(planets=planets, angular_velocity=angular_velocity)
+        prod1   = int(rng.integers(1, 6))
+        ships1  = int(rng.integers(10, 101))
+        radius1 = 1.0 + math.log(prod1)
 
-    label = 1 if ships0 > ships1 else 0
+        planets = [
+            [0, player_id, x0, y0, radius0, ships0, prod0],
+            [1,         -1, x1, y1, radius1, ships1, prod1],
+        ]
+        obs = Obs(planets=planets, angular_velocity=angular_velocity)
+        label = 1 if ships0 > ships1 else 0
 
-    # Collect snapshots for animation (11 steps, no actions)
-    sim = copy.deepcopy(obs)
-    snapshots = []
-    for i in range(11):
-        snapshots.append({
-            'step':    i,
-            'planets': [p[:] for p in sim.planets],
-            'fleets':  [f[:] for f in sim.fleets],
-        })
-        interpreter(sim, [[], []], i)
+        data = build_hetero_data(obs, step=0, label=label, player_id=player_id)
+        if data['planet', 'attacks', 'planet'].edge_index.shape[1] == 0:
+            continue  # path exists geometrically but swept-pair found nothing — retry
 
-    data = build_hetero_data(obs, step=0, label=label, player_id=player_id)
-    return data, snapshots
+        # Collect snapshots for animation (11 steps, no actions)
+        sim = copy.deepcopy(obs)
+        snapshots = []
+        for i in range(11):
+            snapshots.append({
+                'step':    i,
+                'planets': [p[:] for p in sim.planets],
+                'fleets':  [f[:] for f in sim.fleets],
+            })
+            interpreter(sim, [[], []], i)
+
+        return data, snapshots
+
+    raise RuntimeError(f"generate_sample(seed={seed}): could not place valid 2-planet scenario in 200 attempts")
