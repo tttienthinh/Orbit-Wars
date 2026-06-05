@@ -137,17 +137,48 @@ Edge classifier
 
 ---
 
+## 96-library.py
+
+A clean rewrite of `93-Supplier_to_moving.py` tailored for GNN graph construction.
+The notebook does `%run 96-library.py` instead of `%run 93-Supplier_to_moving.py`.
+
+**Keep unchanged:** `GameConfig`, `PhysicsEngine`, `interpreter`, `Obs`
+
+**Modified `get_opportunities(df_s, planet_disp, source_planet_ids: set)`:**
+- Replaces `player_id` ownership filter with explicit `source_planet_ids` — uses step-0
+  positions of those IDs as sources, no multi-step stability check
+- Replaces range expansion with `SHIPS_OPTIONS = [1, 2, 4, 8, 16]` directly (5 values × all
+  reachable `step_diff` in 1–10), avoiding the explode over hundreds of values
+
+**New helpers:**
+
+`build_edge_features(pa, all_planet_ids) → dict[(src_id, dst_id), np.ndarray(50)]`
+- Groups `pa` by `(id_src, id)`
+- For each row maps `(ships_sent, step_diff)` → `feature[s_idx * 10 + (step_diff-1)] = 1`
+  where `s_idx = SHIPS_OPTIONS.index(ships_sent)`
+- Any `(src, dst)` pair absent from `pa` gets a zero vector
+
+`build_hetero_data(obs, step, label) → HeteroData`
+- Calls `get_obs_dataframe` → `get_opportunities` → `build_edge_features`
+- Assembles master node (6-dim), planet nodes (22-dim), all edge types
+- Attaches `data.y = label`
+
+`generate_sample(seed) → tuple[HeteroData, list[dict]]`
+- Random 2-planet placement with sun-distance rejection (dist to (50,50) > 15)
+- `angular_velocity ~ Uniform(0.025, 0.05)`
+- Returns `(hetero_data, snapshots)` where snapshots are the 11-step interpreter outputs
+  for use in `make_animation`
+
 ## Notebook Structure
 
 | Cell | Content |
 |------|---------|
 | 0 | Markdown title |
-| 1 | `%run 93-Supplier_to_moving.py` + imports |
+| 1 | `%run 96-library.py` + imports |
 | 2 | Animation helpers (copied from `94`) |
-| 3 | `generate_sample` function |
-| 4 | Generate + inspect one sample |
-| 5 | Generate train/test datasets |
-| 6 | Model definition (`GNNEdgeClassifier`) |
-| 7 | Training loop |
-| 8 | Evaluation metrics |
-| 9–18 | One animation cell per test sample |
+| 3 | Generate + inspect one sample |
+| 4 | Generate train/test datasets |
+| 5 | Model definition (`GNNEdgeClassifier`) |
+| 6 | Training loop |
+| 7 | Evaluation metrics |
+| 8–17 | One animation cell per test sample |
