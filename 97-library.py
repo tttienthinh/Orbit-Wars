@@ -303,9 +303,10 @@ def build_hetero_data_97(obs, step: int = 0, player_id: int = 0):
                    for pid_ in range(4)]
     master_feat = [step / 500.0, (obs.angular_velocity - 0.025) / (0.05 - 0.025)] + proportions
 
-    # ── Action node features (2-dim) ─────────────────────────────────────────
+    # ── Action node features (3-dim) ─────────────────────────────────────────
+    # an = (src_id, dst_id, eta, min_ships, max_ships)
     action_feats = [
-        [math.log(max(an[3], 1)) / _LOG1024, math.log(max(an[4], 1)) / _LOG1024]
+        [math.log(max(an[3], 1)) / _LOG1024, math.log(max(an[4], 1)) / _LOG1024, an[2] / 9.0]
         for an in action_nodes
     ]
 
@@ -335,7 +336,7 @@ def build_hetero_data_97(obs, step: int = 0, player_id: int = 0):
         data['action', 'attacks', 'planet'].edge_index = torch.tensor(
             [action_range, attacks_dst], dtype=torch.long)
     else:
-        data['action'].x = torch.zeros((0, 2), dtype=torch.float)
+        data['action'].x = torch.zeros((0, 3), dtype=torch.float)
         data['action'].y = torch.zeros(0, dtype=torch.float)
         data['action'].ships_target = torch.zeros(0, dtype=torch.float)
         data['planet', 'spawns', 'action'].edge_index = torch.zeros((2, 0), dtype=torch.long)

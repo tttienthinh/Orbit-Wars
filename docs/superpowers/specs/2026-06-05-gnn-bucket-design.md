@@ -6,7 +6,7 @@ Files: `97-library.py`, `97-GNN_bucket.ipynb`
 
 A heterogeneous GNN that, given a full game observation, selects which attacks to launch and
 exactly how many ships to send — output format `[[src_id, dst_id, eta, ships_to_send], ...]`.
-Trained via imitation of the `93-Supplier_to_moving.py` heuristic.
+Trained via imitation of the `90-Simulate10Next_Conqueror2_Supplier_prod_per_step.py`.
 
 ---
 
