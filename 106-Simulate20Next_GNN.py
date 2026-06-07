@@ -745,6 +745,82 @@ class StrategyPipeline:
         df_s["owner"] = df_s["owner"].map(lambda x: id_map.get(x, x))
         return df_s
 
+    @staticmethod
+    def _05_get_GNN(
+        df_s: pd.DataFrame,
+        pa: pd.DataFrame,
+        safe_attacks: pd.DataFrame,
+    ) -> HeteroData:
+        # ── Planet nodes (static, 4-dim) ────────────────────────────────────
+        planets_df = (
+            df_s[["id", "production", "nature"]]
+            .drop_duplicates()
+            .sort_values("id")
+            .reset_index(drop=True)
+        )
+        nature_dummies = (
+            pd.get_dummies(planets_df["nature"])
+            .reindex(columns=["fix", "moving", "comet"], fill_value=0)
+            .astype("float32")
+        )
+        planet_x = torch.tensor(
+            pd.concat(
+                [nature_dummies, planets_df[["production"]].div(5)], axis=1
+            ).values,
+            dtype=torch.float32,
+        )
+
+        # ── PlanetStep nodes (dynamic, 9-dim) ───────────────────────────────
+        ps_df = (
+            df_s[["id", "step", "x", "y", "ships", "owner"]]
+            .copy()
+            .reset_index(drop=True)
+        )
+        owner_dummies = (
+            pd.get_dummies(ps_df["owner"])
+            .reindex(columns=[-1, 0, 1, 2, 3], fill_value=0)
+            .astype("float32")
+        )
+        owner_dummies.columns = [
+            "owner_neg1", "owner_0", "owner_1", "owner_2", "owner_3"
+        ]
+        planet_step_x = torch.tensor(
+            pd.concat(
+                [
+                    ps_df[["step"]].div(GameConfig.NB_STEPS_SIM),
+                    ps_df[["x"]].div(100),
+                    ps_df[["y"]].div(100),
+                    np.log(ps_df[["ships"]].clip(lower=1)) / np.log(1024),
+                    owner_dummies,
+                ],
+                axis=1,
+            ).values,
+            dtype=torch.float32,
+        )
+
+        # ── has_snapshot edges: planet → planet_step ─────────────────────────
+        id_to_pos = pd.Series(planets_df.index, index=planets_df["id"])
+        src_snap = torch.tensor(
+            ps_df["id"].map(id_to_pos).values, dtype=torch.long
+        )
+        dst_snap = torch.arange(len(ps_df), dtype=torch.long)
+
+        # ── Index lookup: (id, step) → planet_step row index ─────────────────
+        ps_idx = (
+            ps_df[["id", "step"]]
+            .reset_index()
+            .rename(columns={"index": "ps_idx"})
+        )
+
+        data = HeteroData()
+        data["planet"].x = planet_x
+        data["planet_step"].x = planet_step_x
+        data["planet", "has_snapshot", "planet_step"].edge_index = torch.stack(
+            [src_snap, dst_snap]
+        )
+
+        return data
+
 
 # ── Entry point ───────────────────────────────────────────────────────────────
 step = 0
