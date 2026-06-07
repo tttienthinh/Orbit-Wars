@@ -653,7 +653,7 @@ class StrategyPipeline:
     @staticmethod
     def _04_score_and_decide(
         attacks_with_angle: pd.DataFrame,
-        reach_matrix: pd.DataFrame,
+        reach_matrix: pd.DataFrame,  # reserved for threat-model scoring; unused in this iteration
         player_id: int,
     ) -> list:
         if attacks_with_angle.empty:
@@ -727,10 +727,6 @@ class StrategyPipeline:
             .loc[lambda d: d["ships_sent"] <= d["ships_min"]]
         )
 
-        for _, row in attacks.iterrows():
-            print(f"From {row['id_src']}, To {row['id']} at step {row['step']} "
-                  f"with {row['ships_sent']} ships (target has min {row['ships_min']})")
-
         moves += attacks[["id_src", "final_angle", "ships_sent"]].values.tolist()
         return moves
 
@@ -801,7 +797,7 @@ def agent(obs):
     pa_reach    = StrategyPipeline._02_get_all_opportunities(coarse_all,  df_s, planet_disp)
     safe_attacks = StrategyPipeline._03_filter_collision(pa)
     reach        = StrategyPipeline._03_filter_collision(pa_reach)
-    moves        = StrategyPipeline._04_score_and_decide(safe_attacks, reach, 0)
+    moves        = StrategyPipeline._04_score_and_decide(safe_attacks, reach, player_id=0)
 
     step += 1
     return moves
