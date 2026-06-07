@@ -1037,14 +1037,18 @@ class OrbitGNN(nn.Module):
 
         edge_index_dict = data.edge_index_dict
 
-        # Pass edge_attr only for reaches (GATConv uses it; SAGEConv does not)
-        reaches_attr = None
+        # Pass edge_attr only for reaches (GATConv uses it; SAGEConv does not).
+        # Fallback to ones so lin_edge always receives gradients when reaches edges exist.
+        edge_attr_map = {}
         if _REACHES_KEY in edge_index_dict:
             try:
                 reaches_attr = data[_REACHES_KEY].edge_attr
             except AttributeError:
-                pass
-        edge_attr_map = {_REACHES_KEY: reaches_attr} if reaches_attr is not None else {}
+                reaches_attr = None
+            if reaches_attr is None:
+                n_r = data[_REACHES_KEY].edge_index.shape[1]
+                reaches_attr = torch.ones(n_r, 1)
+            edge_attr_map[_REACHES_KEY] = reaches_attr
 
         for conv in (self.conv1, self.conv2):
             x_dict = conv(x_dict, edge_index_dict, edge_attr_dict=edge_attr_map)
