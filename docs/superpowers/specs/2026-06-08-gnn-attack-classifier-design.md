@@ -236,7 +236,7 @@ import mlflow
 
 BATCH_SIZE = 32
 LR = 1e-3
-SAVE_EVERY = 50   # games
+SAVE_EVERY = 5    # games
 
 model = OrbitGNN(hidden_dim=16)
 optimizer = torch.optim.Adam(model.parameters(), lr=LR)
