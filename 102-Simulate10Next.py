@@ -445,8 +445,7 @@ class StrategyPipeline:
         if coarse.empty:
             return pd.DataFrame()
 
-        # Same list object in every cell — callers must not mutate ships_sent rows
-        coarse = coarse.assign(ships_sent=[ships_list] * len(coarse))
+        coarse = coarse.assign(ships_sent=[list(ships_list) for _ in range(len(coarse))])
 
         return coarse
 
