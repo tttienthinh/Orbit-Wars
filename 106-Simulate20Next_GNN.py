@@ -727,6 +727,98 @@ class StrategyPipeline:
         return moves
 
     @staticmethod
+    def _04_get_selected(
+        attacks_with_angle: pd.DataFrame,
+        player_id: int,
+    ) -> pd.DataFrame:
+        """Same selection logic as _04_score_and_decide; returns selected attack rows
+        with columns [id_src, id, step, ships_sent] for label construction."""
+        _EMPTY = pd.DataFrame(columns=["id_src", "id", "step", "ships_sent"])
+        if attacks_with_angle.empty:
+            return _EMPTY
+
+        selected_parts: list[pd.DataFrame] = []
+
+        # Comet evasion (mirrors _04_score_and_decide exactly)
+        awa_comets = attacks_with_angle[attacks_with_angle["nature_src"] == "comet"]
+        if not awa_comets.empty:
+            x_off = (awa_comets["x_src"] - GameConfig.CENTER).abs().max() or 0
+            y_off = (awa_comets["y_src"] - GameConfig.CENTER).abs().max() or 0
+            if max(x_off, y_off) > 45:
+                comet_sel = (
+                    awa_comets[awa_comets["ships_sent"] <= awa_comets["ships_min"]]
+                    .sort_values(["ships_sent", "step"], ascending=[False, True])
+                    .groupby("id_src", sort=False)
+                    .first()
+                    .reset_index()
+                )
+                if not comet_sel.empty:
+                    selected_parts.append(comet_sel[["id_src", "id", "step", "ships_sent"]])
+                id_to_avoid = awa_comets["id_src"].unique().tolist()
+                attacks_with_angle = attacks_with_angle[
+                    ~attacks_with_angle["id_src"].isin(id_to_avoid)
+                ]
+
+        if attacks_with_angle.empty:
+            return pd.concat(selected_parts, ignore_index=True) if selected_parts else _EMPTY
+
+        planet_id_top_5 = (
+            attacks_with_angle
+            .sort_values(["step", "ships_sent"])
+            .groupby(["id_src", "id"], sort=False)
+            .first()
+            .reset_index()
+            .sort_values(["step", "ships_sent"])
+            .groupby("id_src", sort=False)
+            .head(5)
+            [["id_src", "id"]]
+        )
+
+        attacks_joined = (
+            planet_id_top_5
+            .merge(attacks_with_angle, on=["id_src", "id"], how="left")
+            .loc[lambda d: d["owner"] != player_id]
+            .assign(
+                ships_needed=lambda d: np.where(
+                    d["owner"] == -1, d["ships"], d["ships"] + d["production"]
+                )
+            )
+            .loc[lambda d:
+                (d["ships_needed"] + 1 <= d["ships_sent"]) &
+                (d["ships_sent"] <= d["ships_needed"] + d["production_src"] + 1)
+            ]
+            .sort_values(["step", "ships_sent"])
+            .groupby(["id_src", "id"], sort=False)
+            .first()
+            .reset_index()
+            .assign(time_cost=lambda d: d["ships_needed"] / d["production_src"])
+        )
+
+        if attacks_joined.empty:
+            return pd.concat(selected_parts, ignore_index=True) if selected_parts else _EMPTY
+
+        attacks_joined = attacks_joined.assign(
+            total_time_cost=attacks_joined.groupby("id_src")["time_cost"].transform("sum")
+        ).assign(
+            score=lambda d: (d["total_time_cost"] - d["time_cost"] - d["step_diff"])
+                            * d["production"]
+        )
+
+        attacks = (
+            attacks_joined
+            .sort_values("score", ascending=False)
+            .groupby("id_src", sort=False)
+            .first()
+            .reset_index()
+            .loc[lambda d: d["ships_sent"] <= d["ships_min"]]
+        )
+
+        if not attacks.empty:
+            selected_parts.append(attacks[["id_src", "id", "step", "ships_sent"]])
+
+        return pd.concat(selected_parts, ignore_index=True) if selected_parts else _EMPTY
+
+    @staticmethod
     def _00_remap_owner(df_s: pd.DataFrame, obs, player_id: int) -> pd.DataFrame:
         """Remap owner column: player_id→0, opponents sorted by desc ships→1..n."""
         ships_by_player: dict[int, int] = {}
