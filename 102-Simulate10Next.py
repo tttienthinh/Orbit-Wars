@@ -69,7 +69,7 @@ BOARD_SIZE = 100.0
 MAX_NB_STEP = 500
 
 
-def interpreter(obs, actions, step, num_agents=2):
+def _interpreter(obs, actions, step, num_agents=2):
     obs0 = obs
 
     expired_comet_pids = []
@@ -300,7 +300,7 @@ class StrategyPipeline:
                     "owner": owner,
                     "nature": nature,
                 })
-            interpreter(sim, no_actions, step + i, num_agents)
+            _interpreter(sim, no_actions, step + i, num_agents)
 
         df_s = pd.DataFrame(rows).sort_values("step").reset_index(drop=True)
 
