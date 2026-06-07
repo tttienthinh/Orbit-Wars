@@ -2,6 +2,7 @@ import math
 import copy
 import pandas as pd
 import numpy as np
+from pathlib import Path
 import torch
 import torch.nn.functional as F
 from torch import nn
@@ -1065,6 +1066,12 @@ step = 0
 num_agents = None
 player_id = None
 
+gnn_model = OrbitGNN(hidden_dim=16)
+_gnn_weights = Path(__file__).with_name("gnn_weights.pt") if "__file__" in dir() else None
+if _gnn_weights is not None and _gnn_weights.exists():
+    gnn_model.load_state_dict(torch.load(str(_gnn_weights), map_location="cpu"))
+gnn_model.eval()
+
 
 def agent(obs):
     global step, num_agents, player_id
@@ -1085,8 +1092,20 @@ def agent(obs):
     coarse_mine = StrategyPipeline._02_pre_mine(df_s, 0)
     pa          = StrategyPipeline._02_get_all_opportunities(coarse_mine, df_s, planet_disp)
     safe_attacks = StrategyPipeline._03_filter_collision(pa)
-    reach        = pd.DataFrame()  # placeholder until _04 uses reach_matrix
-    moves        = StrategyPipeline._04_score_and_decide(safe_attacks, reach, player_id=0)
+
+    data = StrategyPipeline._05_get_GNN(df_s, pa, safe_attacks)
+    attack_df = safe_attacks.query("ships_sent <= ships_min").reset_index(drop=True)
+    if not attack_df.empty and "attack" in data.node_types:
+        with torch.no_grad():
+            logits = gnn_model(data)          # [n_attacks]
+        mask = logits.sigmoid() > 0.5
+        moves = (
+            attack_df[mask.numpy().astype(bool)]
+            [["id_src", "final_angle", "ships_sent"]]
+            .values.tolist()
+        )
+    else:
+        moves = []
 
     step += 1
     return moves
