@@ -405,6 +405,9 @@ class StrategyPipeline:
 
     @staticmethod
     def _02_pre_all(df_s: pd.DataFrame, ships_list: list) -> pd.DataFrame:
+        if df_s.empty:
+            return pd.DataFrame()
+
         all_base = (
             df_s
             .groupby("id", sort=False)
@@ -422,9 +425,6 @@ class StrategyPipeline:
             .rename(columns={"id": "id_src"})
             .reset_index(drop=True)
         )
-
-        if all_base.empty:
-            return pd.DataFrame()
 
         coarse = (
             all_base.assign(_key=1)
@@ -445,6 +445,7 @@ class StrategyPipeline:
         if coarse.empty:
             return pd.DataFrame()
 
+        # Same list object in every cell — callers must not mutate ships_sent rows
         coarse = coarse.assign(ships_sent=[ships_list] * len(coarse))
 
         return coarse

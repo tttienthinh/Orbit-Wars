@@ -7,8 +7,7 @@ def test_includes_all_planets_as_sources(simple_obs):
     coarse = StrategyPipeline._02_pre_all(df_s, ships_list=[4, 16, 64, 256])
     assert not coarse.empty
     sources = set(coarse["id_src"].unique())
-    assert 0 in sources
-    assert 1 in sources
+    assert sources == {0, 1}
 
 
 def test_ships_sent_is_the_fixed_list(simple_obs):
