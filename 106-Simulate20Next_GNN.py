@@ -821,19 +821,24 @@ class StrategyPipeline:
 
         # ── reaches edges: planet_step → planet_step ─────────────────────────
         if not pa.empty:
-            src_r = (
-                pa[["id_src", "step_src"]]
-                .rename(columns={"id_src": "id", "step_src": "step"})
-                .merge(ps_idx, on=["id", "step"])["ps_idx"]
-                .values
+            reach_edge_df = (
+                pa[["id_src", "step_src", "id", "step", "ships_sent"]]
+                .merge(
+                    ps_idx.rename(columns={"id": "id_src", "step": "step_src", "ps_idx": "src_r"}),
+                    on=["id_src", "step_src"],
+                )
+                .merge(
+                    ps_idx.rename(columns={"ps_idx": "dst_r"}),
+                    on=["id", "step"],
+                )
             )
-            dst_r = pa[["id", "step"]].merge(ps_idx, on=["id", "step"])["ps_idx"].values
             edge_attr_r = torch.tensor(
-                (np.log(pa["ships_sent"].values) / np.log(1024)).reshape(-1, 1),
+                (np.log(np.clip(reach_edge_df["ships_sent"].values, 1, None)) / np.log(1024)).reshape(-1, 1),
                 dtype=torch.float32,
             )
             data["planet_step", "reaches", "planet_step"].edge_index = torch.tensor(
-                np.stack([src_r, dst_r]), dtype=torch.long
+                np.stack([reach_edge_df["src_r"].values, reach_edge_df["dst_r"].values]),
+                dtype=torch.long,
             )
             data["planet_step", "reaches", "planet_step"].edge_attr = edge_attr_r
 
@@ -845,31 +850,32 @@ class StrategyPipeline:
         )
 
         if not attack_df.empty:
-            attack_x = torch.tensor(
-                (np.log(attack_df["ships_sent"].values) / np.log(1024)).reshape(-1, 1),
-                dtype=torch.float32,
+            atk_edge_df = (
+                attack_df[["id_src", "step_src", "id", "step", "ships_sent"]]
+                .merge(
+                    ps_idx.rename(columns={"id": "id_src", "step": "step_src", "ps_idx": "src_atk"}),
+                    on=["id_src", "step_src"],
+                )
+                .merge(
+                    ps_idx.rename(columns={"ps_idx": "dst_tgt"}),
+                    on=["id", "step"],
+                )
             )
-            src_atk = (
-                attack_df[["id_src", "step_src"]]
-                .rename(columns={"id_src": "id", "step_src": "step"})
-                .merge(ps_idx, on=["id", "step"])["ps_idx"]
-                .values
-            )
-            dst_tgt = (
-                attack_df[["id", "step"]]
-                .merge(ps_idx, on=["id", "step"])["ps_idx"]
-                .values
-            )
-            n_atk = len(attack_df)
-            data["attack"].x = attack_x
-            data["planet_step", "AttackSrc", "attack"].edge_index = torch.stack([
-                torch.tensor(src_atk, dtype=torch.long),
-                torch.arange(n_atk, dtype=torch.long),
-            ])
-            data["attack", "AttackTgt", "planet_step"].edge_index = torch.stack([
-                torch.arange(n_atk, dtype=torch.long),
-                torch.tensor(dst_tgt, dtype=torch.long),
-            ])
+            if not atk_edge_df.empty:
+                attack_x = torch.tensor(
+                    (np.log(np.clip(atk_edge_df["ships_sent"].values, 1, None)) / np.log(1024)).reshape(-1, 1),
+                    dtype=torch.float32,
+                )
+                n_atk = len(atk_edge_df)
+                data["attack"].x = attack_x
+                data["planet_step", "AttackSrc", "attack"].edge_index = torch.stack([
+                    torch.tensor(atk_edge_df["src_atk"].values, dtype=torch.long),
+                    torch.arange(n_atk, dtype=torch.long),
+                ])
+                data["attack", "AttackTgt", "planet_step"].edge_index = torch.stack([
+                    torch.arange(n_atk, dtype=torch.long),
+                    torch.tensor(atk_edge_df["dst_tgt"].values, dtype=torch.long),
+                ])
 
         return data
 
