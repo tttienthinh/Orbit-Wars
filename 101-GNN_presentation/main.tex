@@ -11,6 +11,7 @@
 \definecolor{attackcol}{HTML}{FAD7A0}   % orange
 \definecolor{stepcol} {HTML}{D5D8DC}   % grey
 \definecolor{mastercol}{HTML}{A9DFBF}   % light green
+\definecolor{basecol} {HTML}{EBF5FB}   % very pale blue (static base planet)
 
 % ── Shared TikZ styles ───────────────────────────────────────────────────────
 \tikzset{
@@ -18,10 +19,12 @@
   anode/.style={circle, draw, fill=attackcol,  minimum size=0.65cm, font=\scriptsize, inner sep=1pt},
   snode/.style={rectangle, draw, fill=stepcol, minimum size=0.65cm, font=\scriptsize, inner sep=2pt},
   mnode/.style={diamond,   draw, fill=mastercol,minimum size=0.75cm, font=\scriptsize, inner sep=1pt},
+  bnode/.style={circle, draw, fill=basecol,    minimum size=0.75cm, font=\scriptsize, inner sep=1pt, densely dashed},
+  tnode/.style={circle, draw, fill=planetcol,  minimum size=0.75cm, font=\scriptsize, inner sep=1pt},
 }
 
 \title{GNN Modelisations for Orbit Wars}
-\subtitle{Five graph representations for fleet decision-making}
+\subtitle{Six graph representations for fleet decision-making}
 \date{2026-06-07}
 \author{}
 
@@ -36,6 +39,7 @@
   \item \textbf{M3 — Attack-only graph:} attack nodes + same-src / same-dst edges
   \item \textbf{M4 — Step nodes:} ETA lifted into a dedicated node type
   \item \textbf{M5 — Temporal unrolling:} $N\times10$ planet copies across time
+  \item \textbf{M6 — Hybrid bipartite:} base $+$ temporal snapshot $+$ attack nodes
 \end{enumerate}
 
 \vspace{6pt}
@@ -267,7 +271,76 @@ $N\times10$ planet nodes total.
 \end{columns}
 \end{frame}
 
-% ── Slide 8 : Add-ons ─────────────────────────────────────────────────────────
+% ── Slide 8 : M6 ─────────────────────────────────────────────────────────────
+\begin{frame}{M6 — Hybrid Bipartite Action-Selector}
+\begin{columns}[T]
+
+\begin{column}{0.50\textwidth}
+\centering
+\begin{tikzpicture}[>=Stealth, font=\tiny, node distance=0pt]
+  % ── base planet nodes (foundation, pale dashed) ──────────────────
+  \node[bnode] (Pb_s) at (-1.9, 0.0) {$P_{\text{src}}$};
+  \node[bnode] (Pb_d) at ( 1.9, 0.0) {$P_{\text{dst}}$};
+  % ── temporal snapshot nodes (middle row) ─────────────────────────
+  \node[tnode] (Pt_s) at (-1.9, 1.8) {$P_{\text{src},t}$};
+  \node[tnode] (Pt_d) at ( 1.9, 1.8) {\shortstack{$P_{\text{dst},}$\\$_{t+\eta}$}};
+  % ── attack node (top centre) ─────────────────────────────────────
+  \node[anode, minimum size=0.85cm] (A) at (0, 3.4) {$A$};
+  % ── state-to-base ────────────────────────────────────────────────
+  \draw[->] (Pt_s) -- node[left, pos=0.5]{\textit{grnd}} (Pb_s);
+  \draw[->] (Pt_d) -- node[right,pos=0.5]{\textit{grnd}} (Pb_d);
+  % ── attack-action edges ──────────────────────────────────────────
+  \draw[->, thick] (Pt_s) -- node[above,sloped]{\texttt{src}} (A);
+  \draw[->, thick] (Pt_d) -- node[above,sloped]{\texttt{dst}} (A);
+  % ── temporal attack edge (dashed, discrete ships) ─────────────────
+  \draw[->, dashed, orange!80!black, thick]
+    (Pt_s) to[bend left=20]
+    node[above, pos=0.5]{$s\!\in\!\{4,16,64,256\}$} (Pt_d);
+  % ── legend strip ─────────────────────────────────────────────────
+  \node[bnode, minimum size=0.45cm, font=\tiny] at (-1.6,-1.0) {};
+  \node[font=\tiny, anchor=west] at (-1.2,-1.0) {base};
+  \node[tnode, minimum size=0.45cm, font=\tiny] at ( 0.0,-1.0) {};
+  \node[font=\tiny, anchor=west] at ( 0.4,-1.0) {snapshot};
+  \node[anode, minimum size=0.45cm, font=\tiny] at ( 1.6,-1.0) {};
+  \node[font=\tiny, anchor=west] at ( 2.0,-1.0) {attack};
+\end{tikzpicture}
+\end{column}
+
+\begin{column}{0.48\textwidth}
+\footnotesize
+\begin{tabular}{@{}p{1.7cm}p{3.3cm}@{}}
+  \toprule
+  Type & Features \\
+  \midrule
+  Base $P_i$ \newline (4-dim) &
+    nature$^\dagger$ (one-hot),\,$\mathrm{prod}/5$ \\[4pt]
+  Snapshot $P_{i,t}$ \newline (9-dim) &
+    $x/100$,\,$y/100$,\,$\tfrac{\log s}{\log 1024}$,\,
+    owner$^{\dagger\dagger}$ (one-hot),\,$t/20$ \\[4pt]
+  Attack $A$ \newline (1-dim) &
+    $\tfrac{\log s_{\text{fleet}}}{\log 1024}$ \\
+  \bottomrule
+\end{tabular}
+
+\vspace{4pt}
+{\tiny $^\dagger$fix/moving/comet \hfill $^{\dagger\dagger}$5-class one-hot}
+
+\vspace{5pt}
+\textbf{Edges:}
+\begin{itemize}\scriptsize
+  \item $P_{i,t}\!\to\!P_i$ \ state-to-base (grounding)
+  \item $P_{\text{src},t}\!\to\!A$,\,$P_{\text{dst},t+\eta}\!\to\!A$ \ attack-action
+  \item $P_{i,t_i}\!\dashrightarrow\!P_{j,t_j}$ \ temporal ($s\!\in\!\{4,16,64,256\}$)
+\end{itemize}
+
+\vspace{5pt}
+\textbf{Task:} node classification on attack nodes
+\end{column}
+
+\end{columns}
+\end{frame}
+
+% ── Slide 9 : Add-ons ─────────────────────────────────────────────────────────
 \begin{frame}{Add-ons / Extensions}
 Applicable to any modelisation:
 
