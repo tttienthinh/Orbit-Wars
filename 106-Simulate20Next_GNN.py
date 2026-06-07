@@ -819,6 +819,58 @@ class StrategyPipeline:
             [src_snap, dst_snap]
         )
 
+        # ── reaches edges: planet_step → planet_step ─────────────────────────
+        if not pa.empty:
+            src_r = (
+                pa[["id_src", "step_src"]]
+                .rename(columns={"id_src": "id", "step_src": "step"})
+                .merge(ps_idx, on=["id", "step"])["ps_idx"]
+                .values
+            )
+            dst_r = pa[["id", "step"]].merge(ps_idx, on=["id", "step"])["ps_idx"].values
+            edge_attr_r = torch.tensor(
+                (np.log(pa["ships_sent"].values) / np.log(1024)).reshape(-1, 1),
+                dtype=torch.float32,
+            )
+            data["planet_step", "reaches", "planet_step"].edge_index = torch.tensor(
+                np.stack([src_r, dst_r]), dtype=torch.long
+            )
+            data["planet_step", "reaches", "planet_step"].edge_attr = edge_attr_r
+
+        # ── Attack nodes ──────────────────────────────────────────────────────
+        attack_df = (
+            safe_attacks.query("ships_sent <= ships_min")[
+                ["id_src", "step_src", "step", "id", "ships_sent"]
+            ].reset_index(drop=True)
+        )
+
+        if not attack_df.empty:
+            attack_x = torch.tensor(
+                (np.log(attack_df["ships_sent"].values) / np.log(1024)).reshape(-1, 1),
+                dtype=torch.float32,
+            )
+            src_atk = (
+                attack_df[["id_src", "step_src"]]
+                .rename(columns={"id_src": "id", "step_src": "step"})
+                .merge(ps_idx, on=["id", "step"])["ps_idx"]
+                .values
+            )
+            dst_tgt = (
+                attack_df[["id", "step"]]
+                .merge(ps_idx, on=["id", "step"])["ps_idx"]
+                .values
+            )
+            n_atk = len(attack_df)
+            data["attack"].x = attack_x
+            data["planet_step", "AttackSrc", "attack"].edge_index = torch.stack([
+                torch.tensor(src_atk, dtype=torch.long),
+                torch.arange(n_atk, dtype=torch.long),
+            ])
+            data["attack", "AttackTgt", "planet_step"].edge_index = torch.stack([
+                torch.arange(n_atk, dtype=torch.long),
+                torch.tensor(dst_tgt, dtype=torch.long),
+            ])
+
         return data
 
 
