@@ -452,61 +452,22 @@ class StrategyPipeline:
 
     @staticmethod
     def _02_get_all_opportunities(
+        coarse: pd.DataFrame,
         df_s: pd.DataFrame,
         planet_disp: pd.DataFrame,
-        player_id: int,
     ) -> pd.DataFrame:
-        mine_base = (
-            df_s
-            .assign(is_mine=(df_s["owner"] == player_id).astype(int))
-            .groupby("id", sort=False)
-            .agg(
-                step_src=("step", "first"),
-                x_src=("x", "first"),
-                y_src=("y", "first"),
-                radius_src=("radius", "first"),
-                ships_min=("ships", "min"),
-                production_src=("production", "first"),
-                nature_src=("nature", "first"),
-                owner_src=("owner", "first"),
-                row_count=("id", "count"),
-                is_mine=("is_mine", "sum"),
-            )
-            .reset_index()
-            .loc[lambda d: (d["row_count"] == d["is_mine"]) & (d["owner_src"] == player_id)]
-            .rename(columns={"id": "id_src"})
-            .reset_index(drop=True)
-        )
-
-        if mine_base.empty:
+        if coarse.empty:
             return pd.DataFrame()
-
-        # Phase A: planet-level cross join
-        coarse = (
-            mine_base.assign(_key=1)
-            .merge(df_s.assign(_key=1), on="_key")
-            .drop(columns="_key")
-            .loc[lambda d: (d["step"] > d["step_src"]) & (d["id"] != d["id_src"])]
-            .merge(planet_disp, on=["id", "step"], how="left")
-            .reset_index(drop=True)
-            .assign(
-                dist_tgt_src=lambda d: np.sqrt(
-                    (d["x"] - d["x_src"]) ** 2 + (d["y"] - d["y_src"]) ** 2
-                ),
-                step_diff=lambda d: (d["step"] - d["step_src"]).astype(float),
-            )
-        )
-
-        coarse = StrategyPipeline._sun_crossing_filter(coarse)
 
         coarse = (
             coarse
+            .merge(planet_disp, on=["id", "step"], how="left")
             .loc[lambda d:
-                (d["dist_tgt_src"] <
-                 (d["step_diff"] + 1) * GameConfig.MAX_SPEED
-                 + d["radius_src"] + GameConfig.PLANET_MARGIN + d["radius"]
-                 + d["planet_disp"].fillna(0.0))
-            ]
+                d["dist_tgt_src"] <
+                (d["step_diff"] + 1) * GameConfig.MAX_SPEED
+                + d["radius_src"] + GameConfig.PLANET_MARGIN + d["radius"]
+                + d["planet_disp"].fillna(0.0)
+                ]
             .reset_index(drop=True)
         )
 
@@ -514,15 +475,8 @@ class StrategyPipeline:
             return pd.DataFrame()
 
         # Ships_sent expansion
-        nb_steps_sim = GameConfig.NB_STEPS_SIM
         expanded = (
             coarse
-            .assign(
-                ships_sent=lambda d: [
-                    list(range(1, int(sm) + int(ps) * nb_steps_sim + 1))
-                    for sm, ps in zip(d["ships_min"], d["production_src"])
-                ]
-            )
             .explode("ships_sent")
             .assign(ships_sent=lambda d: d["ships_sent"].astype("int64"))
             .reset_index(drop=True)
@@ -838,9 +792,13 @@ def agent(obs):
     obs = remap_player_ids(obs, player_id)
 
     df_s, planet_disp = StrategyPipeline._01_get_obs_dataframe(obs, step, num_agents)
-    pa = StrategyPipeline._02_get_all_opportunities(df_s, planet_disp, 0)
+    coarse_mine = StrategyPipeline._02_pre_mine(df_s, 0)
+    coarse_all  = StrategyPipeline._02_pre_all(df_s, [4, 16, 64, 256])
+    pa          = StrategyPipeline._02_get_all_opportunities(coarse_mine, df_s, planet_disp)
+    pa_reach    = StrategyPipeline._02_get_all_opportunities(coarse_all,  df_s, planet_disp)
     safe_attacks = StrategyPipeline._03_filter_collision(pa)
-    moves = StrategyPipeline._04_score_and_decide(safe_attacks, 0)
+    reach        = StrategyPipeline._03_filter_collision(pa_reach)
+    moves        = StrategyPipeline._04_score_and_decide(safe_attacks, 0)
 
     step += 1
     return moves
