@@ -651,7 +651,11 @@ class StrategyPipeline:
         return attacks_with_angle
 
     @staticmethod
-    def _04_score_and_decide(attacks_with_angle: pd.DataFrame, player_id: int) -> list:
+    def _04_score_and_decide(
+        attacks_with_angle: pd.DataFrame,
+        reach_matrix: pd.DataFrame,
+        player_id: int,
+    ) -> list:
         if attacks_with_angle.empty:
             return []
 
@@ -797,7 +801,7 @@ def agent(obs):
     pa_reach    = StrategyPipeline._02_get_all_opportunities(coarse_all,  df_s, planet_disp)
     safe_attacks = StrategyPipeline._03_filter_collision(pa)
     reach        = StrategyPipeline._03_filter_collision(pa_reach)
-    moves        = StrategyPipeline._04_score_and_decide(safe_attacks, 0)
+    moves        = StrategyPipeline._04_score_and_decide(safe_attacks, reach, 0)
 
     step += 1
     return moves
