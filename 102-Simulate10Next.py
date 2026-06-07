@@ -348,6 +348,62 @@ class StrategyPipeline:
         return coarse[~_crossing].reset_index(drop=True)
 
     @staticmethod
+    def _02_pre_mine(df_s: pd.DataFrame, player_id: int) -> pd.DataFrame:
+        nb_steps_sim = GameConfig.NB_STEPS_SIM
+        mine_base = (
+            df_s
+            .assign(is_mine=(df_s["owner"] == player_id).astype(int))
+            .groupby("id", sort=False)
+            .agg(
+                step_src=("step", "first"),
+                x_src=("x", "first"),
+                y_src=("y", "first"),
+                radius_src=("radius", "first"),
+                ships_min=("ships", "min"),
+                production_src=("production", "first"),
+                nature_src=("nature", "first"),
+                owner_src=("owner", "first"),
+                row_count=("id", "count"),
+                is_mine=("is_mine", "sum"),
+            )
+            .reset_index()
+            .loc[lambda d: (d["row_count"] == d["is_mine"]) & (d["owner_src"] == player_id)]
+            .rename(columns={"id": "id_src"})
+            .reset_index(drop=True)
+        )
+
+        if mine_base.empty:
+            return pd.DataFrame()
+
+        coarse = (
+            mine_base.assign(_key=1)
+            .merge(df_s.assign(_key=1), on="_key")
+            .drop(columns="_key")
+            .loc[lambda d: (d["step"] > d["step_src"]) & (d["id"] != d["id_src"])]
+            .reset_index(drop=True)
+            .assign(
+                dist_tgt_src=lambda d: np.sqrt(
+                    (d["x"] - d["x_src"]) ** 2 + (d["y"] - d["y_src"]) ** 2
+                ),
+                step_diff=lambda d: (d["step"] - d["step_src"]).astype(float),
+            )
+        )
+
+        coarse = StrategyPipeline._sun_crossing_filter(coarse)
+
+        if coarse.empty:
+            return pd.DataFrame()
+
+        coarse = coarse.assign(
+            ships_sent=lambda d: [
+                list(range(1, int(sm) + int(ps) * nb_steps_sim + 1))
+                for sm, ps in zip(d["ships_min"], d["production_src"])
+            ]
+        )
+
+        return coarse
+
+    @staticmethod
     def _02_get_all_opportunities(
         df_s: pd.DataFrame,
         planet_disp: pd.DataFrame,
