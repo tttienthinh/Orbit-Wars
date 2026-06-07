@@ -53,6 +53,8 @@ def _process_step(obs_dict: dict) -> "tuple | None":
     pa = SP._02_get_all_opportunities(coarse, df_s, planet_disp)
     safe_attacks = SP._03_filter_collision(pa)
 
+    if safe_attacks.empty or "ships_sent" not in safe_attacks.columns:
+        return None
     attack_df = safe_attacks.query("ships_sent <= ships_min").reset_index(drop=True)
     if attack_df.empty:
         return None
@@ -90,7 +92,8 @@ def collect_samples(replay: dict) -> list:
             continue
         try:
             result = _process_step(obs_dict)
-        except Exception:
+        except Exception as e:
+            print(f"  step skipped: {e}")
             continue
         if result is not None:
             samples.append(result)
@@ -115,3 +118,129 @@ def run_game(agent_path: Path, opponent_path: Path) -> dict:
     env = make("orbit_wars", debug=False)
     env.run([str(agent_path / "main.py"), str(opponent_path / "main.py")])
     return env.toJSON()
+
+
+# ── Training utilities ────────────────────────────────────────────────────────
+
+def compute_pos_weight(batch_ys: list) -> torch.Tensor:
+    """BCEWithLogitsLoss pos_weight: ratio of negatives to positives per batch."""
+    y_cat = torch.cat(batch_ys)
+    n_pos = y_cat.sum().item()
+    n_neg = len(y_cat) - n_pos
+    if n_pos == 0:
+        return torch.tensor(1.0)
+    return torch.tensor(n_neg / n_pos)
+
+
+def train_step(
+    model: "OrbitGNN",
+    optimizer: "torch.optim.Optimizer",
+    batch_graphs: list,
+    batch_ys: list,
+) -> "tuple[float, float]":
+    """One gradient update. Returns (loss, accuracy)."""
+    model.train()
+    data_batch = Batch.from_data_list(batch_graphs)
+    y = torch.cat(batch_ys)
+    pos_weight = compute_pos_weight(batch_ys)
+
+    logits = model(data_batch)
+    loss = F.binary_cross_entropy_with_logits(logits, y, pos_weight=pos_weight)
+    optimizer.zero_grad()
+    loss.backward()
+    optimizer.step()
+
+    with torch.no_grad():
+        preds = (logits.sigmoid() > 0.5)
+        acc = preds.eq(y.bool()).float().mean().item()
+
+    return loss.item(), acc
+
+
+# ── Main training loop ────────────────────────────────────────────────────────
+
+def main() -> None:
+    import mlflow
+
+    model = OrbitGNN(hidden_dim=16)
+    if WEIGHTS_PATH.exists():
+        model.load_state_dict(torch.load(str(WEIGHTS_PATH), map_location="cpu", weights_only=True))
+        print(f"Loaded weights from {WEIGHTS_PATH}")
+    optimizer = torch.optim.Adam(model.parameters(), lr=LR)
+
+    agent_106_path = Path(".")   # 106-Simulate20Next_GNN.py is in cwd; kaggle-envs needs dir
+
+    # Bootstrap from existing logs
+    bootstrap_samples: list = []
+    for log_file in sorted(LOGS_DIR.glob("*.json")):
+        try:
+            replay = json.loads(log_file.read_text(encoding="utf-8"))
+            bootstrap_samples.extend(collect_samples(replay))
+        except Exception as e:
+            print(f"  skip {log_file.name}: {e}")
+    print(f"Bootstrap: {len(bootstrap_samples)} samples from {LOGS_DIR}")
+
+    buffer_graphs: list = [s[0] for s in bootstrap_samples]
+    buffer_ys: list = [s[1] for s in bootstrap_samples]
+    game_idx = 0
+    update_idx = 0
+
+    with mlflow.start_run():
+        mlflow.log_params({
+            "hidden_dim": 16,
+            "lr": LR,
+            "batch_size": BATCH_SIZE,
+            "save_every": SAVE_EVERY,
+        })
+
+        while True:
+            # ── Run one game ──────────────────────────────────────────────────
+            opponent_path = sample_opponent()
+            try:
+                replay = run_game(agent_106_path, opponent_path)
+            except Exception as e:
+                print(f"Game {game_idx} failed ({opponent_path.name}): {e}")
+                game_idx += 1
+                continue
+
+            # Win rate (player 0 = our GNN agent)
+            rewards = replay.get("rewards", [])
+            winner_is_gnn = (len(rewards) > 0 and rewards[0] == 1)
+            mlflow.log_metrics(
+                {"win": int(winner_is_gnn)},
+                step=game_idx,
+            )
+            print(
+                f"Game {game_idx} vs {opponent_path.name}: "
+                f"{'WIN' if winner_is_gnn else 'LOSS'}"
+            )
+
+            # ── Collect samples from the just-played game ─────────────────────
+            new_samples = collect_samples(replay)
+            buffer_graphs.extend(s[0] for s in new_samples)
+            buffer_ys.extend(s[1] for s in new_samples)
+
+            # ── Batch updates while buffer has enough samples ─────────────────
+            while len(buffer_graphs) >= BATCH_SIZE:
+                batch_g = buffer_graphs[:BATCH_SIZE]
+                batch_y = buffer_ys[:BATCH_SIZE]
+                buffer_graphs = buffer_graphs[BATCH_SIZE:]
+                buffer_ys = buffer_ys[BATCH_SIZE:]
+
+                loss, acc = train_step(model, optimizer, batch_g, batch_y)
+                mlflow.log_metrics(
+                    {"loss": loss, "accuracy": acc},
+                    step=update_idx,
+                )
+                print(f"  update {update_idx}: loss={loss:.4f} acc={acc:.3f}")
+                update_idx += 1
+
+            # ── Save weights every SAVE_EVERY games ───────────────────────────
+            game_idx += 1
+            if game_idx % SAVE_EVERY == 0:
+                torch.save(model.state_dict(), str(WEIGHTS_PATH))
+                print(f"Saved weights -> {WEIGHTS_PATH}  (game {game_idx})")
+
+
+if __name__ == "__main__":
+    main()
