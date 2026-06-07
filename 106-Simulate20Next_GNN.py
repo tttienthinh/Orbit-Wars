@@ -1067,9 +1067,9 @@ num_agents = None
 player_id = None
 
 gnn_model = OrbitGNN(hidden_dim=16)
-_gnn_weights = Path(__file__).with_name("gnn_weights.pt") if "__file__" in dir() else None
+_gnn_weights = Path(__file__).with_name("gnn_weights.pt") if "__file__" in globals() else None
 if _gnn_weights is not None and _gnn_weights.exists():
-    gnn_model.load_state_dict(torch.load(str(_gnn_weights), map_location="cpu"))
+    gnn_model.load_state_dict(torch.load(str(_gnn_weights), map_location="cpu", weights_only=True))
 gnn_model.eval()
 
 
@@ -1100,7 +1100,7 @@ def agent(obs):
             logits = gnn_model(data)          # [n_attacks]
         mask = logits.sigmoid() > 0.5
         moves = (
-            attack_df[mask.numpy().astype(bool)]
+            attack_df[mask.numpy()]
             [["id_src", "final_angle", "ships_sent"]]
             .values.tolist()
         )
