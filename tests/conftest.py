@@ -21,9 +21,10 @@ GameConfig = _mod.GameConfig
 @pytest.fixture
 def simple_obs():
     """Two fixed planets: mine (id=0) at (20,10), enemy (id=1) at (45,10).
-    dist=25, well within NB_STEPS_SIM=10 reach. Path stays 40 units from sun."""
+    dist=25, well within NB_STEPS_SIM=10 reach. Path stays 40 units from sun.
+    Mine ships=50 so ships_min (50) exceeds the attack window ships_sent (~16-17)."""
     planets = [
-        [0, 0, 20.0, 10.0, 3.0, 10, 1],
+        [0, 0, 20.0, 10.0, 3.0, 50, 1],
         [1, 1, 45.0, 10.0, 3.0,  5, 1],
     ]
     obs = types.SimpleNamespace(

@@ -792,11 +792,9 @@ def agent(obs):
 
     df_s, planet_disp = StrategyPipeline._01_get_obs_dataframe(obs, step, num_agents)
     coarse_mine = StrategyPipeline._02_pre_mine(df_s, 0)
-    coarse_all  = StrategyPipeline._02_pre_all(df_s, [4, 16, 64, 256])
     pa          = StrategyPipeline._02_get_all_opportunities(coarse_mine, df_s, planet_disp)
-    pa_reach    = StrategyPipeline._02_get_all_opportunities(coarse_all,  df_s, planet_disp)
     safe_attacks = StrategyPipeline._03_filter_collision(pa)
-    reach        = StrategyPipeline._03_filter_collision(pa_reach)
+    reach        = pd.DataFrame()  # placeholder until _04 uses reach_matrix
     moves        = StrategyPipeline._04_score_and_decide(safe_attacks, reach, player_id=0)
 
     step += 1

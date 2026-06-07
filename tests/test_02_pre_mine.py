@@ -1,4 +1,3 @@
-import pytest
 from tests.conftest import StrategyPipeline
 
 
@@ -16,9 +15,9 @@ def test_ships_sent_is_list_starting_at_1(simple_obs):
     first_list = coarse.iloc[0]["ships_sent"]
     assert isinstance(first_list, list)
     assert first_list[0] == 1
-    # planet 0: ships_min=10, production=1, NB_STEPS_SIM=10 → range(1,21)
-    assert first_list[-1] == 20
-    assert len(first_list) == 20
+    # planet 0: ships_min=50, production=1, NB_STEPS_SIM=10 → range(1,61)
+    assert first_list[-1] == 60
+    assert len(first_list) == 60
 
 
 def test_enemy_player_id_returns_enemy_source(simple_obs):
