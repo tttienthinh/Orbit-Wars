@@ -323,6 +323,31 @@ class StrategyPipeline:
         return df_s, planet_disp
 
     @staticmethod
+    def _sun_crossing_filter(coarse: pd.DataFrame) -> pd.DataFrame:
+        _dx = coarse["x"].values - coarse["x_src"].values
+        _dy = coarse["y"].values - coarse["y_src"].values
+        _l2 = _dx ** 2 + _dy ** 2
+        _dot = (
+            (GameConfig.CENTER - coarse["x_src"].values) * _dx
+            + (GameConfig.CENTER - coarse["y_src"].values) * _dy
+        )
+        _t_sun = np.clip(_dot / np.where(_l2 == 0, 1.0, _l2), 0.0, 1.0)
+        _proj = np.sqrt(
+            (GameConfig.CENTER - coarse["x_src"].values - _t_sun * _dx) ** 2
+            + (GameConfig.CENTER - coarse["y_src"].values - _t_sun * _dy) ** 2
+        )
+        _sun_dist = np.where(
+            _l2 == 0,
+            np.sqrt(
+                (GameConfig.CENTER - coarse["x_src"].values) ** 2
+                + (GameConfig.CENTER - coarse["y_src"].values) ** 2
+            ),
+            _proj,
+        )
+        _crossing = _sun_dist < (GameConfig.SUN_RADIUS + GameConfig.PLANET_MARGIN)
+        return coarse[~_crossing].reset_index(drop=True)
+
+    @staticmethod
     def _02_get_all_opportunities(
         df_s: pd.DataFrame,
         planet_disp: pd.DataFrame,
@@ -369,34 +394,16 @@ class StrategyPipeline:
             )
         )
 
-        # Sun-crossing filter (vectorised)
-        _dx = coarse["x"].values - coarse["x_src"].values
-        _dy = coarse["y"].values - coarse["y_src"].values
-        _l2 = _dx ** 2 + _dy ** 2
-        _dot = (GameConfig.CENTER - coarse["x_src"].values) * _dx + (GameConfig.CENTER - coarse["y_src"].values) * _dy
-        _t_sun = np.clip(_dot / np.where(_l2 == 0, 1.0, _l2), 0.0, 1.0)
-        _proj = np.sqrt(
-            (GameConfig.CENTER - coarse["x_src"].values - _t_sun * _dx) ** 2 +
-            (GameConfig.CENTER - coarse["y_src"].values - _t_sun * _dy) ** 2
-        )
-        _sun_dist = np.where(
-            _l2 == 0,
-            np.sqrt((GameConfig.CENTER - coarse["x_src"].values) ** 2 + (GameConfig.CENTER - coarse["y_src"].values) ** 2),
-            _proj,
-        )
-        _crossing_sun = _sun_dist < (GameConfig.SUN_RADIUS + GameConfig.PLANET_MARGIN)
+        coarse = StrategyPipeline._sun_crossing_filter(coarse)
 
         coarse = (
             coarse
-            .assign(_crossing_sun=_crossing_sun)
             .loc[lambda d:
                 (d["dist_tgt_src"] <
                  (d["step_diff"] + 1) * GameConfig.MAX_SPEED
                  + d["radius_src"] + GameConfig.PLANET_MARGIN + d["radius"]
                  + d["planet_disp"].fillna(0.0))
-                & ~d["_crossing_sun"]
             ]
-            .drop(columns="_crossing_sun")
             .reset_index(drop=True)
         )
 
