@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 import torch
 from torch_geometric.data import HeteroData
+from torch_geometric.transforms import ToUndirected
 
 
 # ── Configuration ─────────────────────────────────────────────────────────────
@@ -877,7 +878,7 @@ class StrategyPipeline:
                     torch.tensor(atk_edge_df["dst_tgt"].values, dtype=torch.long),
                 ])
 
-        return data
+        return ToUndirected()(data)
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────
