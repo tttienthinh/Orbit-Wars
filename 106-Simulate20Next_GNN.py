@@ -732,7 +732,8 @@ class StrategyPipeline:
         player_id: int,
     ) -> pd.DataFrame:
         """Same selection logic as _04_score_and_decide; returns selected attack rows
-        with columns [id_src, id, step, ships_sent] for label construction."""
+        with columns [id_src, id, step, ships_sent] for label construction.
+        reach_matrix omitted — unused in current iteration (matches _04_score_and_decide)."""
         _EMPTY = pd.DataFrame(columns=["id_src", "id", "step", "ships_sent"])
         if attacks_with_angle.empty:
             return _EMPTY
