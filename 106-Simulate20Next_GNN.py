@@ -3,7 +3,10 @@ import copy
 import pandas as pd
 import numpy as np
 import torch
+import torch.nn.functional as F
+from torch import nn
 from torch_geometric.data import HeteroData
+from torch_geometric.nn import HeteroConv, SAGEConv, GATConv
 from torch_geometric.transforms import ToUndirected
 
 
@@ -972,6 +975,85 @@ class StrategyPipeline:
                 ])
 
         return ToUndirected()(data)
+
+
+# ── GNN Model ─────────────────────────────────────────────────────────────────
+_REACHES_KEY = ("planet_step", "reaches", "planet_step")
+
+
+class OrbitGNN(nn.Module):
+    def __init__(self, hidden_dim: int = 16):
+        super().__init__()
+        self.hidden_dim = hidden_dim
+
+        self.planet_proj = nn.Linear(4, hidden_dim, bias=False)
+        self.planet_step_proj = nn.Linear(9, hidden_dim, bias=False)
+        self.attack_proj = nn.Linear(1, hidden_dim, bias=False)
+
+        def _make_conv():
+            return HeteroConv(
+                {
+                    ("planet", "has_snapshot", "planet_step"):
+                        SAGEConv((hidden_dim, hidden_dim), hidden_dim),
+                    ("planet_step", "rev_has_snapshot", "planet"):
+                        SAGEConv((hidden_dim, hidden_dim), hidden_dim),
+                    ("planet_step", "reaches", "planet_step"):
+                        GATConv(
+                            (hidden_dim, hidden_dim), hidden_dim,
+                            edge_dim=1, heads=1, add_self_loops=False,
+                        ),
+                    ("planet_step", "AttackSrc", "attack"):
+                        SAGEConv((hidden_dim, hidden_dim), hidden_dim),
+                    ("attack", "rev_AttackSrc", "planet_step"):
+                        SAGEConv((hidden_dim, hidden_dim), hidden_dim),
+                    ("attack", "AttackTgt", "planet_step"):
+                        SAGEConv((hidden_dim, hidden_dim), hidden_dim),
+                    ("planet_step", "rev_AttackTgt", "attack"):
+                        SAGEConv((hidden_dim, hidden_dim), hidden_dim),
+                },
+                aggr="sum",
+            )
+
+        self.conv1 = _make_conv()
+        self.conv2 = _make_conv()
+        self.head = nn.Sequential(
+            nn.Linear(hidden_dim, 8),
+            nn.ReLU(),
+            nn.Linear(8, 1),
+        )
+
+    def forward(self, data) -> "torch.Tensor":
+        has_attack = (
+            "attack" in data.node_types
+            and data["attack"].x.numel() > 0
+        )
+
+        x_dict = {
+            "planet":      self.planet_proj(data["planet"].x),
+            "planet_step": self.planet_step_proj(data["planet_step"].x),
+        }
+        if has_attack:
+            x_dict["attack"] = self.attack_proj(data["attack"].x)
+
+        edge_index_dict = data.edge_index_dict
+
+        # Pass edge_attr only for reaches (GATConv uses it; SAGEConv does not)
+        reaches_attr = None
+        if _REACHES_KEY in edge_index_dict:
+            try:
+                reaches_attr = data[_REACHES_KEY].edge_attr
+            except AttributeError:
+                pass
+        edge_attr_map = {_REACHES_KEY: reaches_attr} if reaches_attr is not None else {}
+
+        for conv in (self.conv1, self.conv2):
+            x_dict = conv(x_dict, edge_index_dict, edge_attr_dict=edge_attr_map)
+            x_dict = {k: F.relu(v) for k, v in x_dict.items()}
+
+        atk = x_dict.get("attack")
+        if atk is None or atk.numel() == 0:
+            return torch.zeros(0)
+        return self.head(atk).squeeze(-1)   # [n_attacks]
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────
