@@ -113,15 +113,38 @@ def sample_opponent() -> Path:
 
 
 def run_game(agent_path: Path, opponent_path: Path) -> dict:
-    """Run one 1v1 game (agent_path=player0, opponent_path=player1). Return replay dict.
+    """Run one 1v1 game in a subprocess to avoid PyTorch/PyG double-init segfault.
 
+    Writes the replay to a temp file to avoid stdout pollution from agent prints.
     agent_path may be a .py file or a directory containing main.py.
     """
-    from kaggle_environments import make
-    env = make("orbit_wars", debug=False)
+    import subprocess, tempfile, os
     a0 = str(agent_path) if str(agent_path).endswith(".py") else str(agent_path / "main.py")
-    env.run([a0, str(opponent_path / "main.py")])
-    return env.toJSON()
+    a1 = str(opponent_path / "main.py")
+    tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False)
+    tmp.close()
+    tmp_path = tmp.name
+    code = (
+        "import json; from kaggle_environments import make; "
+        f"env = make('orbit_wars', debug=False); "
+        f"env.run([{a0!r}, {a1!r}]); "
+        f"open({tmp_path!r}, 'w').write(json.dumps(env.toJSON()))"
+    )
+    result = subprocess.run(
+        ["python", "-c", code],
+        stderr=subprocess.DEVNULL,
+        timeout=600,
+    )
+    try:
+        if result.returncode != 0:
+            raise RuntimeError(f"Game subprocess exited {result.returncode}")
+        with open(tmp_path) as fh:
+            return json.load(fh)
+    finally:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
 
 
 # ── Training utilities ────────────────────────────────────────────────────────
