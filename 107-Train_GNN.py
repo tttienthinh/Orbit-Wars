@@ -113,10 +113,14 @@ def sample_opponent() -> Path:
 
 
 def run_game(agent_path: Path, opponent_path: Path) -> dict:
-    """Run one 1v1 game (agent_path=player0, opponent_path=player1). Return replay dict."""
+    """Run one 1v1 game (agent_path=player0, opponent_path=player1). Return replay dict.
+
+    agent_path may be a .py file or a directory containing main.py.
+    """
     from kaggle_environments import make
     env = make("orbit_wars", debug=False)
-    env.run([str(agent_path / "main.py"), str(opponent_path / "main.py")])
+    a0 = str(agent_path) if str(agent_path).endswith(".py") else str(agent_path / "main.py")
+    env.run([a0, str(opponent_path / "main.py")])
     return env.toJSON()
 
 
@@ -168,7 +172,7 @@ def main() -> None:
         print(f"Loaded weights from {WEIGHTS_PATH}")
     optimizer = torch.optim.Adam(model.parameters(), lr=LR)
 
-    agent_106_path = Path(".")   # 106-Simulate20Next_GNN.py is in cwd; kaggle-envs needs dir
+    agent_106_path = Path("106-Simulate20Next_GNN.py")
 
     # Bootstrap from existing logs
     bootstrap_samples: list = []
