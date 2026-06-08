@@ -132,6 +132,7 @@ def run_game(agent_path: Path, opponent_path: Path) -> dict:
     )
     result = subprocess.run(
         ["python", "-c", code],
+        stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
         timeout=600,
     )
