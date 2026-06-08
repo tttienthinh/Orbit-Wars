@@ -723,43 +723,25 @@ class StrategyPipeline:
         moves += attacks[["id_src", "final_angle", "ships_sent"]].values.tolist()
         return moves
 
-
-# ── Player-ID normalisation ───────────────────────────────────────────────────
-def remap_player_ids(obs, my_player_id: int):
-    """Return a deep-copied Obs with player IDs normalised.
-
-    my_player_id → 0; remaining active players ranked 1-3 by descending total
-    ships (planet garrison + in-flight fleets).  Planet/comet IDs (p[0]) are
-    unchanged so action [from_planet_id, angle, ships] needs no reverse mapping.
-    """
-    obs = copy.deepcopy(obs)
-
-    ships_by_player = {}
-    for p in obs.planets:
-        if p[1] != -1:
-            ships_by_player[p[1]] = ships_by_player.get(p[1], 0) + p[5]
-    for f in obs.fleets:
-        ships_by_player[f[1]] = ships_by_player.get(f[1], 0) + f[6]
-
-    opponents = sorted(
-        [(pid, s) for pid, s in ships_by_player.items() if pid != my_player_id],
-        key=lambda x: x[1],
-        reverse=True,
-    )
-    id_map = {my_player_id: 0}
-    for new_id, (old_id, _) in enumerate(opponents, start=1):
-        id_map[old_id] = new_id
-
-    for p in obs.planets:
-        if p[1] != -1:
-            p[1] = id_map.get(p[1], p[1])
-    for p in obs.initial_planets:
-        if p[1] != -1:
-            p[1] = id_map.get(p[1], p[1])
-    for f in obs.fleets:
-        f[1] = id_map.get(f[1], f[1])
-
-    return obs
+    @staticmethod
+    def _00_remap_owner(df_s: pd.DataFrame, obs, player_id: int) -> pd.DataFrame:
+        """Remap owner column: player_id→0, opponents sorted by desc ships→1..n."""
+        ships_by_player: dict[int, int] = {}
+        for p in obs.planets:
+            if p[1] != -1:
+                ships_by_player[p[1]] = ships_by_player.get(p[1], 0) + p[5]
+        for f in obs.fleets:
+            ships_by_player[f[1]] = ships_by_player.get(f[1], 0) + f[6]
+        opponents = sorted(
+            [(pid, s) for pid, s in ships_by_player.items() if pid != player_id],
+            key=lambda x: x[1], reverse=True,
+        )
+        id_map = {player_id: 0}
+        for new_id, (old_id, _) in enumerate(opponents, start=1):
+            id_map[old_id] = new_id
+        df_s = df_s.copy()
+        df_s["owner"] = df_s["owner"].map(lambda x: id_map.get(x, x))
+        return df_s
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────
@@ -781,9 +763,9 @@ def agent(obs):
     if player_id is None:
         player_id = obs.get("player", 0) if isinstance(obs, dict) else obs.player
 
-    obs = remap_player_ids(obs, player_id)
-
     df_s, planet_disp = StrategyPipeline._01_get_obs_dataframe(obs, step, num_agents)
+    df_s = StrategyPipeline._00_remap_owner(df_s, obs, player_id)
+
     coarse_mine = StrategyPipeline._02_pre_mine(df_s, 0)
     pa          = StrategyPipeline._02_get_all_opportunities(coarse_mine, df_s, planet_disp)
     safe_attacks = StrategyPipeline._03_filter_collision(pa)
