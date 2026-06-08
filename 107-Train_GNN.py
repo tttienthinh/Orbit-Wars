@@ -29,6 +29,7 @@ OrbitGNN = m.OrbitGNN
 
 AGENTS_DIR = Path("orbit-wars-lab/agents")
 LOGS_DIR = Path("62-logs")
+MODEL_DIR = Path("107-model")
 BATCH_SIZE = 32
 LR = 1e-3
 SAVE_EVERY = 5
@@ -213,6 +214,7 @@ def main() -> None:
     game_idx = 0
     update_idx = 0
 
+    mlflow.set_tracking_uri("sqlite:///mlflow.db")
     with mlflow.start_run():
         mlflow.log_params({
             "hidden_dim": 16,
@@ -266,8 +268,11 @@ def main() -> None:
             # ── Save weights every SAVE_EVERY games ───────────────────────────
             game_idx += 1
             if game_idx % SAVE_EVERY == 0:
+                MODEL_DIR.mkdir(exist_ok=True)
+                checkpoint_path = MODEL_DIR / f"After{game_idx}Games.pt"
+                torch.save(model.state_dict(), str(checkpoint_path))
                 torch.save(model.state_dict(), str(WEIGHTS_PATH))
-                print(f"Saved weights -> {WEIGHTS_PATH}  (game {game_idx})")
+                print(f"Saved weights -> {checkpoint_path}  and  {WEIGHTS_PATH}")
 
 
 if __name__ == "__main__":
