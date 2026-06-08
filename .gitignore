@@ -2,6 +2,8 @@
 00-replay.html
 00-setup.ipynb
 
+110-replays
+
 # Nested git repo — add as submodule if you want it tracked
 orbit-wars-lab/
 

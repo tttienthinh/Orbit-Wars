@@ -144,25 +144,28 @@ def run_game(agent_path: Path, opponent_path: Path) -> dict:
 
 # ── Training utilities ────────────────────────────────────────────────────────
 
-def compute_pos_weight(batch_ys: list) -> torch.Tensor:
-    y_cat = torch.cat(batch_ys)
-    n_pos = y_cat.sum().item()
-    n_neg = len(y_cat) - n_pos
+def compute_global_pos_weight(samples: list, cap: float = 50.0) -> torch.Tensor:
+    """Compute pos_weight once from all bootstrap samples, capped to avoid collapse."""
+    if not samples:
+        return torch.tensor(10.0)
+    all_y = torch.cat([s[1] for s in samples])
+    n_pos = all_y.sum().item()
+    n_neg = len(all_y) - n_pos
     if n_pos == 0:
-        return torch.tensor(1.0)
-    return torch.tensor(n_neg / n_pos)
+        return torch.tensor(cap)
+    return torch.tensor(min(n_neg / n_pos, cap))
 
 
-def train_step(model, optimizer, batch_graphs, batch_ys) -> "tuple[float, float]":
+def train_step(model, optimizer, batch_graphs, batch_ys, pos_weight: torch.Tensor) -> "tuple[float, float]":
     model.train()
     data_batch = Batch.from_data_list(batch_graphs)
     y = torch.cat(batch_ys)
-    pos_weight = compute_pos_weight(batch_ys)
 
     logits = model(data_batch)
     loss = F.binary_cross_entropy_with_logits(logits, y, pos_weight=pos_weight)
     optimizer.zero_grad()
     loss.backward()
+    torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
     optimizer.step()
 
     with torch.no_grad():
@@ -194,6 +197,9 @@ def main() -> None:
             print(f"  skip {log_file.name}: {e}")
     print(f"Bootstrap: {len(bootstrap_samples)} samples from {LOGS_DIR}")
 
+    global_pos_weight = compute_global_pos_weight(bootstrap_samples)
+    print(f"Global pos_weight: {global_pos_weight.item():.2f}")
+
     buffer_graphs: list = [s[0] for s in bootstrap_samples]
     buffer_ys: list = [s[1] for s in bootstrap_samples]
     game_idx = 0
@@ -207,6 +213,8 @@ def main() -> None:
             "batch_size": BATCH_SIZE,
             "save_every": SAVE_EVERY,
             "pipeline": "polars",
+            "pos_weight": round(global_pos_weight.item(), 2),
+            "grad_clip": 1.0,
         })
 
         while True:
@@ -233,7 +241,7 @@ def main() -> None:
                 buffer_graphs = buffer_graphs[BATCH_SIZE:]
                 buffer_ys = buffer_ys[BATCH_SIZE:]
 
-                loss, acc = train_step(model, optimizer, batch_g, batch_y)
+                loss, acc = train_step(model, optimizer, batch_g, batch_y, global_pos_weight)
                 mlflow.log_metrics({"loss": loss, "accuracy": acc}, step=update_idx)
                 print(f"  update {update_idx}: loss={loss:.4f} acc={acc:.3f}")
                 update_idx += 1
