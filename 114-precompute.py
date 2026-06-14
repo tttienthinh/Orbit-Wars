@@ -80,11 +80,12 @@ def _winner_idx(ep_meta: dict) -> int | None:
 
 def _process_episode(
     ep_json: dict, player_idx: int
-) -> tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame, pl.DataFrame]:
+) -> tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame]:
     df_s_parts: list[pl.DataFrame] = []
     reach_parts: list[pl.DataFrame] = []
-    atk_parts: list[pl.DataFrame] = []
-    act_rows: list[dict] = []
+    raw_actions: list[tuple] = []
+    planet_snap: dict[int, dict] = {}   # step -> {pid: (x, y, radius)}
+    fleet_snap: dict[int, dict] = {}    # step -> {fid: (x, y, angle, from_pid, ships)}
 
     for game_step, step_states in enumerate(ep_json.get("steps", [])):
         if not step_states or len(step_states) <= player_idx:
@@ -92,13 +93,25 @@ def _process_episode(
         state = step_states[player_idx]
         if not isinstance(state, dict):
             continue
-        if state.get("status", "ACTIVE") not in ("ACTIVE", None, ""):
-            continue
         obs_dict = state.get("observation")
         if not obs_dict:
             continue
 
         obs = types.SimpleNamespace(**obs_dict)
+
+        # ── Always snapshot planets/fleets (needed even for DONE steps) ──────
+        planet_snap[game_step] = {
+            p[0]: (p[2], p[3], p[4])
+            for p in getattr(obs, "planets", [])
+        }
+        fleet_snap[game_step] = {
+            f[0]: (f[2], f[3], f[4], f[5], f[6])
+            for f in getattr(obs, "fleets", [])
+        }
+
+        if state.get("status", "ACTIVE") not in ("ACTIVE", None, ""):
+            continue
+
         pid = obs.player
 
         initial = getattr(obs, "initial_planets", [])
@@ -109,9 +122,6 @@ def _process_episode(
             df_s_full, planet_disp = SP._01_get_obs_dataframe(obs, game_step, num_agents)
             df_s_full = SP._00_remap_owner(df_s_full, obs, pid)
 
-            # Single geometry pass: all planets × REACH_POW2 ships values.
-            # This covers both reach (filter to REACH_POW2) and actions (filter
-            # to owner==0, ships_sent<=ships_min) without running two pipelines.
             raw = SP._02_get_reach(df_s_full, planet_disp, REACH_POW2).collect()
             filtered = SP._03_filter_collision(raw.lazy()).collect()
         except Exception as e:
@@ -121,67 +131,18 @@ def _process_episode(
         # ── df_s ─────────────────────────────────────────────────────────────
         df_s_parts.append(df_s_full.select(DF_S_COLS))
 
-        # ── reach: REACH_POW2 values, all source planets ─────────────────────
+        # ── reach: all REACH_POW2, all source planets ─────────────────────────
         if not filtered.is_empty():
-            reach_df = filtered.filter(pl.col("ships_sent").is_in(REACH_POW2))
-            if not reach_df.is_empty():
-                reach_parts.append(reach_df.select(REACH_COLS))
+            reach_parts.append(filtered.select(REACH_COLS))
 
-        # ── attacks: mine planets only, ships_sent <= ships_min ───────────────
-        if not filtered.is_empty():
-            atk_df = (
-                filtered
-                .filter(
-                    (pl.col("owner_src") == 0) &
-                    (pl.col("ships_sent") <= pl.col("ships_min"))
-                )
-                .select(["id_src", "step_src", "step", "id", "ships_sent", "final_angle"])
-                .rename({"final_angle": "angle"})
-            )
-            if not atk_df.is_empty():
-                atk_parts.append(atk_df)
-
-        # ── actions: map launch angle → target planet id ──────────────────────
-        # Use simple geometric lookup: find the planet whose current position
-        # is most aligned with the action launch angle from the source planet.
-        # This works regardless of the player's angle convention (direct aim vs
-        # orbital intercept) since planet separation >> orbital displacement.
-        base_pos: dict[int, tuple[float, float]] = {
-            row[0]: (row[1], row[2])
-            for row in df_s_full
-            .group_by("id")
-            .agg(pl.first("x"), pl.first("y"))
-            .rows()
-        }
-        _TWO_PI = 2.0 * math.pi
-
+        # ── raw actions (target resolved in Pass 2 below) ─────────────────────
         raw_action = state.get("action") or []
         if isinstance(raw_action, list):
             for move in raw_action:
                 if isinstance(move, list) and len(move) == 3:
-                    id_src = int(move[0])
-                    angle = float(move[1])
-                    ships = int(move[2])
-                    id_tgt = None
-                    src = base_pos.get(id_src)
-                    if src is not None:
-                        sx, sy = src
-                        best_diff = 0.25  # ~14 degree threshold
-                        for tgt_id, (tx, ty) in base_pos.items():
-                            if tgt_id == id_src:
-                                continue
-                            tgt_angle = math.atan2(ty - sy, tx - sx)
-                            diff = abs(((angle - tgt_angle + math.pi) % _TWO_PI) - math.pi)
-                            if diff < best_diff:
-                                best_diff = diff
-                                id_tgt = tgt_id
-                    act_rows.append({
-                        "game_step": game_step,
-                        "id_src": id_src,
-                        "angle": angle,
-                        "ships_sent": ships,
-                        "id": id_tgt,
-                    })
+                    raw_actions.append((
+                        game_step, int(move[0]), float(move[1]), int(move[2])
+                    ))
 
     # ── Batch dedup and assemble output ───────────────────────────────────────
     df_s_out = (
