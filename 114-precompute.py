@@ -177,7 +177,7 @@ def _process_episode(
         matched_fid = None
         for fid in sorted(fleet_life):
             info = fleet_life[fid]
-            if (info["born"] == game_step + 1
+            if (info["born"] == game_step
                     and info["from_pid"] == id_src
                     and info["angle"] == angle
                     and info["ships"] == ships_sent):
