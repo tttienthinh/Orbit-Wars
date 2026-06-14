@@ -144,7 +144,74 @@ def _process_episode(
                         game_step, int(move[0]), float(move[1]), int(move[2])
                     ))
 
-    # ── Batch dedup and assemble output ───────────────────────────────────────
+    # ── Pass 2: build fleet lifetime index ───────────────────────────────────
+    all_fids: set[int] = set()
+    for step_fleets in fleet_snap.values():
+        all_fids.update(step_fleets.keys())
+
+    fleet_life: dict[int, dict] = {}
+    for fid in all_fids:
+        born = last_step = None
+        last_x = last_y = 0.0
+        from_pid = angle_f = ships_f = None
+        for step in sorted(fleet_snap):
+            if fid in fleet_snap[step]:
+                fx, fy, fa, fpid, fships = fleet_snap[step][fid]
+                if born is None:
+                    born = step
+                    from_pid, angle_f, ships_f = fpid, fa, fships
+                last_step = step
+                last_x, last_y = fx, fy
+        if born is not None:
+            fleet_life[fid] = {
+                "born": born, "from_pid": from_pid,
+                "angle": angle_f, "ships": ships_f,
+                "last_step": last_step, "last_x": last_x, "last_y": last_y,
+            }
+
+    # ── Pass 2: resolve each action's target planet ───────────────────────────
+    act_rows: list[dict] = []
+    for game_step, id_src, angle, ships_sent in raw_actions:
+        id_tgt = None
+
+        matched_fid = None
+        for fid in sorted(fleet_life):
+            info = fleet_life[fid]
+            if (info["born"] == game_step + 1
+                    and info["from_pid"] == id_src
+                    and info["angle"] == angle
+                    and info["ships"] == ships_sent):
+                matched_fid = fid
+                break
+
+        if matched_fid is not None:
+            info = fleet_life[matched_fid]
+            t_last = info["last_step"]
+            next_step = t_last + 1
+            # Fleet absent from next observed step → it hit something that tick
+            if next_step in fleet_snap and matched_fid not in fleet_snap[next_step]:
+                if next_step in planet_snap:
+                    spd = fleet_speed(ships_sent)
+                    fl_old = (info["last_x"], info["last_y"])
+                    fl_new = (
+                        info["last_x"] + spd * math.cos(angle),
+                        info["last_y"] + spd * math.sin(angle),
+                    )
+                    for pid_t, (px0, py0, r0) in planet_snap[t_last].items():
+                        if pid_t in planet_snap[next_step]:
+                            px1, py1 = planet_snap[next_step][pid_t][:2]
+                        else:
+                            px1, py1 = px0, py0  # planet expired (comet), hold in place
+                        if swept_pair_hit(fl_old, fl_new, (px0, py0), (px1, py1), r0):
+                            id_tgt = pid_t
+                            break
+
+        act_rows.append({
+            "game_step": game_step, "id_src": id_src,
+            "angle": angle, "ships_sent": ships_sent, "id": id_tgt,
+        })
+
+    # ── Assemble outputs ──────────────────────────────────────────────────────
     df_s_out = (
         pl.concat(df_s_parts).unique(subset=["id", "step"], keep="first")
         if df_s_parts
@@ -155,7 +222,11 @@ def _process_episode(
         if reach_parts
         else pl.DataFrame(schema={c: pl.Int64 for c in REACH_COLS})
     )
-    act_out = pl.DataFrame(schema=ACT_SCHEMA)
+    act_out = (
+        pl.DataFrame(act_rows, schema=ACT_SCHEMA)
+        if act_rows
+        else pl.DataFrame(schema=ACT_SCHEMA)
+    )
 
     return df_s_out, reach_out, act_out
 
