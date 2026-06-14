@@ -169,20 +169,17 @@ def _process_episode(
                 "last_step": last_step, "last_x": last_x, "last_y": last_y,
             }
 
+    fleet_by_sig: dict[tuple, int] = {}
+    for fid, info in fleet_life.items():
+        key = (info["born"], info["from_pid"], info["angle"], info["ships"])
+        fleet_by_sig.setdefault(key, fid)  # keep lowest fid on collision
+
     # ── Pass 2: resolve each action's target planet ───────────────────────────
     act_rows: list[dict] = []
     for game_step, id_src, angle, ships_sent in raw_actions:
         id_tgt = None
 
-        matched_fid = None
-        for fid in sorted(fleet_life):
-            info = fleet_life[fid]
-            if (info["born"] == game_step
-                    and info["from_pid"] == id_src
-                    and info["angle"] == angle
-                    and info["ships"] == ships_sent):
-                matched_fid = fid
-                break
+        matched_fid = fleet_by_sig.get((game_step, id_src, angle, ships_sent))
 
         if matched_fid is not None:
             info = fleet_life[matched_fid]
@@ -215,7 +212,12 @@ def _process_episode(
     df_s_out = (
         pl.concat(df_s_parts).unique(subset=["id", "step"], keep="first")
         if df_s_parts
-        else pl.DataFrame(schema={c: pl.Int64 for c in DF_S_COLS})
+        else pl.DataFrame(schema={
+            "id": pl.Int64, "step": pl.Int64,
+            "x": pl.Float64, "y": pl.Float64,
+            "ships": pl.Int64, "owner": pl.Int64,
+            "production": pl.Int64, "nature": pl.Utf8,
+        })
     )
     reach_out = (
         pl.concat(reach_parts).unique(keep="first")
