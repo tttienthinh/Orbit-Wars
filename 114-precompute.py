@@ -245,7 +245,7 @@ def main() -> None:
     for ep_path in bar:
         ep_id = int(ep_path.stem.split("_")[1])
         out_dir = OUT_ROOT / str(ep_id)
-        all_files = ("df_s.parquet", "reach.parquet", "attacks.parquet", "actions.parquet")
+        all_files = ("df_s.parquet", "reach.parquet", "actions.parquet")
 
         if out_dir.exists() and all((out_dir / f).exists() for f in all_files):
             skipped += 1
@@ -261,12 +261,11 @@ def main() -> None:
 
         try:
             ep_json = json.loads(ep_path.read_text(encoding="utf-8"))
-            df_s, reach, attacks, actions = _process_episode(ep_json, player_idx)
+            df_s, reach, actions = _process_episode(ep_json, player_idx)
 
             out_dir.mkdir(exist_ok=True)
             df_s.write_parquet(out_dir / "df_s.parquet")
             reach.write_parquet(out_dir / "reach.parquet")
-            attacks.write_parquet(out_dir / "attacks.parquet")
             actions.write_parquet(out_dir / "actions.parquet")
             done += 1
         except Exception as e:
