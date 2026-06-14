@@ -98,6 +98,22 @@ For each `(game_step, id_src, angle, ships_sent)` in `raw_actions`:
 
 Unchanged.
 
+## Helper functions needed in 114-precompute.py
+
+**`swept_pair_hit`**: import from `kaggle_env_orbit_wars/1_29_3.py` alongside the existing `113` import:
+```python
+import importlib.util as _ilu
+_spec2 = _ilu.spec_from_file_location("env", "kaggle_env_orbit_wars/1_29_3.py")
+_m2 = _ilu.module_from_spec(_spec2)
+_spec2.loader.exec_module(_m2)
+swept_pair_hit = _m2.swept_pair_hit
+```
+
+**`fleet_speed`**: reuse from the already-imported `113` module:
+```python
+fleet_speed = _m.PhysicsEngine.fleet_speed
+```
+
 ## Implementation location
 
-All changes are in `114-precompute.py`. `113-Polars_GNN_Corrected.py` is not modified.
+All changes are in `114-precompute.py`. `113-Polars_GNN_Corrected.py` and `kaggle_env_orbit_wars/1_29_3.py` are not modified.
