@@ -100,13 +100,24 @@ Unchanged.
 
 ## Helper functions needed in 114-precompute.py
 
-**`swept_pair_hit`**: import from `kaggle_env_orbit_wars/1_29_3.py` alongside the existing `113` import:
+**`swept_pair_hit`**: copy the function body directly into `114-precompute.py` (no extra import):
 ```python
-import importlib.util as _ilu
-_spec2 = _ilu.spec_from_file_location("env", "kaggle_env_orbit_wars/1_29_3.py")
-_m2 = _ilu.module_from_spec(_spec2)
-_spec2.loader.exec_module(_m2)
-swept_pair_hit = _m2.swept_pair_hit
+def swept_pair_hit(A, B, P0, P1, r):
+    d0x, d0y = A[0] - P0[0], A[1] - P0[1]
+    dvx = (B[0] - A[0]) - (P1[0] - P0[0])
+    dvy = (B[1] - A[1]) - (P1[1] - P0[1])
+    a = dvx * dvx + dvy * dvy
+    b = 2.0 * (d0x * dvx + d0y * dvy)
+    c = d0x * d0x + d0y * d0y - r * r
+    if a < 1e-12:
+        return c <= 0.0
+    disc = b * b - 4.0 * a * c
+    if disc < 0.0:
+        return False
+    sq = math.sqrt(disc)
+    t1 = (-b - sq) / (2.0 * a)
+    t2 = (-b + sq) / (2.0 * a)
+    return t2 >= 0.0 and t1 <= 1.0
 ```
 
 **`fleet_speed`**: reuse from the already-imported `113` module:
