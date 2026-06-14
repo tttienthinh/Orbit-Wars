@@ -3,6 +3,7 @@
 00-setup.ipynb
 
 110-replays
+113-precompute
 
 # Nested git repo — add as submodule if you want it tracked
 orbit-wars-lab/
