@@ -155,18 +155,9 @@ def _process_episode(
         if reach_parts
         else pl.DataFrame(schema={c: pl.Int64 for c in REACH_COLS})
     )
-    atk_out = (
-        pl.concat(atk_parts)
-        if atk_parts
-        else pl.DataFrame(schema={c: pl.Int64 for c in ATK_COLS})
-    )
-    act_out = (
-        pl.DataFrame(act_rows, schema=ACT_SCHEMA)
-        if act_rows
-        else pl.DataFrame(schema=ACT_SCHEMA)
-    )
+    act_out = pl.DataFrame(schema=ACT_SCHEMA)
 
-    return df_s_out, reach_out, atk_out, act_out
+    return df_s_out, reach_out, act_out
 
 
 def main() -> None:
