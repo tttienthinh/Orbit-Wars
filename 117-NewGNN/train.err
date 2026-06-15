@@ -1,0 +1,29 @@
+Traceback (most recent call last):
+  File "C:\Users\trant\Documents\Programmation\Orbit Wars\117-NewGNN.py", line 486, in <module>
+    main()
+  File "C:\Users\trant\Documents\Programmation\Orbit Wars\117-NewGNN.py", line 424, in main
+    auc = roc_auc_score(all_labels, all_scores)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\trant\AppData\Roaming\Python\Python312\site-packages\sklearn\utils\_param_validation.py", line 218, in wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\trant\AppData\Roaming\Python\Python312\site-packages\sklearn\metrics\_ranking.py", line 686, in roc_auc_score
+    return _average_binary_score(
+           ^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\trant\AppData\Roaming\Python\Python312\site-packages\sklearn\metrics\_base.py", line 69, in _average_binary_score
+    return binary_metric(y_true, y_score, sample_weight=sample_weight)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\trant\AppData\Roaming\Python\Python312\site-packages\sklearn\metrics\_ranking.py", line 433, in _binary_roc_auc_score
+    fpr, tpr, _ = roc_curve(y_true, y_score, sample_weight=sample_weight)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\trant\AppData\Roaming\Python\Python312\site-packages\sklearn\utils\_param_validation.py", line 191, in wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\trant\AppData\Roaming\Python\Python312\site-packages\sklearn\metrics\_ranking.py", line 1163, in roc_curve
+    fps, tps, thresholds = _binary_clf_curve(
+                           ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\trant\AppData\Roaming\Python\Python312\site-packages\sklearn\metrics\_ranking.py", line 865, in _binary_clf_curve
+    check_consistent_length(y_true, y_score, sample_weight)
+  File "C:\Users\trant\AppData\Roaming\Python\Python312\site-packages\sklearn\utils\validation.py", line 473, in check_consistent_length
+    raise ValueError(
+ValueError: Found input variables with inconsistent numbers of samples: [807473, 1049078]
