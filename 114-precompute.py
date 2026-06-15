@@ -35,7 +35,6 @@ META_PATH = REPLAYS_DIR / "_metadata.json"
 
 DF_S_COLS = ["id", "step", "x", "y", "ships", "owner", "production", "nature"]
 REACH_COLS = ["id_src", "step_src", "id", "step", "ships_sent"]
-ATK_COLS = ["id_src", "step_src", "step", "id", "ships_sent", "angle"]
 ACT_SCHEMA = {
     "game_step": pl.Int64, "id_src": pl.Int64, "angle": pl.Float64,
     "ships_sent": pl.Int64, "id": pl.Int64,

@@ -3,6 +3,8 @@ import math
 import random
 from pathlib import Path
 
+import mlflow
+import mlflow.pytorch
 import numpy as np
 import polars as pl
 import torch
@@ -16,11 +18,12 @@ from torch_geometric.transforms import ToUndirected
 PRECOMPUTE_DIR = Path("114-precompute")
 OUT_DIR        = Path("117-NewGNN")
 NB_STEPS_SIM   = 20
-N_EPOCHS       = 10
-HIDDEN_DIM     = 64
-NUM_LAYERS     = 3
-LR             = 1e-3
-TRAIN_RATIO    = 0.8
+N_EPOCHS           = 200
+EPISODES_PER_EPOCH = 8    # sample this many episodes per epoch (~1 min/epoch)
+HIDDEN_DIM         = 64
+NUM_LAYERS         = 3
+LR                 = 1e-3
+TRAIN_RATIO        = 0.8
 
 
 def build_graph(
@@ -228,9 +231,10 @@ def build_attack_pairs(
 def train_episode(
     ep_dir: Path,
     model: OrbitGNN,
-    optimizer: torch.optim.Optimizer,
 ) -> tuple[float, list[float], list[float]]:
-    """Load one episode, iterate game steps, update model.
+    """Load one episode and accumulate gradients across all game steps.
+
+    Caller must call optimizer.zero_grad() before and optimizer.step() after.
 
     Returns:
         (avg_loss, all_sigmoid_scores, all_labels) across all steps in this episode.
@@ -259,11 +263,12 @@ def train_episode(
     total_loss = 0.0
     n_steps    = 0
 
+    model.train()
     for t in sorted(reach["step_src"].unique().to_list()):
-        reach_t    = reach.filter(pl.col("step_src") == t)
+        reach_t       = reach.filter(pl.col("step_src") == t)
         arrival_steps = reach_t["step"].unique().to_list()
-        df_s_t     = df_s.filter(pl.col("step").is_in([t] + arrival_steps))
-        df_s_at_t  = df_s.filter(pl.col("step") == t)
+        df_s_t        = df_s.filter(pl.col("step").is_in([t] + arrival_steps))
+        df_s_at_t     = df_s.filter(pl.col("step") == t)
 
         if df_s_t.is_empty() or df_s_at_t.is_empty():
             continue
@@ -274,9 +279,6 @@ def train_episode(
         if len(src_idx) == 0:
             continue
 
-        model.train()
-        optimizer.zero_grad()
-
         h_planet = model.encode(data)
         logits   = model.score_pairs(h_planet, src_idx, tgt_idx)
 
@@ -285,8 +287,7 @@ def train_episode(
         pos_weight = torch.tensor([n_neg / max(n_pos, 1)], dtype=torch.float32)
         loss       = F.binary_cross_entropy_with_logits(logits, labels, pos_weight=pos_weight)
 
-        loss.backward()
-        optimizer.step()
+        loss.backward()  # accumulate gradients; caller steps optimizer once per episode
 
         total_loss += loss.item()
         n_steps    += 1
@@ -328,7 +329,9 @@ def _test_train_episode():
         return
     model     = OrbitGNN(hidden_dim=8, num_layers=1)
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
-    loss, scores, labels = train_episode(ep_dirs[0], model, optimizer)
+    optimizer.zero_grad()
+    loss, scores, labels = train_episode(ep_dirs[0], model)
+    optimizer.step()
     assert isinstance(loss, float)
     assert len(scores) == len(labels)
     n_pos = int(sum(labels))
@@ -350,8 +353,21 @@ def _test_build_attack_pairs():
     print("_test_build_attack_pairs PASSED")
 
 
+def _log(msg: str, log_fh=None) -> None:
+    """Print with flush and optionally mirror to an explicit log file."""
+    print(msg, flush=True)
+    if log_fh is not None:
+        log_fh.write(msg + "\n")
+        log_fh.flush()
+
+
 def main() -> None:
+    import sys
     OUT_DIR.mkdir(exist_ok=True)
+
+    # Open an explicit log file so output is captured regardless of buffering
+    log_path = OUT_DIR / "metrics.log"
+    log_fh   = open(log_path, "a", encoding="utf-8")
 
     ep_dirs = sorted([d for d in PRECOMPUTE_DIR.iterdir() if d.is_dir()])
     ep_ids  = [int(d.name) for d in ep_dirs]
@@ -362,37 +378,72 @@ def main() -> None:
     train_ids  = set(ep_ids[:split])
     train_dirs = [PRECOMPUTE_DIR / str(eid) for eid in ep_ids if eid in train_ids]
 
-    print(f"Episodes: {len(ep_ids)} total, {len(train_dirs)} train")
+    n_ep = min(EPISODES_PER_EPOCH, len(train_dirs))
+    _log(f"Episodes: {len(ep_ids)} total, {len(train_dirs)} train, {n_ep}/epoch -> ~1 min/epoch", log_fh)
 
     model     = OrbitGNN(hidden_dim=HIDDEN_DIM, num_layers=NUM_LAYERS)
     optimizer = torch.optim.Adam(model.parameters(), lr=LR)
 
-    for epoch in range(1, N_EPOCHS + 1):
-        all_scores: list[float] = []
-        all_labels: list[float] = []
-        epoch_loss = 0.0
+    mlflow.set_experiment("117-NewGNN")
+    with mlflow.start_run():
+        mlflow.log_params({
+            "hidden_dim":         HIDDEN_DIM,
+            "num_layers":         NUM_LAYERS,
+            "lr":                 LR,
+            "n_epochs":           N_EPOCHS,
+            "episodes_per_epoch": n_ep,
+            "train_ratio":        TRAIN_RATIO,
+            "nb_steps_sim":       NB_STEPS_SIM,
+            "total_episodes":     len(ep_ids),
+            "train_episodes":     len(train_dirs),
+        })
 
-        for ep_dir in train_dirs:
-            try:
-                loss, scores, labels = train_episode(ep_dir, model, optimizer)
-                epoch_loss += loss
-                all_scores.extend(scores)
-                all_labels.extend(labels)
-            except Exception as e:
-                print(f"  episode {ep_dir.name} failed: {e}")
+        for epoch in range(1, N_EPOCHS + 1):
+            all_scores: list[float] = []
+            all_labels: list[float] = []
+            epoch_loss   = 0.0
+            epoch_dirs   = random.sample(train_dirs, n_ep)
 
-        avg_loss = epoch_loss / max(len(train_dirs), 1)
-        if len(set(all_labels)) > 1:
-            auc = roc_auc_score(all_labels, all_scores)
-        else:
-            auc = float("nan")
+            for ep_dir in epoch_dirs:
+                try:
+                    optimizer.zero_grad()
+                    loss, scores, labels = train_episode(ep_dir, model)
+                    optimizer.step()
+                    epoch_loss += loss
+                    all_scores.extend(scores)
+                    all_labels.extend(labels)
+                except Exception as e:
+                    _log(f"  episode {ep_dir.name} failed: {e}", log_fh)
 
-        print(f"Epoch {epoch:3d}  loss={avg_loss:.4f}  train_auc={auc:.4f}")
-        ckpt = OUT_DIR / f"model_epoch{epoch}.pt"
-        torch.save(model.state_dict(), ckpt)
-        print(f"  → saved {ckpt}")
+            avg_loss   = epoch_loss / max(n_ep, 1)
+            n_pairs    = len(all_labels)
+            n_pos      = int(sum(all_labels))
+            pos_rate   = n_pos / max(n_pairs, 1)
 
-    print(f"\nDone. Models saved to {OUT_DIR}/")
+            if len(set(all_labels)) > 1:
+                auc = roc_auc_score(all_labels, all_scores)
+            else:
+                auc = float("nan")
+
+            line = (f"Epoch {epoch:3d}  loss={avg_loss:.4f}  train_auc={auc:.4f}"
+                    f"  pairs={n_pairs}  pos={n_pos}  pos_rate={pos_rate:.4f}")
+            _log(line, log_fh)
+
+            mlflow.log_metrics({
+                "train_loss":    avg_loss,
+                "train_auc":     auc if not math.isnan(auc) else 0.0,
+                "n_pairs":       n_pairs,
+                "n_positives":   n_pos,
+                "positive_rate": pos_rate,
+            }, step=epoch)
+
+            ckpt = OUT_DIR / f"model_epoch{epoch}.pt"
+            torch.save(model.state_dict(), ckpt)
+            mlflow.log_artifact(str(ckpt), artifact_path="checkpoints")
+            _log(f"  -> saved {ckpt}", log_fh)
+
+    _log(f"\nDone. Models saved to {OUT_DIR}/", log_fh)
+    log_fh.close()
 
 
 def _test_build_graph():
