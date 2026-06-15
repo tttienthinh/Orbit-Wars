@@ -225,6 +225,79 @@ def build_attack_pairs(
     )
 
 
+def train_episode(
+    ep_dir: Path,
+    model: OrbitGNN,
+    optimizer: torch.optim.Optimizer,
+) -> tuple[float, list[float], list[float]]:
+    """Load one episode, iterate game steps, update model.
+
+    Returns:
+        (avg_loss, all_sigmoid_scores, all_labels) across all steps in this episode.
+    """
+    df_s    = pl.read_parquet(ep_dir / "df_s.parquet")
+    reach   = pl.read_parquet(ep_dir / "reach.parquet")
+    actions = pl.read_parquet(ep_dir / "actions.parquet")
+
+    # Keep earliest arrival step per (id_src, step_src, id, ships_sent)
+    reach = (
+        reach
+        .group_by(["id_src", "step_src", "id", "ships_sent"])
+        .agg(pl.all().sort_by("step").first())
+    )
+
+    actions_set: set[tuple[int, int, int]] = set(
+        zip(
+            actions["game_step"].to_list(),
+            actions["id_src"].to_list(),
+            actions["id"].to_list(),
+        )
+    )
+
+    all_scores: list[float] = []
+    all_labels: list[float] = []
+    total_loss = 0.0
+    n_steps    = 0
+
+    for t in sorted(reach["step_src"].unique().to_list()):
+        reach_t    = reach.filter(pl.col("step_src") == t)
+        arrival_steps = reach_t["step"].unique().to_list()
+        df_s_t     = df_s.filter(pl.col("step").is_in([t] + arrival_steps))
+        df_s_at_t  = df_s.filter(pl.col("step") == t)
+
+        if df_s_t.is_empty() or df_s_at_t.is_empty():
+            continue
+
+        data, planet_idx = build_graph(df_s_t, reach_t)
+        src_idx, tgt_idx, labels = build_attack_pairs(df_s_at_t, actions_set, planet_idx, t)
+
+        if len(src_idx) == 0:
+            continue
+
+        model.train()
+        optimizer.zero_grad()
+
+        h_planet = model.encode(data)
+        logits   = model.score_pairs(h_planet, src_idx, tgt_idx)
+
+        n_pos      = labels.sum().item()
+        n_neg      = len(labels) - n_pos
+        pos_weight = torch.tensor([n_neg / max(n_pos, 1)], dtype=torch.float32)
+        loss       = F.binary_cross_entropy_with_logits(logits, labels, pos_weight=pos_weight)
+
+        loss.backward()
+        optimizer.step()
+
+        total_loss += loss.item()
+        n_steps    += 1
+
+        with torch.no_grad():
+            all_scores.extend(torch.sigmoid(logits).tolist())
+            all_labels.extend(labels.tolist())
+
+    return total_loss / max(n_steps, 1), all_scores, all_labels
+
+
 def _test_orbit_gnn():
     df_s_t = pl.DataFrame({
         "id":         [0,     1,     0,     1    ],
@@ -246,6 +319,20 @@ def _test_orbit_gnn():
     scores = model.score_pairs(h_planet, torch.tensor([0]), torch.tensor([1]))
     assert scores.shape == (1,), f"scores: {scores.shape}"
     print("_test_orbit_gnn PASSED")
+
+
+def _test_train_episode():
+    ep_dirs = sorted([d for d in PRECOMPUTE_DIR.iterdir() if d.is_dir()])
+    if not ep_dirs:
+        print("_test_train_episode SKIP (no episodes in 114-precompute/)")
+        return
+    model     = OrbitGNN(hidden_dim=8, num_layers=1)
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+    loss, scores, labels = train_episode(ep_dirs[0], model, optimizer)
+    assert isinstance(loss, float)
+    assert len(scores) == len(labels)
+    n_pos = int(sum(labels))
+    print(f"_test_train_episode PASSED  loss={loss:.4f}  pairs={len(scores)}  positives={n_pos}")
 
 
 def _test_build_attack_pairs():
@@ -298,3 +385,4 @@ if __name__ == "__main__":
     _test_build_graph()
     _test_orbit_gnn()
     _test_build_attack_pairs()
+    _test_train_episode()
