@@ -36,6 +36,8 @@ def build_graph(
     Returns:
         (data, planet_idx) where planet_idx maps planet_id -> Planet node row index.
     """
+    if reach_t.is_empty():
+        raise ValueError("reach_t must be non-empty (filtered to a specific step_src)")
     game_step = int(reach_t["step_src"][0])
 
     # ── Planet nodes ──────────────────────────────────────────────────────────
@@ -136,6 +138,10 @@ def _test_build_graph():
     assert planet_idx == {0: 0, 1: 1}
     snap = data["planet", "has_snapshot", "planet_step"].edge_index
     assert snap.shape[1] == 4, f"has_snapshot edges: {snap.shape}"
+    reaches_ei = data["planet_step", "reaches", "planet_step"].edge_index
+    assert reaches_ei.shape == (2, 2), f"reaches edge_index: {reaches_ei.shape}"
+    reaches_ea = data["planet_step", "reaches", "planet_step"].edge_attr
+    assert reaches_ea.shape == (2, 1), f"reaches edge_attr: {reaches_ea.shape}"
     print("_test_build_graph PASSED")
 
 
