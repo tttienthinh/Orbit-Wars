@@ -180,6 +180,51 @@ class OrbitGNN(nn.Module):
         ).squeeze(-1)
 
 
+def build_attack_pairs(
+    df_s_at_t: pl.DataFrame,
+    actions_set: set[tuple[int, int, int]],
+    planet_idx: dict[int, int],
+    game_step: int,
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """Enumerate all (owner-0 src, other tgt) pairs and assign binary labels.
+
+    Args:
+        df_s_at_t: df_s rows where step == game_step.
+        actions_set: set of (game_step, id_src, id_tgt) from actions.parquet.
+        planet_idx: planet_id -> Planet node row index.
+        game_step: current game step.
+
+    Returns:
+        (src_indices, tgt_indices, labels) tensors of shape (N_pairs,).
+        Empty tensors if no owner-0 planet exists.
+    """
+    rows = df_s_at_t.select(["id", "owner"]).to_dicts()
+    src_planets = [r["id"] for r in rows if r["owner"] == 0 and r["id"] in planet_idx]
+    all_planets = [r["id"] for r in rows if r["id"] in planet_idx]
+
+    src_list:   list[int]   = []
+    tgt_list:   list[int]   = []
+    label_list: list[float] = []
+
+    for id_src in src_planets:
+        for id_tgt in all_planets:
+            if id_src == id_tgt:
+                continue
+            src_list.append(planet_idx[id_src])
+            tgt_list.append(planet_idx[id_tgt])
+            label_list.append(1.0 if (game_step, id_src, id_tgt) in actions_set else 0.0)
+
+    if not src_list:
+        empty = torch.zeros(0, dtype=torch.long)
+        return empty, empty, torch.zeros(0, dtype=torch.float32)
+
+    return (
+        torch.tensor(src_list,   dtype=torch.long),
+        torch.tensor(tgt_list,   dtype=torch.long),
+        torch.tensor(label_list, dtype=torch.float32),
+    )
+
+
 def _test_orbit_gnn():
     df_s_t = pl.DataFrame({
         "id":         [0,     1,     0,     1    ],
@@ -201,6 +246,21 @@ def _test_orbit_gnn():
     scores = model.score_pairs(h_planet, torch.tensor([0]), torch.tensor([1]))
     assert scores.shape == (1,), f"scores: {scores.shape}"
     print("_test_orbit_gnn PASSED")
+
+
+def _test_build_attack_pairs():
+    df_s_at_t = pl.DataFrame({
+        "id":    [0, 1, 2],
+        "step":  [10, 10, 10],
+        "owner": [0, 1, -1],
+    })
+    planet_idx  = {0: 0, 1: 1, 2: 2}
+    actions_set = {(10, 0, 1)}  # only src=0 → tgt=1 is a real action
+    src_idx, tgt_idx, labels = build_attack_pairs(df_s_at_t, actions_set, planet_idx, game_step=10)
+    # owner-0 is planet 0; targets are planets 1 and 2 → 2 pairs
+    assert len(src_idx) == 2,           f"expected 2 pairs, got {len(src_idx)}"
+    assert labels.sum().item() == 1.0,  f"expected 1 positive, got {labels.sum()}"
+    print("_test_build_attack_pairs PASSED")
 
 
 def _test_build_graph():
@@ -237,3 +297,4 @@ def _test_build_graph():
 if __name__ == "__main__":
     _test_build_graph()
     _test_orbit_gnn()
+    _test_build_attack_pairs()
