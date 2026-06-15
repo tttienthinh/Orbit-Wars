@@ -69,6 +69,52 @@ def _snap_features(df_at_t: pl.DataFrame, id_alias: str, prefix: str) -> pl.Data
     )
 
 
+def _trajectory_pivot(
+    df_s_window: pl.DataFrame,
+    id_alias: str,
+    ships_prefix: str,
+    owner_prefix: str | None = None,
+) -> pl.DataFrame:
+    """Pivot df_s_window (has 'offset' int and 'ships_log' float cols) to wide trajectory.
+
+    Returns DataFrame keyed by id_alias with columns {ships_prefix}0..19
+    and optionally {owner_prefix}0..19.
+    Missing offsets filled with 0.0 (ships) or -2.0 (owner sentinel).
+    """
+    ships_piv = df_s_window.pivot(
+        values="ships_log", index="id", on="offset", aggregate_function="first"
+    )
+    for i in range(NB_STEPS_SIM):
+        col, new = str(i), f"{ships_prefix}{i}"
+        if col in ships_piv.columns:
+            ships_piv = ships_piv.with_columns(
+                pl.col(col).fill_null(0.0).cast(pl.Float32).alias(new)
+            ).drop(col)
+        else:
+            ships_piv = ships_piv.with_columns(pl.lit(0.0).cast(pl.Float32).alias(new))
+    result = ships_piv.rename({"id": id_alias})
+
+    if owner_prefix is not None:
+        owner_piv = df_s_window.pivot(
+            values="owner", index="id", on="offset", aggregate_function="first"
+        )
+        for i in range(NB_STEPS_SIM):
+            col, new = str(i), f"{owner_prefix}{i}"
+            if col in owner_piv.columns:
+                owner_piv = owner_piv.with_columns(
+                    pl.col(col).fill_null(-2).cast(pl.Float32).alias(new)
+                ).drop(col)
+            else:
+                owner_piv = owner_piv.with_columns(pl.lit(-2.0).cast(pl.Float32).alias(new))
+        owner_cols = [f"{owner_prefix}{i}" for i in range(NB_STEPS_SIM)]
+        result = result.join(
+            owner_piv.select(["id"] + owner_cols).rename({"id": id_alias}),
+            on=id_alias,
+        )
+
+    return result
+
+
 def build_episode_features(ep_dir: Path) -> pl.DataFrame:
     df_s    = pl.read_parquet(ep_dir / "df_s.parquet")
     reach   = pl.read_parquet(ep_dir / "reach.parquet")
@@ -121,6 +167,30 @@ def build_episode_features(ep_dir: Path) -> pl.DataFrame:
         )
         pairs = pairs.join(reach_wide, on=["id_src", "id_tgt"], how="left")
 
+        # ── Trajectory: target ships+owner, source ships for offsets 0..19 ────
+        df_s_window = (
+            df_s
+            .filter((pl.col("step") >= t) & (pl.col("step") < t + NB_STEPS_SIM))
+            .with_columns([
+                (pl.col("step") - t).alias("offset"),
+                (pl.col("ships").cast(pl.Float32).clip(1.0, None).log(math.e) / _LOG1024)
+                .alias("ships_log"),
+            ])
+        )
+
+        if not df_s_window.is_empty():
+            tgt_traj = _trajectory_pivot(df_s_window, "id_tgt", "tgt_ships_t", "tgt_owner_t")
+            src_traj = _trajectory_pivot(df_s_window, "id_src", "src_ships_t", owner_prefix=None)
+            pairs = pairs.join(tgt_traj, on="id_tgt", how="left")
+            pairs = pairs.join(src_traj, on="id_src", how="left")
+        else:
+            for i in range(NB_STEPS_SIM):
+                pairs = pairs.with_columns([
+                    pl.lit(0.0).cast(pl.Float32).alias(f"tgt_ships_t{i}"),
+                    pl.lit(-2.0).cast(pl.Float32).alias(f"tgt_owner_t{i}"),
+                    pl.lit(0.0).cast(pl.Float32).alias(f"src_ships_t{i}"),
+                ])
+
         step_dfs.append(pairs.with_columns(pl.lit(t).alias("game_step")))
 
     return pl.concat(step_dfs) if step_dfs else pl.DataFrame()
@@ -155,3 +225,16 @@ def _test_travel_features():
     assert (valid >= 0.0).all() and (valid <= 1.0).all(), \
         f"travel_1 out of [0,1]: min={valid.min()}, max={valid.max()}"
     print(f"_test_travel_features PASSED  rows={len(df)}  travel_1_non_null={len(valid)}")
+
+
+def _test_trajectory_features():
+    ep_dirs = sorted([d for d in PRECOMPUTE_DIR.iterdir() if d.is_dir()])
+    if not ep_dirs:
+        print("_test_trajectory_features SKIP"); return
+    df = build_episode_features(ep_dirs[0])
+    for col in ["tgt_ships_t0", "tgt_owner_t0", "src_ships_t0",
+                "tgt_ships_t19", "tgt_owner_t19", "src_ships_t19"]:
+        assert col in df.columns, f"missing {col}"
+    assert df["tgt_ships_t0"].dtype == pl.Float32, "expected Float32"
+    assert df["src_ships_t0"].dtype == pl.Float32, "expected Float32"
+    print(f"_test_trajectory_features PASSED  rows={len(df)}")
