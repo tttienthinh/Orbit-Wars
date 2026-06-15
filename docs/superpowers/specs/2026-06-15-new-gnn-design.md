@@ -106,6 +106,7 @@ Index lookup: `planet_idx: dict[planet_id → row_index]` precomputed per graph 
 - **Optimizer:** Adam, lr=1e-3
 - **Batching:** one step = one forward pass; gradients accumulated or `torch_geometric.data.Batch` across steps
 - **Train/val split:** by episode ID (not step) to prevent data leakage
+- **Metrics:** ROC AUC reported per epoch over the training set (collect all scores + labels across steps/episodes, compute `sklearn.metrics.roc_auc_score` once per epoch)
 
 ---
 
