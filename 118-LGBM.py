@@ -16,6 +16,7 @@ NB_STEPS_SIM   = 20
 TRAIN_RATIO    = 0.8
 REACH_POW2     = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024]
 LGBM_PARAMS    = dict(n_estimators=500, learning_rate=0.05, num_leaves=63, n_jobs=-1, verbose=-1)
+STEP_STRIDE    = 10   # sample every Nth step_src to keep RAM under ~3 GB
 
 _LOG1024 = math.log(1024)
 
@@ -129,7 +130,8 @@ def build_episode_features(ep_dir: Path) -> pl.DataFrame:
 
     step_dfs: list[pl.DataFrame] = []
 
-    for t in sorted(reach["step_src"].unique().to_list()):
+    all_steps = sorted(reach["step_src"].unique().to_list())
+    for t in all_steps[::STEP_STRIDE]:
         df_s_at_t = df_s.filter(pl.col("step") == t)
         if df_s_at_t.is_empty():
             continue
@@ -288,21 +290,23 @@ def main() -> None:
     print(f"Episodes: {len(ep_ids)} total | {len(train_dirs)} train | {len(test_dirs)} test")
 
     def build_dataset(dirs: list[Path], desc: str) -> tuple[np.ndarray, np.ndarray]:
-        frames: list[pl.DataFrame] = []
+        X_parts: list[np.ndarray] = []
+        y_parts: list[np.ndarray] = []
         for d in tqdm(dirs, desc=desc):
             try:
                 frame = build_episode_features(d)
                 if not frame.is_empty():
-                    frames.append(frame)
+                    X_parts.append(
+                        frame.select(FEATURE_COLS).fill_null(float("nan"))
+                             .to_numpy().astype(np.float32)
+                    )
+                    y_parts.append(frame["label"].to_numpy().astype(np.float32))
             except Exception as e:
                 print(f"  {d.name} failed: {e}")
-        if not frames:
+        if not X_parts:
             return (np.zeros((0, len(FEATURE_COLS)), dtype=np.float32),
                     np.zeros(0, dtype=np.float32))
-        df = pl.concat(frames)
-        X = df.select(FEATURE_COLS).fill_null(float("nan")).to_numpy().astype(np.float32)
-        y = df["label"].to_numpy().astype(np.float32)
-        return X, y
+        return np.concatenate(X_parts, axis=0), np.concatenate(y_parts)
 
     X_train, y_train = build_dataset(train_dirs, "Train")
     X_test,  y_test  = build_dataset(test_dirs,  "Test")
@@ -321,6 +325,7 @@ def main() -> None:
             "test_episodes":  len(test_dirs),
             "n_features":     len(FEATURE_COLS),
             "pos_weight":     round(pos_weight, 4),
+            "step_stride":    STEP_STRIDE,
             **{k: v for k, v in LGBM_PARAMS.items() if k != "verbose"},
         })
 
