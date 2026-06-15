@@ -114,6 +114,95 @@ def build_graph(
     return ToUndirected()(data), planet_idx
 
 
+_REACHES_KEY = ("planet_step", "reaches", "planet_step")
+
+
+class OrbitGNN(nn.Module):
+    def __init__(self, hidden_dim: int = 64, num_layers: int = 3):
+        super().__init__()
+        H = hidden_dim
+        self.hidden_dim = H
+
+        self.planet_proj      = nn.Linear(4, H, bias=False)
+        self.planet_step_proj = nn.Linear(9, H, bias=False)
+
+        self.convs = nn.ModuleList([
+            HeteroConv({
+                ("planet",      "has_snapshot",     "planet_step"): SAGEConv((H, H), H),
+                ("planet_step", "rev_has_snapshot", "planet"):      SAGEConv((H, H), H),
+                ("planet_step", "reaches",          "planet_step"): GATConv(
+                    (H, H), H, edge_dim=1, heads=1, add_self_loops=False
+                ),
+                ("planet_step", "rev_reaches",      "planet_step"): SAGEConv((H, H), H),
+            }, aggr="sum")
+            for _ in range(num_layers)
+        ])
+
+        self.pair_mlp = nn.Sequential(
+            nn.Linear(2 * H, H),
+            nn.ReLU(),
+            nn.Linear(H, H // 2),
+            nn.ReLU(),
+            nn.Linear(H // 2, 1),
+        )
+
+    def encode(self, data: HeteroData) -> torch.Tensor:
+        """Run message passing. Returns Planet node embeddings, shape (N_planets, H)."""
+        x_dict = {
+            "planet":      self.planet_proj(data["planet"].x),
+            "planet_step": self.planet_step_proj(data["planet_step"].x),
+        }
+        edge_index_dict = data.edge_index_dict
+        edge_attr_map: dict = {}
+        if _REACHES_KEY in edge_index_dict:
+            try:
+                attr = data[_REACHES_KEY].edge_attr
+            except AttributeError:
+                attr = None
+            if attr is not None:
+                edge_attr_map[_REACHES_KEY] = attr
+
+        for conv in self.convs:
+            x_dict = conv(x_dict, edge_index_dict, edge_attr_dict=edge_attr_map)
+            x_dict = {k: F.relu(v) for k, v in x_dict.items()}
+
+        return x_dict["planet"]  # (N_planets, H)
+
+    def score_pairs(
+        self,
+        h_planet: torch.Tensor,
+        src_idx: torch.Tensor,
+        tgt_idx: torch.Tensor,
+    ) -> torch.Tensor:
+        """Two-tower MLP scorer. Returns logits of shape (N_pairs,)."""
+        return self.pair_mlp(
+            torch.cat([h_planet[src_idx], h_planet[tgt_idx]], dim=-1)
+        ).squeeze(-1)
+
+
+def _test_orbit_gnn():
+    df_s_t = pl.DataFrame({
+        "id":         [0,     1,     0,     1    ],
+        "step":       [10,    10,    12,    12   ],
+        "x":          [30.0,  70.0,  30.1,  70.1 ],
+        "y":          [30.0,  70.0,  30.1,  70.1 ],
+        "ships":      [10,    5,     11,    5    ],
+        "owner":      [0,     1,     0,     1    ],
+        "production": [2,     1,     2,     1    ],
+        "nature":     ["fix", "fix", "fix", "fix"],
+    })
+    reach_t = pl.DataFrame({
+        "id_src": [0], "step_src": [10], "id": [1], "step": [12], "ships_sent": [4],
+    })
+    data, planet_idx = build_graph(df_s_t, reach_t)
+    model    = OrbitGNN(hidden_dim=8, num_layers=2)
+    h_planet = model.encode(data)
+    assert h_planet.shape == (2, 8), f"h_planet: {h_planet.shape}"
+    scores = model.score_pairs(h_planet, torch.tensor([0]), torch.tensor([1]))
+    assert scores.shape == (1,), f"scores: {scores.shape}"
+    print("_test_orbit_gnn PASSED")
+
+
 def _test_build_graph():
     df_s_t = pl.DataFrame({
         "id":         [0,     1,     0,     1    ],
@@ -147,3 +236,4 @@ def _test_build_graph():
 
 if __name__ == "__main__":
     _test_build_graph()
+    _test_orbit_gnn()
