@@ -118,4 +118,4 @@ Sections:
 3. `OrbitGNN(hidden_dim, num_layers)` — GNN + `pair_mlp` head
 4. `build_attack_pairs(df_s_t, actions_set, planet_idx)` — returns tensors of (src_idx, tgt_idx, label)
 5. `train_episode(ep_dir, model, optimizer)` — processes one episode
-6. `main()` — loads episodes, trains, saves weights
+6. `main()` — loads episodes, trains, saves weights to `117-NewGNN/` (e.g. `117-NewGNN/model_epoch{N}.pt`)
