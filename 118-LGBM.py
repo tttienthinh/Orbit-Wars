@@ -272,3 +272,93 @@ def _test_labels():
 
     print(f"_test_labels PASSED  rows={len(df)}  positives={n_pos}  "
           f"pos_rate={n_pos/len(df):.4f}")
+
+
+def main() -> None:
+    OUT_DIR.mkdir(exist_ok=True)
+
+    ep_dirs = sorted([d for d in PRECOMPUTE_DIR.iterdir() if d.is_dir()])
+    ep_ids  = [int(d.name) for d in ep_dirs]
+    random.seed(42)
+    random.shuffle(ep_ids)   # mix easy (low ID) and hard (high ID) in both sets
+
+    split      = int(TRAIN_RATIO * len(ep_ids))
+    train_dirs = [PRECOMPUTE_DIR / str(eid) for eid in ep_ids[:split]]
+    test_dirs  = [PRECOMPUTE_DIR / str(eid) for eid in ep_ids[split:]]
+    print(f"Episodes: {len(ep_ids)} total | {len(train_dirs)} train | {len(test_dirs)} test")
+
+    def build_dataset(dirs: list[Path], desc: str) -> tuple[np.ndarray, np.ndarray]:
+        frames: list[pl.DataFrame] = []
+        for d in tqdm(dirs, desc=desc):
+            try:
+                frame = build_episode_features(d)
+                if not frame.is_empty():
+                    frames.append(frame)
+            except Exception as e:
+                print(f"  {d.name} failed: {e}")
+        if not frames:
+            return (np.zeros((0, len(FEATURE_COLS)), dtype=np.float32),
+                    np.zeros(0, dtype=np.float32))
+        df = pl.concat(frames)
+        X = df.select(FEATURE_COLS).fill_null(float("nan")).to_numpy().astype(np.float32)
+        y = df["label"].to_numpy().astype(np.float32)
+        return X, y
+
+    X_train, y_train = build_dataset(train_dirs, "Train")
+    X_test,  y_test  = build_dataset(test_dirs,  "Test")
+
+    n_pos      = int(y_train.sum())
+    n_neg      = len(y_train) - n_pos
+    pos_weight = n_neg / max(n_pos, 1)
+    print(f"Train: {len(X_train)} pairs | {n_pos} pos | pos_weight={pos_weight:.1f}")
+    print(f"Test:  {len(X_test)} pairs  | {int(y_test.sum())} pos")
+
+    mlflow.set_experiment("118-LGBM")
+    with mlflow.start_run():
+        mlflow.log_params({
+            "train_ratio":    TRAIN_RATIO,
+            "train_episodes": len(train_dirs),
+            "test_episodes":  len(test_dirs),
+            "n_features":     len(FEATURE_COLS),
+            "pos_weight":     round(pos_weight, 4),
+            **{k: v for k, v in LGBM_PARAMS.items() if k != "verbose"},
+        })
+
+        model = LGBMClassifier(scale_pos_weight=pos_weight, **LGBM_PARAMS)
+        model.fit(X_train, y_train, feature_name=FEATURE_COLS)
+
+        train_auc = roc_auc_score(y_train, model.predict_proba(X_train)[:, 1])
+        test_auc  = roc_auc_score(y_test,  model.predict_proba(X_test)[:, 1])
+        pos_rate  = float(y_train.mean())
+
+        print(f"\nTrain AUC: {train_auc:.4f}  |  Test AUC: {test_auc:.4f}")
+
+        mlflow.log_metrics({
+            "train_auc":     train_auc,
+            "test_auc":      test_auc,
+            "n_train_pairs": len(X_train),
+            "n_test_pairs":  len(X_test),
+            "positive_rate": pos_rate,
+        })
+
+        model_path = OUT_DIR / "model.txt"
+        model.booster_.save_model(str(model_path))
+        mlflow.log_artifact(str(model_path))
+
+        importances = sorted(
+            zip(FEATURE_COLS, model.feature_importances_), key=lambda x: -x[1]
+        )
+        print("\nTop 20 features:")
+        for name, imp in importances[:20]:
+            print(f"  {name:<30s} {imp}")
+
+    print(f"\nDone. Model saved to {model_path}")
+
+
+if __name__ == "__main__":
+    _test_snap_features()
+    _test_travel_features()
+    _test_trajectory_features()
+    _test_labels()
+    print("\nAll tests passed. Starting training...\n")
+    main()
