@@ -106,21 +106,19 @@ def build_episode_features(ep_dir: Path) -> pl.DataFrame:
         reach_t    = reach.filter(pl.col("step_src") == t)
         reach_wide = (
             reach_t
-            .pivot(values="step", index=["id_src", "id"], columns="ships_sent",
+            .pivot(values="step", index=["id_src", "id"], on="ships_sent",
                    aggregate_function="first")
             .rename({"id": "id_tgt"})
         )
-        for s in REACH_POW2:
-            col = str(s)
-            new = f"travel_{s}"
-            if col in reach_wide.columns:
-                reach_wide = reach_wide.with_columns(
-                    ((pl.col(col) - t) / NB_STEPS_SIM).cast(pl.Float32).alias(new)
-                ).drop(col)
-            else:
-                reach_wide = reach_wide.with_columns(
-                    pl.lit(None).cast(pl.Float32).alias(new)
-                )
+        travel_exprs = [
+            ((pl.col(str(s)) - t) / NB_STEPS_SIM).cast(pl.Float32).alias(f"travel_{s}")
+            if str(s) in reach_wide.columns
+            else pl.lit(None).cast(pl.Float32).alias(f"travel_{s}")
+            for s in REACH_POW2
+        ]
+        reach_wide = reach_wide.with_columns(travel_exprs).select(
+            ["id_src", "id_tgt"] + [f"travel_{s}" for s in REACH_POW2]
+        )
         pairs = pairs.join(reach_wide, on=["id_src", "id_tgt"], how="left")
 
         step_dfs.append(pairs.with_columns(pl.lit(t).alias("game_step")))
