@@ -191,6 +191,20 @@ def build_episode_features(ep_dir: Path) -> pl.DataFrame:
                     pl.lit(0.0).cast(pl.Float32).alias(f"src_ships_t{i}"),
                 ])
 
+        # ── Labels: 1.0 if (t, id_src, id_tgt) was attacked, else 0.0 ────────
+        label_df = (
+            actions.filter(pl.col("game_step") == t)
+            .rename({"id": "id_tgt"})
+            .select(["id_src", "id_tgt"])
+            .unique()
+            .with_columns(pl.lit(1.0).cast(pl.Float32).alias("label"))
+        )
+        pairs = (
+            pairs
+            .join(label_df, on=["id_src", "id_tgt"], how="left")
+            .with_columns(pl.col("label").fill_null(0.0))
+        )
+
         step_dfs.append(pairs.with_columns(pl.lit(t).alias("game_step")))
 
     return pl.concat(step_dfs) if step_dfs else pl.DataFrame()
@@ -238,3 +252,23 @@ def _test_trajectory_features():
     assert df["tgt_ships_t0"].dtype == pl.Float32, "expected Float32"
     assert df["src_ships_t0"].dtype == pl.Float32, "expected Float32"
     print(f"_test_trajectory_features PASSED  rows={len(df)}")
+
+
+def _test_labels():
+    ep_dirs = sorted([d for d in PRECOMPUTE_DIR.iterdir() if d.is_dir()])
+    if not ep_dirs:
+        print("_test_labels SKIP"); return
+    df = build_episode_features(ep_dirs[0])
+
+    missing = [c for c in FEATURE_COLS if c not in df.columns]
+    assert not missing, f"Missing FEATURE_COLS: {missing}"
+
+    label_vals = set(df["label"].unique().to_list())
+    assert label_vals.issubset({0.0, 1.0}), f"Unexpected label values: {label_vals}"
+
+    n_pos = int(df["label"].sum())
+    assert n_pos > 0,       "Expected at least one positive label"
+    assert n_pos < len(df), "Expected at least one negative label"
+
+    print(f"_test_labels PASSED  rows={len(df)}  positives={n_pos}  "
+          f"pos_rate={n_pos/len(df):.4f}")
