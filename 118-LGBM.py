@@ -102,6 +102,27 @@ def build_episode_features(ep_dir: Path) -> pl.DataFrame:
         pairs = pairs.join(_snap_features(df_s_at_t, "id_src", "src_"), on="id_src", how="left")
         pairs = pairs.join(_snap_features(df_s_at_t, "id_tgt", "tgt_"), on="id_tgt", how="left")
 
+        # ── Travel time: pivot reach_t → one column per ships_sent ───────────
+        reach_t    = reach.filter(pl.col("step_src") == t)
+        reach_wide = (
+            reach_t
+            .pivot(values="step", index=["id_src", "id"], columns="ships_sent",
+                   aggregate_function="first")
+            .rename({"id": "id_tgt"})
+        )
+        for s in REACH_POW2:
+            col = str(s)
+            new = f"travel_{s}"
+            if col in reach_wide.columns:
+                reach_wide = reach_wide.with_columns(
+                    ((pl.col(col) - t) / NB_STEPS_SIM).cast(pl.Float32).alias(new)
+                ).drop(col)
+            else:
+                reach_wide = reach_wide.with_columns(
+                    pl.lit(None).cast(pl.Float32).alias(new)
+                )
+        pairs = pairs.join(reach_wide, on=["id_src", "id_tgt"], how="left")
+
         step_dfs.append(pairs.with_columns(pl.lit(t).alias("game_step")))
 
     return pl.concat(step_dfs) if step_dfs else pl.DataFrame()
@@ -123,3 +144,16 @@ def _test_snap_features():
     assert row1["src_is_moving"][0] == 1.0,  "is_moving wrong"
     assert row1["src_is_fix"][0]    == 0.0,  "is_fix wrong"
     print("_test_snap_features PASSED")
+
+
+def _test_travel_features():
+    ep_dirs = sorted([d for d in PRECOMPUTE_DIR.iterdir() if d.is_dir()])
+    if not ep_dirs:
+        print("_test_travel_features SKIP (no episodes)"); return
+    df = build_episode_features(ep_dirs[0])
+    assert "travel_1"    in df.columns, "missing travel_1"
+    assert "travel_1024" in df.columns, "missing travel_1024"
+    valid = df["travel_1"].drop_nulls()
+    assert (valid >= 0.0).all() and (valid <= 1.0).all(), \
+        f"travel_1 out of [0,1]: min={valid.min()}, max={valid.max()}"
+    print(f"_test_travel_features PASSED  rows={len(df)}  travel_1_non_null={len(valid)}")
