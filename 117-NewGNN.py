@@ -350,6 +350,51 @@ def _test_build_attack_pairs():
     print("_test_build_attack_pairs PASSED")
 
 
+def main() -> None:
+    OUT_DIR.mkdir(exist_ok=True)
+
+    ep_dirs = sorted([d for d in PRECOMPUTE_DIR.iterdir() if d.is_dir()])
+    ep_ids  = [int(d.name) for d in ep_dirs]
+    random.seed(42)
+    random.shuffle(ep_ids)
+
+    split      = int(TRAIN_RATIO * len(ep_ids))
+    train_ids  = set(ep_ids[:split])
+    train_dirs = [PRECOMPUTE_DIR / str(eid) for eid in ep_ids if eid in train_ids]
+
+    print(f"Episodes: {len(ep_ids)} total, {len(train_dirs)} train")
+
+    model     = OrbitGNN(hidden_dim=HIDDEN_DIM, num_layers=NUM_LAYERS)
+    optimizer = torch.optim.Adam(model.parameters(), lr=LR)
+
+    for epoch in range(1, N_EPOCHS + 1):
+        all_scores: list[float] = []
+        all_labels: list[float] = []
+        epoch_loss = 0.0
+
+        for ep_dir in train_dirs:
+            try:
+                loss, scores, labels = train_episode(ep_dir, model, optimizer)
+                epoch_loss += loss
+                all_scores.extend(scores)
+                all_labels.extend(labels)
+            except Exception as e:
+                print(f"  episode {ep_dir.name} failed: {e}")
+
+        avg_loss = epoch_loss / max(len(train_dirs), 1)
+        if len(set(all_labels)) > 1:
+            auc = roc_auc_score(all_labels, all_scores)
+        else:
+            auc = float("nan")
+
+        print(f"Epoch {epoch:3d}  loss={avg_loss:.4f}  train_auc={auc:.4f}")
+        ckpt = OUT_DIR / f"model_epoch{epoch}.pt"
+        torch.save(model.state_dict(), ckpt)
+        print(f"  → saved {ckpt}")
+
+    print(f"\nDone. Models saved to {OUT_DIR}/")
+
+
 def _test_build_graph():
     df_s_t = pl.DataFrame({
         "id":         [0,     1,     0,     1    ],
@@ -386,3 +431,5 @@ if __name__ == "__main__":
     _test_orbit_gnn()
     _test_build_attack_pairs()
     _test_train_episode()
+    print("\nAll tests passed. Starting training...\n")
+    main()
