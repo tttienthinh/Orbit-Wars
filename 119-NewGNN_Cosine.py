@@ -330,6 +330,67 @@ def train_episode(
     return total_loss / max(n_steps, 1), all_scores, all_labels
 
 
+def evaluate_episode(
+    ep_dir: Path,
+    model: OrbitGNN,
+) -> tuple[float, list[float], list[float]]:
+    """Evaluate one episode without gradients. Returns (avg_loss, scores, labels)."""
+    df_s    = pl.read_parquet(ep_dir / "df_s.parquet")
+    reach   = pl.read_parquet(ep_dir / "reach.parquet")
+    actions = pl.read_parquet(ep_dir / "actions.parquet")
+
+    reach = (
+        reach
+        .group_by(["id_src", "step_src", "id", "ships_sent"])
+        .agg(pl.all().sort_by("step").first())
+    )
+
+    actions_set: set[tuple[int, int, int]] = set(
+        zip(
+            actions["game_step"].to_list(),
+            actions["id_src"].to_list(),
+            actions["id"].to_list(),
+        )
+    )
+
+    all_scores: list[float] = []
+    all_labels: list[float] = []
+    total_loss = 0.0
+    n_steps    = 0
+
+    model.eval()
+    with torch.no_grad():
+        for t in sorted(reach["step_src"].unique().to_list()):
+            reach_t       = reach.filter(pl.col("step_src") == t)
+            arrival_steps = reach_t["step"].unique().to_list()
+            df_s_t        = df_s.filter(pl.col("step").is_in([t] + arrival_steps))
+            df_s_at_t     = df_s.filter(pl.col("step") == t)
+
+            if df_s_t.is_empty() or df_s_at_t.is_empty():
+                continue
+
+            data, planet_idx = build_graph(df_s_t, reach_t)
+            src_idx, tgt_idx, labels = build_attack_pairs(df_s_at_t, actions_set, planet_idx, t)
+
+            if len(src_idx) == 0:
+                continue
+
+            h_planet = model.encode(data)
+            logits   = model.score_pairs(h_planet, src_idx, tgt_idx)
+
+            n_pos      = labels.sum().item()
+            n_neg      = len(labels) - n_pos
+            pos_weight = torch.tensor([n_neg / max(n_pos, 1)], dtype=torch.float32)
+            loss       = F.binary_cross_entropy_with_logits(logits, labels, pos_weight=pos_weight)
+
+            total_loss += loss.item()
+            n_steps    += 1
+            all_scores.extend(torch.sigmoid(logits).tolist())
+            all_labels.extend(labels.tolist())
+
+    return total_loss / max(n_steps, 1), all_scores, all_labels
+
+
 def _test_orbit_gnn():
     df_s_t = pl.DataFrame({
         "id":         [0,     1,     0,     1    ],
