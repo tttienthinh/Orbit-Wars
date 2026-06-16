@@ -32,6 +32,8 @@ TEST_EPISODE_IDS = {
 TRANSFORMS         = ["identity", "rot90", "rot180", "rot270"]
 EPISODES_PER_EPOCH = 8   # pairs sampled per epoch from the pool of 534×4=2136
 
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 
 def build_graph(
     df_s_t: pl.DataFrame,
@@ -262,6 +264,7 @@ def train_episode(
     ep_dir: Path,
     model: OrbitGNN,
     transform: str = "identity",
+    device: torch.device = torch.device("cpu"),
 ) -> tuple[float, list[float], list[float]]:
     """Load one episode and accumulate gradients across all game steps.
 
@@ -311,12 +314,14 @@ def train_episode(
         if len(src_idx) == 0:
             continue
 
+        data   = data.to(device)
+        labels = labels.to(device)
         h_planet = model.encode(data)
-        logits   = model.score_pairs(h_planet, src_idx, tgt_idx)
+        logits   = model.score_pairs(h_planet, src_idx.to(device), tgt_idx.to(device))
 
         n_pos      = labels.sum().item()
         n_neg      = len(labels) - n_pos
-        pos_weight = torch.tensor([n_neg / max(n_pos, 1)], dtype=torch.float32)
+        pos_weight = torch.tensor([n_neg / max(n_pos, 1)], dtype=torch.float32, device=device)
         loss       = F.binary_cross_entropy_with_logits(logits, labels, pos_weight=pos_weight)
 
         loss.backward()  # accumulate gradients; caller steps optimizer once per episode
@@ -334,6 +339,7 @@ def train_episode(
 def evaluate_episode(
     ep_dir: Path,
     model: OrbitGNN,
+    device: torch.device = torch.device("cpu"),
 ) -> tuple[float, list[float], list[float]]:
     """Evaluate one episode without gradients. Returns (avg_loss, scores, labels)."""
     df_s    = pl.read_parquet(ep_dir / "df_s.parquet")
@@ -376,12 +382,14 @@ def evaluate_episode(
             if len(src_idx) == 0:
                 continue
 
+            data   = data.to(device)
+            labels = labels.to(device)
             h_planet = model.encode(data)
-            logits   = model.score_pairs(h_planet, src_idx, tgt_idx)
+            logits   = model.score_pairs(h_planet, src_idx.to(device), tgt_idx.to(device))
 
             n_pos      = labels.sum().item()
             n_neg      = len(labels) - n_pos
-            pos_weight = torch.tensor([n_neg / max(n_pos, 1)], dtype=torch.float32)
+            pos_weight = torch.tensor([n_neg / max(n_pos, 1)], dtype=torch.float32, device=device)
             loss       = F.binary_cross_entropy_with_logits(logits, labels, pos_weight=pos_weight)
 
             total_loss += loss.item()
@@ -498,12 +506,13 @@ def main() -> None:
     test_dirs  = [d for d in ep_dirs if int(d.name) in     TEST_EPISODE_IDS]
 
     pool_size = len(train_dirs) * len(TRANSFORMS)
+    _log(f"Device: {DEVICE}", log_fh)
     _log(f"Episodes: {len(ep_dirs)} total | train={len(train_dirs)} test={len(test_dirs)}", log_fh)
     _log(f"Pool: {pool_size} pairs | sample {EPISODES_PER_EPOCH}/epoch", log_fh)
 
     all_pairs = [(ep_dir, t) for ep_dir in train_dirs for t in TRANSFORMS]
 
-    model     = OrbitGNN(hidden_dim=HIDDEN_DIM, num_layers=NUM_LAYERS)
+    model     = OrbitGNN(hidden_dim=HIDDEN_DIM, num_layers=NUM_LAYERS).to(DEVICE)
     optimizer = torch.optim.AdamW(model.parameters(), lr=LR, weight_decay=WEIGHT_DECAY)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=N_EPOCHS, eta_min=1e-6)
 
@@ -537,7 +546,7 @@ def main() -> None:
             for ep_dir, transform in epoch_pairs:
                 try:
                     optimizer.zero_grad()
-                    loss, scores, labels = train_episode(ep_dir, model, transform)
+                    loss, scores, labels = train_episode(ep_dir, model, transform, DEVICE)
                     optimizer.step()
                     tr_loss_sum += loss
                     tr_steps    += 1
@@ -557,7 +566,7 @@ def main() -> None:
 
             for ep_dir in test_dirs:
                 try:
-                    loss, scores, labels = evaluate_episode(ep_dir, model)
+                    loss, scores, labels = evaluate_episode(ep_dir, model, DEVICE)
                     te_loss_sum += loss
                     te_steps    += 1
                     te_scores.extend(scores)
