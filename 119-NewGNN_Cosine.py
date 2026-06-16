@@ -644,6 +644,7 @@ if __name__ == "__main__":
     _test_build_graph()
     _test_orbit_gnn()
     _test_build_attack_pairs()
+    _test_apply_transform()
     _test_train_episode()
     print("\nAll tests passed. Starting training...\n")
     main()
