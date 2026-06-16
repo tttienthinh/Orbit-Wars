@@ -463,6 +463,23 @@ def _test_apply_transform():
     print("_test_apply_transform PASSED")
 
 
+def _compute_metrics(scores: list[float], labels: list[float]) -> dict:
+    """Compute ROC-AUC, accuracy, TP, TN, pos count, neg count at threshold 0.5."""
+    n_pos = int(sum(labels))
+    n_neg = len(labels) - n_pos
+
+    if len(set(labels)) > 1:
+        auc = roc_auc_score(labels, scores)
+    else:
+        auc = float("nan")
+
+    tp = int(sum(1 for s, l in zip(scores, labels) if s >= 0.5 and l == 1.0))
+    tn = int(sum(1 for s, l in zip(scores, labels) if s <  0.5 and l == 0.0))
+    acc = (tp + tn) / max(len(labels), 1)
+
+    return {"auc": auc, "acc": acc, "n_pos": n_pos, "n_neg": n_neg, "tp": tp, "tn": tn}
+
+
 def _log(msg: str, log_fh=None) -> None:
     """Print with flush and optionally mirror to an explicit log file."""
     print(msg, flush=True)
