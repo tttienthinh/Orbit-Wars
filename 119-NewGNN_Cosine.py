@@ -29,7 +29,8 @@ TEST_EPISODE_IDS = {
     79126912, 79175592, 79228392, 79320069,
 }
 
-TRANSFORMS = ["identity", "rot90", "rot180", "rot270"]
+TRANSFORMS         = ["identity", "rot90", "rot180", "rot270"]
+EPISODES_PER_EPOCH = 8   # pairs sampled per epoch from the pool of 534×4=2136
 
 
 def build_graph(
@@ -496,9 +497,9 @@ def main() -> None:
     train_dirs = [d for d in ep_dirs if int(d.name) not in TEST_EPISODE_IDS]
     test_dirs  = [d for d in ep_dirs if int(d.name) in     TEST_EPISODE_IDS]
 
-    n_pairs = len(train_dirs) * len(TRANSFORMS)
+    pool_size = len(train_dirs) * len(TRANSFORMS)
     _log(f"Episodes: {len(ep_dirs)} total | train={len(train_dirs)} test={len(test_dirs)}", log_fh)
-    _log(f"Pairs/epoch: {len(train_dirs)} × {len(TRANSFORMS)} = {n_pairs} (all, shuffled)", log_fh)
+    _log(f"Pool: {pool_size} pairs | sample {EPISODES_PER_EPOCH}/epoch", log_fh)
 
     all_pairs = [(ep_dir, t) for ep_dir in train_dirs for t in TRANSFORMS]
 
@@ -519,13 +520,13 @@ def main() -> None:
             "train_episodes":  len(train_dirs),
             "test_episodes":   len(test_dirs),
             "transforms":      len(TRANSFORMS),
-            "pairs_per_epoch": n_pairs,
+            "pool_size":         pool_size,
+            "episodes_per_epoch": EPISODES_PER_EPOCH,
         })
 
         for epoch in range(1, N_EPOCHS + 1):
             # ── Training ────────────────────────────────────────────────────
-            epoch_pairs = all_pairs.copy()
-            random.shuffle(epoch_pairs)
+            epoch_pairs = random.sample(all_pairs, EPISODES_PER_EPOCH)
 
             tr_scores: list[float] = []
             tr_labels: list[float] = []
