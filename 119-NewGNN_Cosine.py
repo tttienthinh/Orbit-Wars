@@ -489,112 +489,123 @@ def _log(msg: str, log_fh=None) -> None:
 
 
 def main() -> None:
-    import sys
     OUT_DIR.mkdir(exist_ok=True)
+    log_fh = open(OUT_DIR / "metrics.log", "a", encoding="utf-8")
 
-    # Open an explicit log file so output is captured regardless of buffering
-    log_path = OUT_DIR / "metrics.log"
-    log_fh   = open(log_path, "a", encoding="utf-8")
+    ep_dirs    = sorted([d for d in PRECOMPUTE_DIR.iterdir() if d.is_dir()])
+    train_dirs = [d for d in ep_dirs if int(d.name) not in TEST_EPISODE_IDS]
+    test_dirs  = [d for d in ep_dirs if int(d.name) in     TEST_EPISODE_IDS]
 
-    ep_dirs = sorted([d for d in PRECOMPUTE_DIR.iterdir() if d.is_dir()])
-    ep_ids  = [int(d.name) for d in ep_dirs]
+    n_pairs = len(train_dirs) * len(TRANSFORMS)
+    _log(f"Episodes: {len(ep_dirs)} total | train={len(train_dirs)} test={len(test_dirs)}", log_fh)
+    _log(f"Pairs/epoch: {len(train_dirs)} × {len(TRANSFORMS)} = {n_pairs} (all, shuffled)", log_fh)
 
-    train_ids  = set(eid for eid in ep_ids if eid not in TEST_EPISODE_IDS)
-    test_ids   = set(eid for eid in ep_ids if eid in TEST_EPISODE_IDS)
-    train_dirs = [PRECOMPUTE_DIR / str(eid) for eid in ep_ids if eid in train_ids]
-    test_dirs  = [PRECOMPUTE_DIR / str(eid) for eid in ep_ids if eid in test_ids]
-
-    _log(f"Episodes: {len(ep_ids)} total, {len(train_dirs)} train, {len(test_dirs)} test", log_fh)
+    all_pairs = [(ep_dir, t) for ep_dir in train_dirs for t in TRANSFORMS]
 
     model     = OrbitGNN(hidden_dim=HIDDEN_DIM, num_layers=NUM_LAYERS)
     optimizer = torch.optim.AdamW(model.parameters(), lr=LR, weight_decay=WEIGHT_DECAY)
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=N_EPOCHS)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=N_EPOCHS, eta_min=1e-6)
+
+    best_test_auc = float("-inf")
 
     mlflow.set_experiment("119-NewGNN_Cosine")
     with mlflow.start_run():
         mlflow.log_params({
-            "hidden_dim":     HIDDEN_DIM,
-            "num_layers":     NUM_LAYERS,
-            "lr":             LR,
-            "weight_decay":   WEIGHT_DECAY,
-            "n_epochs":       N_EPOCHS,
-            "nb_steps_sim":   NB_STEPS_SIM,
-            "total_episodes": len(ep_ids),
-            "train_episodes": len(train_dirs),
-            "test_episodes":  len(test_dirs),
-            "transforms":     str(TRANSFORMS),
+            "hidden_dim":      HIDDEN_DIM,
+            "num_layers":      NUM_LAYERS,
+            "lr":              LR,
+            "weight_decay":    WEIGHT_DECAY,
+            "n_epochs":        N_EPOCHS,
+            "train_episodes":  len(train_dirs),
+            "test_episodes":   len(test_dirs),
+            "transforms":      len(TRANSFORMS),
+            "pairs_per_epoch": n_pairs,
         })
 
         for epoch in range(1, N_EPOCHS + 1):
-            all_scores: list[float] = []
-            all_labels: list[float] = []
-            epoch_loss = 0.0
+            # ── Training ────────────────────────────────────────────────────
+            epoch_pairs = all_pairs.copy()
+            random.shuffle(epoch_pairs)
 
-            for ep_dir in train_dirs:
+            tr_scores: list[float] = []
+            tr_labels: list[float] = []
+            tr_loss_sum = 0.0
+            tr_steps    = 0
+
+            model.train()
+            for ep_dir, transform in epoch_pairs:
                 try:
                     optimizer.zero_grad()
-                    loss, scores, labels = train_episode(ep_dir, model)
+                    loss, scores, labels = train_episode(ep_dir, model, transform)
                     optimizer.step()
-                    epoch_loss += loss
-                    all_scores.extend(scores)
-                    all_labels.extend(labels)
+                    tr_loss_sum += loss
+                    tr_steps    += 1
+                    tr_scores.extend(scores)
+                    tr_labels.extend(labels)
                 except Exception as e:
-                    _log(f"  episode {ep_dir.name} failed: {e}", log_fh)
+                    _log(f"  SKIP train {ep_dir.name}/{transform}: {e}", log_fh)
 
             scheduler.step()
+            current_lr = scheduler.get_last_lr()[0]
 
-            n_train    = max(len(train_dirs), 1)
-            avg_loss   = epoch_loss / n_train
-            n_pairs    = len(all_labels)
-            n_pos      = int(sum(all_labels))
-            pos_rate   = n_pos / max(n_pairs, 1)
+            # ── Test evaluation ─────────────────────────────────────────────
+            te_scores: list[float] = []
+            te_labels: list[float] = []
+            te_loss_sum = 0.0
+            te_steps    = 0
 
-            if len(set(all_labels)) > 1:
-                train_auc = roc_auc_score(all_labels, all_scores)
-            else:
-                train_auc = float("nan")
+            for ep_dir in test_dirs:
+                try:
+                    loss, scores, labels = evaluate_episode(ep_dir, model)
+                    te_loss_sum += loss
+                    te_steps    += 1
+                    te_scores.extend(scores)
+                    te_labels.extend(labels)
+                except Exception as e:
+                    _log(f"  SKIP test  {ep_dir.name}: {e}", log_fh)
 
-            # ── Test evaluation ───────────────────────────────────────────────
-            test_scores: list[float] = []
-            test_labels: list[float] = []
-            model.eval()
-            with torch.no_grad():
-                for ep_dir in test_dirs:
-                    try:
-                        _, scores, labels = train_episode(ep_dir, model)
-                        test_scores.extend(scores)
-                        test_labels.extend(labels)
-                    except Exception as e:
-                        _log(f"  test episode {ep_dir.name} failed: {e}", log_fh)
-            model.train()
+            # ── Metrics ─────────────────────────────────────────────────────
+            avg_tr = tr_loss_sum / max(tr_steps, 1)
+            avg_te = te_loss_sum / max(te_steps, 1)
+            tr_m   = _compute_metrics(tr_scores, tr_labels)
+            te_m   = _compute_metrics(te_scores, te_labels)
 
-            if len(set(test_labels)) > 1:
-                test_auc = roc_auc_score(test_labels, test_scores)
-            else:
-                test_auc = float("nan")
+            def _fmt(m: dict, loss: float) -> str:
+                auc = f"{m['auc']:.4f}" if not math.isnan(m['auc']) else "  nan"
+                return (f"loss={loss:.4f}  auc={auc}  acc={m['acc']:.4f}"
+                        f"  pos={m['n_pos']}  neg={m['n_neg']}  tp={m['tp']}  tn={m['tn']}")
 
-            line = (f"Epoch {epoch:3d}  loss={avg_loss:.4f}"
-                    f"  train_auc={train_auc:.4f}  test_auc={test_auc:.4f}"
-                    f"  pairs={n_pairs}  pos={n_pos}  pos_rate={pos_rate:.4f}"
-                    f"  lr={scheduler.get_last_lr()[0]:.6f}")
-            _log(line, log_fh)
+            _log(f"Epoch {epoch:3d}  lr={current_lr:.2e}", log_fh)
+            _log(f"  [train] {_fmt(tr_m, avg_tr)}", log_fh)
+            _log(f"  [test]  {_fmt(te_m, avg_te)}", log_fh)
 
             mlflow.log_metrics({
-                "train_loss":    avg_loss,
-                "train_auc":     train_auc if not math.isnan(train_auc) else 0.0,
-                "test_auc":      test_auc  if not math.isnan(test_auc)  else 0.0,
-                "n_pairs":       n_pairs,
-                "n_positives":   n_pos,
-                "positive_rate": pos_rate,
-                "lr":            scheduler.get_last_lr()[0],
+                "train_loss": avg_tr,
+                "train_auc":  tr_m["auc"]  if not math.isnan(tr_m["auc"])  else 0.0,
+                "train_acc":  tr_m["acc"],
+                "train_tp":   tr_m["tp"],
+                "train_tn":   tr_m["tn"],
+                "test_loss":  avg_te,
+                "test_auc":   te_m["auc"]  if not math.isnan(te_m["auc"])  else 0.0,
+                "test_acc":   te_m["acc"],
+                "test_tp":    te_m["tp"],
+                "test_tn":    te_m["tn"],
+                "lr":         current_lr,
             }, step=epoch)
 
+            # ── Checkpoints ─────────────────────────────────────────────────
             ckpt = OUT_DIR / f"model_epoch{epoch}.pt"
             torch.save(model.state_dict(), ckpt)
             mlflow.log_artifact(str(ckpt), artifact_path="checkpoints")
             _log(f"  -> saved {ckpt}", log_fh)
 
-    _log(f"\nDone. Models saved to {OUT_DIR}/", log_fh)
+            if not math.isnan(te_m["auc"]) and te_m["auc"] > best_test_auc:
+                best_test_auc = te_m["auc"]
+                best_path = OUT_DIR / "best_model.pt"
+                torch.save(model.state_dict(), best_path)
+                _log(f"  -> NEW BEST test_auc={best_test_auc:.4f}  saved {best_path}", log_fh)
+
+    _log(f"\nDone. Best test AUC: {best_test_auc:.4f}  Models in {OUT_DIR}/", log_fh)
     log_fh.close()
 
 
