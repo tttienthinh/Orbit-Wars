@@ -234,9 +234,33 @@ def build_attack_pairs(
     )
 
 
+def _apply_transform(df_s: pl.DataFrame, transform: str) -> pl.DataFrame:
+    """Apply a board rotation to the x/y columns of df_s. Sun at (50,50) is preserved."""
+    if transform == "identity":
+        return df_s
+    elif transform == "rot90":
+        return df_s.with_columns([
+            (100.0 - pl.col("y")).alias("x"),
+            pl.col("x").alias("y"),
+        ])
+    elif transform == "rot180":
+        return df_s.with_columns([
+            (100.0 - pl.col("x")).alias("x"),
+            (100.0 - pl.col("y")).alias("y"),
+        ])
+    elif transform == "rot270":
+        return df_s.with_columns([
+            pl.col("y").alias("x"),
+            (100.0 - pl.col("x")).alias("y"),
+        ])
+    else:
+        raise ValueError(f"Unknown transform: {transform!r}")
+
+
 def train_episode(
     ep_dir: Path,
     model: OrbitGNN,
+    transform: str = "identity",
 ) -> tuple[float, list[float], list[float]]:
     """Load one episode and accumulate gradients across all game steps.
 
@@ -248,6 +272,7 @@ def train_episode(
     df_s    = pl.read_parquet(ep_dir / "df_s.parquet")
     reach   = pl.read_parquet(ep_dir / "reach.parquet")
     actions = pl.read_parquet(ep_dir / "actions.parquet")
+    df_s = _apply_transform(df_s, transform)
 
     # Keep earliest arrival step per (id_src, step_src, id, ships_sent)
     reach = (
@@ -357,6 +382,24 @@ def _test_build_attack_pairs():
     assert len(src_idx) == 2,           f"expected 2 pairs, got {len(src_idx)}"
     assert labels.sum().item() == 1.0,  f"expected 1 positive, got {labels.sum()}"
     print("_test_build_attack_pairs PASSED")
+
+
+def _test_apply_transform():
+    df = pl.DataFrame({"x": [0.0, 100.0, 50.0], "y": [0.0, 100.0, 50.0],
+                       "id": [0, 1, 2], "step": [1, 1, 1]})
+    # rot90: new_x = 100-y, new_y = x
+    r = _apply_transform(df, "rot90")
+    assert r["x"].to_list() == [100.0, 0.0, 50.0], r["x"].to_list()
+    assert r["y"].to_list() == [0.0, 100.0, 50.0], r["y"].to_list()
+    # rot180: new_x = 100-x, new_y = 100-y
+    r = _apply_transform(df, "rot180")
+    assert r["x"].to_list() == [100.0, 0.0, 50.0], r["x"].to_list()
+    assert r["y"].to_list() == [100.0, 0.0, 50.0], r["y"].to_list()
+    # rot270: new_x = y, new_y = 100-x
+    r = _apply_transform(df, "rot270")
+    assert r["x"].to_list() == [0.0, 100.0, 50.0], r["x"].to_list()
+    assert r["y"].to_list() == [100.0, 0.0, 50.0], r["y"].to_list()
+    print("_test_apply_transform PASSED")
 
 
 def _log(msg: str, log_fh=None) -> None:
