@@ -35,14 +35,14 @@ Replace the monolithic `df_s` table with a cleaner normalized schema that separa
 |---|---|---|
 | `id` | Int64 | planet id |
 | `step` | Int64 | obs game_step (when observation was recorded) |
-| `future_step` | Int64 | simulated future step, `future_step ∈ [step+1, step+20]` |
+| `future_step` | Int64 | simulated future step, `future_step ∈ [step, step+20]` |
 | `ships` | Int64 | ships at `future_step` per fresh sim from `step` |
 | `owner` | Int64 | owner at `future_step` per fresh sim from `step` |
 
-- 20 rows per `(id, obs_step)`.
+- 21 rows per `(id, obs_step)` (future_step = step, step+1, … step+20).
 - Each obs game_step restarts the simulation independently (`deepcopy(obs)` in `_01_get_obs_dataframe`).
 - Simulation uses no actions (`[[], []]`), so ships/owner reflect passive evolution.
-- Source: tag each `df_s_full` slice with `game_step`, filter `future_step > game_step`.
+- Source: tag each `df_s_full` slice with `game_step`, keep all future_step ≥ game_step.
 
 ---
 
@@ -102,7 +102,7 @@ planete_parts.append(df_s_full.select(["id", "step", "x", "y", "production", "na
 
 planete_step_parts.append(
     df_s_full.select(["id", "step", "ships", "owner"])
-    .filter(pl.col("step") > game_step)
+    .filter(pl.col("step") >= game_step)
     .with_columns(pl.lit(game_step).cast(pl.Int64).alias("obs"))
     .rename({"obs": "step", "step": "future_step"})
     .select(["id", "step", "future_step", "ships", "owner"])

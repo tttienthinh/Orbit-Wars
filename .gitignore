@@ -5,6 +5,10 @@
 110-replays
 113-precompute
 114-precompute
+126-precompute
+119-NewGNN_autoresearch
+119-NewGNN_Cosine
+123-NewGNN_Cosine_finishTraining
 
 # Nested git repo — add as submodule if you want it tracked
 orbit-wars-lab/
