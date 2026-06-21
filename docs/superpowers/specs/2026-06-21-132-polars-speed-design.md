@@ -68,16 +68,24 @@ def agent(obs):
 
 **Position formula per planet type:**
 
-| Type | Formula |
-|------|---------|
-| orbiting | `θ = θ₀ + ω × (game_step − 1)`; `x = 50 + r·cos(θ)`, `y = 50 + r·sin(θ)` |
-| fixed | constant `(x₀, y₀)` — cached once, never evicted |
-| comet | `comet_paths[id][game_step]` if in range, else planet is expired |
+| Type | k=0 (current step) | k≥1 (future steps) |
+|------|--------------------|--------------------|
+| orbiting | `obs.planets[id].(x,y)` | `θ = θ₀ + ω × (T+k−1)`; `x = 50 + r·cos(θ)`, `y = 50 + r·sin(θ)` |
+| fixed | `obs.planets[id].(x,y)` | same constant `(x₀, y₀)` — cached once, never evicted |
+| comet | `obs.planets[id].(x,y)` | `comet_paths[id][obs_path_index + k]` if in range, else expired |
 
-> **Critical:** The formula uses `game_step − 1` (not `game_step`). At step 1 the planet has
-> not yet rotated from its initial position. This matches the interpreter's behaviour where
-> `interpreter(sim, [], step=T)` applies `θ₀ + ω × T`, which is the planet position AFTER
-> advancing from step T to T+1, i.e. the position recorded at i=1 (game_step T+1) in df_s.
+> **Critical — orbiting formula:** Uses `T+k−1`, not `T+k`. The interpreter called with
+> `step=T` applies `θ₀ + ω × T`, which sets the planet position AFTER advancing step T→T+1.
+> This position is recorded at i=1 (game_step T+1 = T+k where k=1), giving
+> `θ = θ₀ + ω × T = θ₀ + ω × (T+1−1)`. ✓
+>
+> **Critical — comet indexing:** Comets use a `path_index` that advances by 1 each step.
+> At i=0, obs already has the current `path_index` (call it `idx`); after interpreter step k,
+> the comet is at `path[idx + k]`. So position at game_step T+k = `path[idx + k]` where
+> `idx = group["path_index"]` from `obs.comets` at the start of this agent call.
+> The rolling cache stores `_pos_window[(comet_id, T+k)] = path[idx + k]`, which is
+> consistent across calls because at step T+1 the new `idx` = old `idx + 1` and
+> `path[(idx+1) + (k-1)] = path[idx + k]`. ✓
 
 ### Fleet arrival cache
 
