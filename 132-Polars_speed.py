@@ -787,6 +787,11 @@ class GameCache:
         self._init_planet_meta(obs)
         self._pos_window: dict = {}
         self._fill_pos_window(obs, step)
+        self._fleet_arrival: dict = {}
+        fleets = obs.fleets if hasattr(obs, "fleets") else obs["fleets"]
+        for fleet in fleets:
+            fid = fleet[0]
+            self._fleet_arrival[fid] = self._compute_fleet_arrival(fleet, step)
 
     # ── Planet metadata ───────────────────────────────────────────────────────
 
@@ -910,6 +915,17 @@ class GameCache:
         old_step = self.step
         self.step = step
 
+        # Fleet arrival cache: evict departed fleets, compute new ones
+        fleets = obs.fleets if hasattr(obs, "fleets") else obs["fleets"]
+        current_fleet_ids = {f[0] for f in fleets}
+        for fid in list(self._fleet_arrival.keys()):
+            if fid not in current_fleet_ids:
+                del self._fleet_arrival[fid]
+        for fleet in fleets:
+            fid = fleet[0]
+            if fid not in self._fleet_arrival:
+                self._fleet_arrival[fid] = self._compute_fleet_arrival(fleet, step)
+
         # Sync expired comets; evict their window entries
         current_comet_pids = set(obs.comet_planet_ids if hasattr(obs, "comet_planet_ids") else obs["comet_planet_ids"])
         for pid in list(self._comet_pid_set - current_comet_pids):
@@ -944,7 +960,8 @@ class GameCache:
 
         arrivals_by_step = {}
         for fleet in fleets:
-            arrival = self._compute_fleet_arrival(fleet, current_step)
+            fid = fleet[0]
+            arrival = self._fleet_arrival.get(fid)
             if arrival is not None:
                 planet_id, arrival_step = arrival
                 arrivals_by_step.setdefault(arrival_step, []).append((fleet, planet_id))
