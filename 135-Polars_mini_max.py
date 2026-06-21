@@ -291,6 +291,19 @@ def evaluate(obs, player_id: int) -> tuple:
     return (my_prod - opp_prod, my_ships - opp_ships)
 
 
+def _simulate(obs, move, n_steps: int, start_step: int,
+              num_agents: int, player_id: int):
+    sim = copy.deepcopy(obs)
+    actions = [[] for _ in range(num_agents)]
+    if move is not None:
+        actions[player_id] = [move]
+    interpreter(sim, actions, start_step, num_agents)
+    no_actions = [[] for _ in range(num_agents)]
+    for k in range(1, n_steps):
+        interpreter(sim, no_actions, start_step + k, num_agents)
+    return sim
+
+
 # ── Strategy pipeline (Polars-based) ─────────────────────────────────────────
 class StrategyPipeline:
     @staticmethod
