@@ -678,8 +678,121 @@ class StrategyPipeline:
 
     @staticmethod
     def _04_minimax_search(safe_lf: pl.LazyFrame, obs, cache, player_id: int) -> list:
-        # stub — replace in Task 5
-        return []
+        attacks_with_angle = safe_lf.collect()
+        moves_out = []
+
+        # ── Comet evasion (preserved from original _04) ───────────────────
+        if not attacks_with_angle.is_empty():
+            awa_comets = attacks_with_angle.filter(pl.col("nature_src") == "comet")
+            if not awa_comets.is_empty():
+                x_off = (awa_comets["x_src"] - GameConfig.CENTER).abs().max() or 0
+                y_off = (awa_comets["y_src"] - GameConfig.CENTER).abs().max() or 0
+                if max(x_off, y_off) > 45:
+                    moves_out += [list(r) for r in (
+                        awa_comets
+                        .sort(["ships_sent", "step"], descending=[True, False])
+                        .group_by("id_src", maintain_order=True)
+                        .first()
+                        .select(["id_src", "final_angle", "ships_sent"])
+                        .rows()
+                    )]
+                    id_to_avoid = awa_comets["id_src"].unique().to_list()
+                    attacks_with_angle = attacks_with_angle.filter(
+                        ~pl.col("id_src").is_in(id_to_avoid)
+                    )
+
+        # ── Step-0 candidates: top-5 per source (plus "do nothing") ──────
+        NB_STEPS_5 = 5
+        num_agents   = cache.num_agents
+        current_step = cache.step
+
+        step0_candidates = [None]  # None means "do nothing"
+        if not attacks_with_angle.is_empty():
+            top5_df = (
+                attacks_with_angle
+                .sort(["step", "ships_sent"])
+                .group_by(["id_src", "id"], maintain_order=True)
+                .first()
+                .sort(["step", "ships_sent"])
+                .group_by("id_src", maintain_order=True)
+                .head(5)
+            )
+            for row in top5_df.select(["id_src", "final_angle", "ships_sent"]).iter_rows():
+                step0_candidates.append(list(row))
+
+        # ── Base cache: "do nothing" → step-5 candidate table ────────────
+        obs_base5 = _simulate(obs, None, NB_STEPS_5, current_step, num_agents, player_id)
+        df_s5_base, pd5_base = build_df_s_n(
+            cache, obs_base5, current_step + NB_STEPS_5, NB_STEPS_5
+        )
+        pa5_base   = StrategyPipeline._02_get_all_opportunities(df_s5_base, pd5_base, player_id)
+        safe5_base = StrategyPipeline._03_filter_collision(pa5_base).collect()
+
+        base_planets5 = {
+            p[0]: (p[1], p[5])
+            for p in (obs_base5.planets if hasattr(obs_base5, "planets") else obs_base5["planets"])
+        }
+
+        best_score: tuple | None = None
+        best_c0 = None
+
+        for c0 in step0_candidates:
+            # Simulate this step-0 candidate to step 5
+            obs_c5 = _simulate(obs, c0, NB_STEPS_5, current_step, num_agents, player_id)
+            c5_planets = obs_c5.planets if hasattr(obs_c5, "planets") else obs_c5["planets"]
+
+            # Detect which of MY planets changed (ownership or ship count)
+            changed_ids: set = set()
+            for p in c5_planets:
+                pid, owner = p[0], p[1]
+                if owner != player_id:
+                    continue
+                base = base_planets5.get(pid)
+                if base is None or base[0] != owner or base[1] != p[5]:
+                    changed_ids.add(pid)
+
+            # Build merged step-5 candidate table
+            if changed_ids:
+                df_s5_c, pd5_c = build_df_s_n(
+                    cache, obs_c5, current_step + NB_STEPS_5, NB_STEPS_5
+                )
+                pa5_c   = StrategyPipeline._02_get_all_opportunities(df_s5_c, pd5_c, player_id)
+                safe5_c = StrategyPipeline._03_filter_collision(pa5_c).collect()
+
+                changed_list = list(changed_ids)
+                new_rows  = safe5_c.filter(pl.col("id_src").is_in(changed_list)) if not safe5_c.is_empty() else safe5_c
+                keep_rows = safe5_base.filter(~pl.col("id_src").is_in(changed_list)) if not safe5_base.is_empty() else safe5_base
+                parts = [df for df in [keep_rows, new_rows] if not df.is_empty()]
+                merged5 = pl.concat(parts) if parts else pl.DataFrame()
+            else:
+                merged5 = safe5_base
+
+            # Enumerate step-5 candidates (plus "do nothing")
+            step5_candidates = [None]
+            if not merged5.is_empty():
+                for row in merged5.select(["id_src", "final_angle", "ships_sent"]).iter_rows():
+                    step5_candidates.append(list(row))
+
+            # Evaluate each leaf
+            best_score_5: tuple | None = None
+            for c5 in step5_candidates:
+                obs_leaf = _simulate(
+                    obs_c5, c5, NB_STEPS_5, current_step + NB_STEPS_5, num_agents, player_id
+                )
+                score = evaluate(obs_leaf, player_id)
+                if best_score_5 is None or score > best_score_5:
+                    best_score_5 = score
+
+            if best_score is None or best_score_5 > best_score:
+                best_score  = best_score_5
+                best_c0     = c0
+
+        if best_c0 is not None:
+            moves_out.append(best_c0)
+
+        if moves_out:
+            print(f"Minimax best move: {moves_out[-1]}  score={best_score}")
+        return moves_out
 
     @staticmethod
     def _04_score_and_decide(safe_lf: pl.LazyFrame, player_id: int) -> list:
