@@ -304,6 +304,110 @@ def _simulate(obs, move, n_steps: int, start_step: int,
     return sim
 
 
+def build_df_s_n(cache, obs, current_step: int, nb_steps: int):
+    planets = obs.planets if hasattr(obs, "planets") else obs["planets"]
+    fleets  = obs.fleets  if hasattr(obs, "fleets")  else obs["fleets"]
+
+    ship_state  = {p[0]: p[5] for p in planets}
+    owner_state = {p[0]: p[1] for p in planets}
+    production  = {p[0]: p[6] for p in planets}
+    radius_map  = {p[0]: p[4] for p in planets}
+
+    arrivals_by_step = {}
+    for fleet in fleets:
+        fid     = fleet[0]
+        arrival = cache._fleet_arrival.get(fid)
+        if arrival is None:
+            arrival = cache._compute_fleet_arrival(fleet, current_step)
+        if arrival is not None:
+            planet_id, arrival_step = arrival
+            arrivals_by_step.setdefault(arrival_step, []).append((fleet, planet_id))
+
+    rows = []
+    for k in range(nb_steps + 1):
+        game_step = current_step + k
+        for pid in list(ship_state.keys()):
+            pos = cache._planet_pos(pid, game_step)
+            if pos is None:
+                continue
+            x, y = pos
+            meta = cache._planet_meta.get(pid)
+            if meta is None:
+                continue
+            rows.append({
+                "step": game_step,
+                "id": pid,
+                "x": x,
+                "y": y,
+                "radius": radius_map[pid],
+                "ships": ship_state[pid],
+                "production": production[pid],
+                "owner": owner_state[pid],
+                "nature": meta["nature"],
+            })
+
+        if k == nb_steps:
+            break
+
+        new_ships = dict(ship_state)
+        new_owner = dict(owner_state)
+        for pid, owner in owner_state.items():
+            if owner != -1:
+                new_ships[pid] += production[pid]
+
+        planet_arrivals = {}
+        for fleet, planet_id in arrivals_by_step.get(game_step, []):
+            if planet_id in ship_state:
+                planet_arrivals.setdefault(planet_id, []).append(fleet)
+
+        for planet_id, fleet_list in planet_arrivals.items():
+            player_ships = {}
+            for fleet in fleet_list:
+                fowner = fleet[1]
+                player_ships[fowner] = player_ships.get(fowner, 0) + fleet[6]
+            sorted_players = sorted(player_ships.items(), key=lambda x: x[1], reverse=True)
+            top_player, top_ships = sorted_players[0]
+            if len(sorted_players) > 1:
+                second_ships = sorted_players[1][1]
+                survivor_ships = 0 if sorted_players[0][1] == sorted_players[1][1] else top_ships - second_ships
+                survivor_owner = top_player if survivor_ships > 0 else -1
+            else:
+                survivor_owner = top_player
+                survivor_ships = top_ships
+            if survivor_ships > 0:
+                if new_owner[planet_id] == survivor_owner:
+                    new_ships[planet_id] += survivor_ships
+                else:
+                    new_ships[planet_id] -= survivor_ships
+                    if new_ships[planet_id] < 0:
+                        new_owner[planet_id] = survivor_owner
+                        new_ships[planet_id] = abs(new_ships[planet_id])
+
+        ship_state  = new_ships
+        owner_state = new_owner
+
+    df_s = pl.DataFrame(rows).sort("step")
+    prev_pos = (
+        df_s.lazy()
+        .select(["id", "step", "x", "y"])
+        .rename({"x": "x_prev", "y": "y_prev"})
+        .with_columns((pl.col("step") + 1).alias("step"))
+    )
+    planet_disp = (
+        df_s.lazy()
+        .select(["id", "step", "x", "y"])
+        .join(prev_pos, on=["id", "step"], how="left")
+        .with_columns(
+            ((pl.col("x") - pl.col("x_prev").fill_null(pl.col("x"))).pow(2) +
+             (pl.col("y") - pl.col("y_prev").fill_null(pl.col("y"))).pow(2)
+            ).sqrt().alias("planet_disp")
+        )
+        .select(["id", "step", "planet_disp"])
+        .collect()
+    )
+    return df_s, planet_disp
+
+
 # ── Strategy pipeline (Polars-based) ─────────────────────────────────────────
 class StrategyPipeline:
     @staticmethod
