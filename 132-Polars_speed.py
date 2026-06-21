@@ -785,6 +785,8 @@ class GameCache:
         self.player_id = player_id
         self.angular_velocity = obs.angular_velocity if hasattr(obs, "angular_velocity") else obs["angular_velocity"]
         self._init_planet_meta(obs)
+        self._pos_window: dict = {}
+        self._fill_pos_window(obs, step)
 
     # ── Planet metadata ───────────────────────────────────────────────────────
 
@@ -824,7 +826,19 @@ class GameCache:
                 meta["pos"] = (x, y)
             self._planet_meta[pid] = meta
 
-    def _planet_pos(self, pid: int, game_step: int):
+    def _fill_pos_window(self, obs, step: int):
+        planets = obs.planets if hasattr(obs, "planets") else obs["planets"]
+        for p in planets:
+            pid = p[0]
+            self._pos_window[(pid, step)] = (p[2], p[3])
+        for k in range(1, GameConfig.NB_STEPS_SIM + 2):
+            game_step = step + k
+            for pid in self._planet_meta:
+                pos = self._planet_pos_analytical(pid, game_step)
+                if pos is not None:
+                    self._pos_window[(pid, game_step)] = pos
+
+    def _planet_pos_analytical(self, pid: int, game_step: int):
         meta = self._planet_meta.get(pid)
         if meta is None:
             return None
@@ -842,6 +856,12 @@ class GameCache:
         if 0 <= comet_idx < len(path):
             return (path[comet_idx][0], path[comet_idx][1])
         return None
+
+    def _planet_pos(self, pid: int, game_step: int):
+        cached = self._pos_window.get((pid, game_step))
+        if cached is not None:
+            return cached
+        return self._planet_pos_analytical(pid, game_step)
 
     # ── Fleet arrival (computed fresh each call) ──────────────────────────────
 
@@ -887,13 +907,29 @@ class GameCache:
     # ── Advance ───────────────────────────────────────────────────────────────
 
     def advance(self, obs, step: int):
+        old_step = self.step
         self.step = step
+
+        # Sync expired comets; evict their window entries
         current_comet_pids = set(obs.comet_planet_ids if hasattr(obs, "comet_planet_ids") else obs["comet_planet_ids"])
         for pid in list(self._comet_pid_set - current_comet_pids):
             self._planet_meta.pop(pid, None)
             self._comet_path_by_pid.pop(pid, None)
             self._comet_idx_by_pid.pop(pid, None)
+            for s in range(old_step, old_step + GameConfig.NB_STEPS_SIM + 3):
+                self._pos_window.pop((pid, s), None)
         self._comet_pid_set = current_comet_pids
+
+        # Evict the just-passed step from the window
+        for pid in self._planet_meta:
+            self._pos_window.pop((pid, old_step), None)
+
+        # Add the new far-end step
+        new_step = step + GameConfig.NB_STEPS_SIM + 1
+        for pid in self._planet_meta:
+            pos = self._planet_pos_analytical(pid, new_step)
+            if pos is not None:
+                self._pos_window[(pid, new_step)] = pos
 
     # ── Build df_s analytically ───────────────────────────────────────────────
 
