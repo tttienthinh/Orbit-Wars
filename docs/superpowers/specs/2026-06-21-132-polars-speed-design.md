@@ -167,21 +167,35 @@ agent(obs)
   └─ moves   = _04_score_and_decide(safe_lf, player_id)                  [unchanged]
 ```
 
+## Implementation Strategy
+
+Implement in small incremental steps. **After each step**, run a symmetry match before
+proceeding. Never move to the next step with a failing symmetry check.
+
+**Incremental steps:**
+1. Bundle globals into `GameCache` skeleton — no logic change, pass-through to original `_01_`
+2. Implement analytical ships/owner timeline (no fleet cache, no position window yet)
+3. Add rolling position window (positions now served from cache instead of interpreter)
+4. Add fleet arrival cache (fleet arrivals precomputed instead of per-step swept_pair)
+
 ## Correctness Verification
 
-Exact match is required on all outputs. Verification is done in three layers:
+**Symmetry match gate (after each step):** Run `92-90-Polars.py` (player 0) vs
+`132-Polars_speed.py` (player 1) using orbit-wars-lab on a symmetric starting board.
+Since both agents run identical logic, player 1's actions must be the mirror image of
+player 0's actions at every step. Any divergence means the latest change introduced a bug.
 
-1. **DataFrame-level**: Run both agents on the same obs sequence from a saved Kaggle episode.
-   Assert `df_s` DataFrames are equal row-by-row (positions, ships, owner, nature columns).
+Exact match is required on all outputs. Verification layers:
 
-2. **Moves-level**: Shadow-run both agents for a full 500-step game on a local replay.
-   Assert `moves` lists are identical at every step.
+1. **Symmetry match**: Run in orbit-wars-lab after each implementation step (see above).
 
-3. **Kaggle env**: Submit `132-Polars_speed.py` and compare episode replays against
-   `92-90-Polars.py` replays — same decisions at every step confirms correct output.
+2. **DataFrame-level**: Run both agents on the same obs sequence and assert `df_s` rows
+   match (positions, ships, owner, nature columns) — confirms intermediate output equality.
+
+3. **Kaggle env**: Submit and compare episode replays against `92-90-Polars.py` episodes.
 
 **Key correctness checks:**
-- Position formula: `θ₀ + ω × (step − 1)` not `× step`
+- Position formula: `θ₀ + ω × (T+k−1)` not `× (T+k)`
 - Production before combat (not after)
 - Expired comets evicted from both pos_window and fleet_arrival
 - Fixed planets never evicted from pos_window
