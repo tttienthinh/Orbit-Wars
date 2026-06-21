@@ -784,12 +784,223 @@ class GameCache:
         self.num_agents = num_agents
         self.player_id = player_id
         self.angular_velocity = obs.angular_velocity if hasattr(obs, "angular_velocity") else obs["angular_velocity"]
+        self._init_planet_meta(obs)
 
-    def advance(self, step: int):
+    # ── Planet metadata ───────────────────────────────────────────────────────
+
+    def _init_planet_meta(self, obs):
+        self._comet_pid_set = set(obs.comet_planet_ids if hasattr(obs, "comet_planet_ids") else obs["comet_planet_ids"])
+
+        self._comet_path_by_pid = {}
+        self._comet_idx_by_pid = {}
+        comets = obs.comets if hasattr(obs, "comets") else obs["comets"]
+        for group in comets:
+            for i, pid in enumerate(group["planet_ids"]):
+                self._comet_path_by_pid[pid] = group["paths"][i]
+                self._comet_idx_by_pid[pid] = group["path_index"]
+
+        initial_planets = obs.initial_planets if hasattr(obs, "initial_planets") else obs["initial_planets"]
+        initial_by_id = {p[0]: p for p in initial_planets}
+
+        self._planet_meta = {}
+        planets = obs.planets if hasattr(obs, "planets") else obs["planets"]
+        for p in planets:
+            pid, owner, x, y, radius, ships, production = p[0], p[1], p[2], p[3], p[4], p[5], p[6]
+            r = math.hypot(x - CENTER, y - CENTER)
+            if pid in self._comet_pid_set:
+                nature = "comet"
+            elif r + radius < ROTATION_RADIUS_LIMIT:
+                nature = "moving"
+            else:
+                nature = "fix"
+            meta = {"nature": nature, "radius": radius, "production": production}
+            if nature == "moving":
+                ip = initial_by_id.get(pid)
+                if ip is not None:
+                    dx, dy = ip[2] - CENTER, ip[3] - CENTER
+                    meta["r"] = math.sqrt(dx * dx + dy * dy)
+                    meta["theta0"] = math.atan2(dy, dx)
+            elif nature == "fix":
+                meta["pos"] = (x, y)
+            self._planet_meta[pid] = meta
+
+    def _planet_pos(self, pid: int, game_step: int):
+        meta = self._planet_meta.get(pid)
+        if meta is None:
+            return None
+        nature = meta["nature"]
+        if nature == "moving":
+            theta = meta["theta0"] + self.angular_velocity * (game_step - 1)
+            return (CENTER + meta["r"] * math.cos(theta), CENTER + meta["r"] * math.sin(theta))
+        if nature == "fix":
+            return meta["pos"]
+        path = self._comet_path_by_pid.get(pid)
+        idx = self._comet_idx_by_pid.get(pid)
+        if path is None or idx is None:
+            return None
+        comet_idx = idx + (game_step - self.step)
+        if 0 <= comet_idx < len(path):
+            return (path[comet_idx][0], path[comet_idx][1])
+        return None
+
+    # ── Fleet arrival (computed fresh each call) ──────────────────────────────
+
+    def _compute_fleet_arrival(self, fleet, current_step: int):
+        _, owner, fx, fy, angle, src_id, ships = fleet
+        speed = PhysicsEngine.fleet_speed(ships)
+        dx_f = math.cos(angle) * speed
+        dy_f = math.sin(angle) * speed
+
+        non_comet_pids = [pid for pid in self._planet_meta if pid not in self._comet_pid_set]
+        comet_pids = list(self._comet_pid_set)
+
+        for k in range(GameConfig.NB_STEPS_SIM):
+            f_old = (fx + k * dx_f, fy + k * dy_f)
+            f_new = (fx + (k + 1) * dx_f, fy + (k + 1) * dy_f)
+            game_step = current_step + k
+
+            for pid in non_comet_pids:
+                p_old = self._planet_pos(pid, game_step)
+                p_new = self._planet_pos(pid, game_step + 1)
+                if p_old is None or p_new is None:
+                    continue
+                radius = self._planet_meta[pid]["radius"]
+                if PhysicsEngine.swept_pair_hit(f_old, f_new, p_old, p_new, radius):
+                    return (pid, game_step)
+
+            if not (0 <= f_new[0] <= BOARD_SIZE and 0 <= f_new[1] <= BOARD_SIZE):
+                return None
+            if PhysicsEngine.point_to_segment_distance((CENTER, CENTER), f_old, f_new) < SUN_RADIUS:
+                return None
+
+            for pid in comet_pids:
+                c_old = self._planet_pos(pid, game_step)
+                c_new = self._planet_pos(pid, game_step + 1)
+                if c_old is None or c_new is None:
+                    continue
+                radius = self._planet_meta[pid]["radius"]
+                if PhysicsEngine.point_to_segment_distance(f_new, c_old, c_new) < radius:
+                    return (pid, game_step)
+
+        return None
+
+    # ── Advance ───────────────────────────────────────────────────────────────
+
+    def advance(self, obs, step: int):
         self.step = step
+        current_comet_pids = set(obs.comet_planet_ids if hasattr(obs, "comet_planet_ids") else obs["comet_planet_ids"])
+        for pid in list(self._comet_pid_set - current_comet_pids):
+            self._planet_meta.pop(pid, None)
+            self._comet_path_by_pid.pop(pid, None)
+            self._comet_idx_by_pid.pop(pid, None)
+        self._comet_pid_set = current_comet_pids
 
-    def build_df_s(self, obs, step: int):
-        return StrategyPipeline._01_get_obs_dataframe(obs, step, self.num_agents)
+    # ── Build df_s analytically ───────────────────────────────────────────────
+
+    def build_df_s(self, obs, current_step: int):
+        planets = obs.planets if hasattr(obs, "planets") else obs["planets"]
+        fleets = obs.fleets if hasattr(obs, "fleets") else obs["fleets"]
+
+        ship_state = {p[0]: p[5] for p in planets}
+        owner_state = {p[0]: p[1] for p in planets}
+        production = {p[0]: p[6] for p in planets}
+        radius_map = {p[0]: p[4] for p in planets}
+
+        arrivals_by_step = {}
+        for fleet in fleets:
+            arrival = self._compute_fleet_arrival(fleet, current_step)
+            if arrival is not None:
+                planet_id, arrival_step = arrival
+                arrivals_by_step.setdefault(arrival_step, []).append((fleet, planet_id))
+
+        rows = []
+        for k in range(GameConfig.NB_STEPS_SIM + 1):
+            game_step = current_step + k
+
+            for pid in list(ship_state.keys()):
+                pos = self._planet_pos(pid, game_step)
+                if pos is None:
+                    continue
+                x, y = pos
+                meta = self._planet_meta.get(pid)
+                if meta is None:
+                    continue
+                rows.append({
+                    "step": game_step,
+                    "id": pid,
+                    "x": x,
+                    "y": y,
+                    "radius": radius_map[pid],
+                    "ships": ship_state[pid],
+                    "production": production[pid],
+                    "owner": owner_state[pid],
+                    "nature": meta["nature"],
+                })
+
+            if k == GameConfig.NB_STEPS_SIM:
+                break
+
+            # Production before combat (matches interpreter order)
+            new_ships = dict(ship_state)
+            new_owner = dict(owner_state)
+            for pid, owner in owner_state.items():
+                if owner != -1:
+                    new_ships[pid] += production[pid]
+
+            planet_arrivals = {}
+            for fleet, planet_id in arrivals_by_step.get(game_step, []):
+                if planet_id in ship_state:
+                    planet_arrivals.setdefault(planet_id, []).append(fleet)
+
+            for planet_id, fleet_list in planet_arrivals.items():
+                player_ships = {}
+                for fleet in fleet_list:
+                    fowner = fleet[1]
+                    player_ships[fowner] = player_ships.get(fowner, 0) + fleet[6]
+                sorted_players = sorted(player_ships.items(), key=lambda x: x[1], reverse=True)
+                top_player, top_ships = sorted_players[0]
+                if len(sorted_players) > 1:
+                    second_ships = sorted_players[1][1]
+                    if sorted_players[0][1] == sorted_players[1][1]:
+                        survivor_ships = 0
+                    else:
+                        survivor_ships = top_ships - second_ships
+                    survivor_owner = top_player if survivor_ships > 0 else -1
+                else:
+                    survivor_owner = top_player
+                    survivor_ships = top_ships
+                if survivor_ships > 0:
+                    if new_owner[planet_id] == survivor_owner:
+                        new_ships[planet_id] += survivor_ships
+                    else:
+                        new_ships[planet_id] -= survivor_ships
+                        if new_ships[planet_id] < 0:
+                            new_owner[planet_id] = survivor_owner
+                            new_ships[planet_id] = abs(new_ships[planet_id])
+
+            ship_state = new_ships
+            owner_state = new_owner
+
+        df_s = pl.DataFrame(rows).sort("step")
+        prev_pos = (
+            df_s.lazy()
+            .select(["id", "step", "x", "y"])
+            .rename({"x": "x_prev", "y": "y_prev"})
+            .with_columns((pl.col("step") + 1).alias("step"))
+        )
+        planet_disp = (
+            df_s.lazy()
+            .select(["id", "step", "x", "y"])
+            .join(prev_pos, on=["id", "step"], how="left")
+            .with_columns(
+                ((pl.col("x") - pl.col("x_prev").fill_null(pl.col("x"))).pow(2) +
+                 (pl.col("y") - pl.col("y_prev").fill_null(pl.col("y"))).pow(2)
+                ).sqrt().alias("planet_disp")
+            )
+            .select(["id", "step", "planet_disp"])
+            .collect()
+        )
+        return df_s, planet_disp
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────
@@ -807,7 +1018,7 @@ def agent(obs):
         player_id = obs.get("player", 0) if isinstance(obs, dict) else obs.player
         CACHE = GameCache(obs, step=0, num_agents=num_agents, player_id=player_id)
     else:
-        CACHE.advance(CACHE.step + 1)
+        CACHE.advance(obs, CACHE.step + 1)
     df_s, planet_disp = CACHE.build_df_s(obs, CACHE.step)
     pa_lf = StrategyPipeline._02_get_all_opportunities(df_s, planet_disp, CACHE.player_id)
     safe_lf = StrategyPipeline._03_filter_collision(pa_lf)
