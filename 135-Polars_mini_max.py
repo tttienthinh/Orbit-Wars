@@ -268,6 +268,29 @@ def interpreter(obs, actions, step, num_agents=2):
     return obs1
 
 
+def evaluate(obs, player_id: int) -> tuple:
+    planets = obs.planets if hasattr(obs, "planets") else obs["planets"]
+    fleets  = obs.fleets  if hasattr(obs, "fleets")  else obs["fleets"]
+
+    opponents = {p[1] for p in planets if p[1] not in (-1, player_id)}
+    opponents |= {f[1] for f in fleets  if f[1] not in (-1, player_id)}
+
+    my_prod  = sum(p[6] for p in planets if p[1] == player_id)
+    my_ships = (sum(p[5] for p in planets if p[1] == player_id)
+              + sum(f[6] for f in fleets  if f[1] == player_id))
+
+    if not opponents:
+        return (my_prod, my_ships)
+
+    opp_prod  = max(sum(p[6] for p in planets if p[1] == opp) for opp in opponents)
+    opp_ships = max(
+        sum(p[5] for p in planets if p[1] == opp)
+      + sum(f[6] for f in fleets  if f[1] == opp)
+        for opp in opponents
+    )
+    return (my_prod - opp_prod, my_ships - opp_ships)
+
+
 # ── Strategy pipeline (Polars-based) ─────────────────────────────────────────
 class StrategyPipeline:
     @staticmethod
