@@ -301,6 +301,150 @@ class StrategyPipeline:
             .with_columns(pl.col("angle").alias("final_angle"))
         )
 
+    @staticmethod
+    def _04_minimax_search(safe_lf: pl.LazyFrame, obs, board: "Board") -> list:
+        NB_STEPS_5   = 5
+        player_id    = board.player_id
+        current_step = board.step
+
+        attacks_with_angle = safe_lf.collect()
+        moves_out: list = []
+
+        # ── Comet evasion (unchanged from 137) ───────────────────────────
+        if not attacks_with_angle.is_empty():
+            awa_comets = attacks_with_angle.filter(pl.col("nature_src") == "comet")
+            if not awa_comets.is_empty():
+                x_off = (awa_comets["x_src"] - GameConfig.CENTER).abs().max() or 0
+                y_off = (awa_comets["y_src"] - GameConfig.CENTER).abs().max() or 0
+                if max(x_off, y_off) > 45:
+                    moves_out += [list(r) for r in (
+                        awa_comets
+                        .sort(["ships_sent", "step"], descending=[True, False])
+                        .group_by("id_src", maintain_order=True)
+                        .first()
+                        .select(["id_src", "final_angle", "ships_sent"])
+                        .rows()
+                    )]
+                    id_to_avoid = awa_comets["id_src"].unique().to_list()
+                    attacks_with_angle = attacks_with_angle.filter(
+                        ~pl.col("id_src").is_in(id_to_avoid)
+                    )
+
+        # ── Step-0 candidates (include id_tgt and step_tgt) ──────────────
+        step0_candidates: list = [(None, None, None)]  # (move, tgt_id, step_tgt)
+        if not attacks_with_angle.is_empty():
+            top5_df = (
+                attacks_with_angle
+                .sort(["step", "ships_sent"])
+                .group_by(["id_src", "id"], maintain_order=True)
+                .first()
+                .sort(["step", "ships_sent"])
+                .group_by("id_src", maintain_order=True)
+                .head(5)
+            )
+            for row in top5_df.select(["id_src", "id", "step", "final_angle", "ships_sent"]).iter_rows():
+                src_id, tgt_id, step_tgt, angle, ships = row
+                step0_candidates.append(([src_id, angle, ships], tgt_id, step_tgt))
+
+        # ── Baseline: df_ships at step NB_STEPS_5 (do nothing at step 0) ─
+        df_ships_base5 = board.df_planete_ships  # covers step 0..10
+        step5_from = current_step + NB_STEPS_5
+        df_s5_base, pd5_base = board.build_df_s_slice(df_ships_base5, step_from=step5_from)
+        pa5_base   = StrategyPipeline._02_get_all_opportunities(df_s5_base, pd5_base, player_id)
+        safe5_base = StrategyPipeline._03_filter_collision(pa5_base).collect()
+
+        # c5 candidates: [id_src, id_tgt, step_tgt, angle, ships_sent]
+        c5_candidates_base: list = [None]
+        if not safe5_base.is_empty():
+            for row in safe5_base.select(["id_src", "id", "step", "final_angle", "ships_sent"]).iter_rows():
+                src, tgt, st, ang, sh = row
+                c5_candidates_base.append([src, tgt, st, ang, sh])
+
+        horizon_base = board.extract_horizon_dict(df_ships_base5)
+
+        top3_scored: list = []
+        for c5 in c5_candidates_base:
+            sim = None if c5 is None else (c5[0], c5[1], c5[2], c5[4])
+            score = board._evaluate_dict(board._apply_sim_fleet(horizon_base, sim), player_id)
+            top3_scored.append((score, c5))
+        top3_scored.sort(key=lambda x: x[0], reverse=True)
+        top3_c5_base = [c5 for _, c5 in top3_scored[:3]]
+        best_score   = top3_scored[0][0] if top3_scored else None
+        best_c0      = None
+
+        # ── Per c0 candidate ──────────────────────────────────────────────
+        for c0_move, c0_tgt_id, c0_step_tgt in step0_candidates[1:]:
+
+            df_ships_c0 = board._recompute_from_sim(
+                df_ships_base5, c0_move, c0_tgt_id, c0_step_tgt
+            )
+
+            # changed-ids shortcut (same as 137)
+            base_at5 = {
+                row["id"]: (row["owner"], row["ships"])
+                for row in df_ships_base5.filter(
+                    pl.col("step") == current_step + NB_STEPS_5
+                ).iter_rows(named=True)
+            }
+            c0_at5 = {
+                row["id"]: (row["owner"], row["ships"])
+                for row in df_ships_c0.filter(
+                    pl.col("step") == current_step + NB_STEPS_5
+                ).iter_rows(named=True)
+            }
+            changed_ids = {
+                pid for pid, (owner, ships) in c0_at5.items()
+                if base_at5.get(pid) != (owner, ships)
+            }
+
+            if changed_ids:
+                df_s5_c, pd5_c = board.build_df_s_slice(df_ships_c0, step_from=step5_from)
+                pa5_c   = StrategyPipeline._02_get_all_opportunities(df_s5_c, pd5_c, player_id)
+                safe5_c = StrategyPipeline._03_filter_collision(pa5_c).collect()
+
+                changed_list = list(changed_ids)
+                new_rows  = safe5_c.filter(pl.col("id_src").is_in(changed_list)) if not safe5_c.is_empty() else safe5_c
+                keep_rows = safe5_base.filter(~pl.col("id_src").is_in(changed_list)) if not safe5_base.is_empty() else safe5_base
+                parts = [df for df in [keep_rows, new_rows] if not df.is_empty()]
+                merged5 = pl.concat(parts) if parts else pl.DataFrame()
+            else:
+                merged5 = safe5_base
+
+            src_id = c0_move[0]
+            covered_srcs = {src_id}
+            if c0_tgt_id is not None:
+                covered_srcs.add(c0_tgt_id)
+
+            restricted: list = [None]
+            if not merged5.is_empty():
+                for filt, col in [("id_src", "id_src"), ("id", "id_src")]:
+                    sub = merged5.filter(pl.col(filt).is_in(list(covered_srcs)))
+                    for row in sub.select(["id_src", "id", "step", "final_angle", "ships_sent"]).iter_rows():
+                        src, tgt, st, ang, sh = row
+                        restricted.append([src, tgt, st, ang, sh])
+
+            for c5 in top3_c5_base:
+                if c5 is not None and c5[0] not in covered_srcs:
+                    restricted.append(c5)
+                    break
+
+            horizon_c0  = board.extract_horizon_dict(df_ships_c0)
+            best_score5 = None
+            for c5 in restricted:
+                sim = None if c5 is None else (c5[0], c5[1], c5[2], c5[4])
+                score = board._evaluate_dict(board._apply_sim_fleet(horizon_c0, sim), player_id)
+                if best_score5 is None or score > best_score5:
+                    best_score5 = score
+
+            if best_score is None or (best_score5 is not None and best_score5 > best_score):
+                best_score = best_score5
+                best_c0    = c0_move
+
+        if best_c0 is not None:
+            moves_out.append(best_c0)
+            print(f"Minimax best move: {best_c0}  score={best_score}")
+        return moves_out
+
 
 def _combat_step(planet_arrivals: dict, ship_state: dict, owner_state: dict):
     """Resolve combat for all planets with arriving fleets this step.
@@ -779,7 +923,27 @@ BOARD: "Board | None" = None
 
 
 def agent(obs):
-    raise NotImplementedError
+    global BOARD
+    step = obs.get("step", 0) if isinstance(obs, dict) else getattr(obs, "step", 0)
+    print(f"Agent called step={step} "
+          f"remainingOverageTime={obs.get('remainingOverageTime', 0) if isinstance(obs, dict) else 0}")
+
+    if BOARD is None:
+        initial = obs.initial_planets if hasattr(obs, "initial_planets") else obs["initial_planets"]
+        owners  = {p[1] for p in initial if p[1] != -1}
+        num_agents = 4 if len(owners) > 2 else 2
+        player_id  = obs.get("player", 0) if isinstance(obs, dict) else obs.player
+        BOARD = Board(obs, step=step, num_agents=num_agents, player_id=player_id)
+    else:
+        BOARD.advance(obs, step=step)
+
+    BOARD.build_base_ships(obs)
+
+    df_s, planet_disp = BOARD.build_df_s_slice(BOARD.df_planete_ships, step_from=step)
+    pa_lf   = StrategyPipeline._02_get_all_opportunities(df_s, planet_disp, BOARD.player_id)
+    safe_lf = StrategyPipeline._03_filter_collision(pa_lf)
+    moves   = StrategyPipeline._04_minimax_search(safe_lf, obs, BOARD)
+    return moves
 
 
 if __name__ == "__main__":
@@ -953,3 +1117,24 @@ if __name__ == "__main__":
     assert base_tgt_6_owner == 1, "Base df must be immutable"
 
     print("Task 6 PASSED")
+
+    # ── Task 7: agent() smoke test ────────────────────────────────────────
+    import time as _time
+
+    # Reset global board so agent() initialises fresh
+    BOARD = None
+    obs_a = _make_obs()
+    t0 = _time.time()
+    result = agent(obs_a)
+    elapsed = _time.time() - t0
+
+    print(f"agent() -> {result}")
+    print(f"elapsed: {elapsed:.3f}s")
+
+    assert isinstance(result, list), "agent must return a list"
+    for move in result:
+        assert len(move) == 3, f"move must be [id_src, angle, ships]: {move}"
+    assert elapsed < 5.0, f"too slow: {elapsed:.3f}s"
+
+    print("Task 7 PASSED")
+    print("Smoke test PASSED.")
