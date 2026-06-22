@@ -303,7 +303,105 @@ class StrategyPipeline:
 
 
 class Board:
-    pass  # implemented in later tasks
+    def __init__(self, obs, step: int, num_agents: int, player_id: int):
+        self.step = step
+        self.num_agents = num_agents
+        self.player_id = player_id
+        self.angular_velocity = obs.angular_velocity if hasattr(obs, "angular_velocity") else obs["angular_velocity"]
+
+        self._init_nature_and_pos(obs)
+        self.df_fleet = pl.DataFrame(schema={
+            "id": pl.Int64, "owner": pl.Int64, "ships": pl.Int64,
+            "id_tgt": pl.Int64, "step_tgt": pl.Int64,
+        })
+        self.df_fleet_sim = pl.DataFrame(schema={
+            "id_src": pl.Int64, "step_src": pl.Int64, "ships_sent": pl.Int64,
+            "owner": pl.Int64, "id_tgt": pl.Int64, "step_tgt": pl.Int64,
+        })
+        self.df_planete_ships = pl.DataFrame(schema={
+            "id": pl.Int64, "step": pl.Int64, "ships": pl.Int64,
+            "owner": pl.Int64, "recompute": pl.Boolean,
+        })
+
+    def _init_nature_and_pos(self, obs):
+        planets  = obs.planets         if hasattr(obs, "planets")         else obs["planets"]
+        initial  = obs.initial_planets if hasattr(obs, "initial_planets") else obs["initial_planets"]
+        comets   = obs.comets          if hasattr(obs, "comets")          else obs["comets"]
+        cpids    = obs.comet_planet_ids if hasattr(obs, "comet_planet_ids") else obs["comet_planet_ids"]
+
+        self._comet_pid_set = set(cpids)
+        self._comet_path_by_pid: dict = {}
+        self._comet_idx_by_pid:  dict = {}
+        for group in comets:
+            for i, pid in enumerate(group["planet_ids"]):
+                self._comet_path_by_pid[pid] = group["paths"][i]
+                self._comet_idx_by_pid[pid]  = group["path_index"]
+
+        initial_by_id = {p[0]: p for p in initial}
+        nature_rows = []
+        for p in planets:
+            pid, owner, x, y, radius, ships, production = p[0], p[1], p[2], p[3], p[4], p[5], p[6]
+            r = math.hypot(x - CENTER, y - CENTER)
+            if pid in self._comet_pid_set:
+                nature = "comet"
+            elif r + radius < ROTATION_RADIUS_LIMIT:
+                nature = "moving"
+            else:
+                nature = "fix"
+            nature_rows.append({"id": pid, "radius": radius, "production": production, "nature": nature})
+
+        self._planet_meta: dict = {}
+        for row in nature_rows:
+            pid = row["id"]
+            meta: dict = {"nature": row["nature"]}
+            if row["nature"] == "moving":
+                ip = initial_by_id.get(pid)
+                if ip is not None:
+                    dx, dy = ip[2] - CENTER, ip[3] - CENTER
+                    meta["r"]      = math.sqrt(dx * dx + dy * dy)
+                    meta["theta0"] = math.atan2(dy, dx)
+            elif row["nature"] == "fix":
+                p_obj = next(pp for pp in planets if pp[0] == pid)
+                meta["pos"] = (p_obj[2], p_obj[3])
+            meta["radius"] = row["radius"]
+            self._planet_meta[pid] = meta
+
+        self.df_planete_nature = pl.DataFrame(
+            nature_rows,
+            schema={"id": pl.Int64, "radius": pl.Float64, "production": pl.Int64, "nature": pl.Utf8},
+        )
+
+        # Build initial position window: steps self.step .. self.step+NB_STEPS_SIM
+        pos_rows = []
+        for pid in self._planet_meta:
+            for k in range(GameConfig.NB_STEPS_SIM + 1):
+                game_step = self.step + k
+                pos = self._planet_pos_analytical(pid, game_step)
+                if pos is not None:
+                    pos_rows.append({"id": pid, "step": game_step, "x": pos[0], "y": pos[1]})
+        self.df_planete_pos = pl.DataFrame(
+            pos_rows,
+            schema={"id": pl.Int64, "step": pl.Int64, "x": pl.Float64, "y": pl.Float64},
+        )
+
+    def _planet_pos_analytical(self, pid: int, game_step: int):
+        meta = self._planet_meta.get(pid)
+        if meta is None:
+            return None
+        nature = meta["nature"]
+        if nature == "moving":
+            theta = meta["theta0"] + self.angular_velocity * (game_step - 1)
+            return (CENTER + meta["r"] * math.cos(theta), CENTER + meta["r"] * math.sin(theta))
+        if nature == "fix":
+            return meta["pos"]
+        path = self._comet_path_by_pid.get(pid)
+        idx  = self._comet_idx_by_pid.get(pid)
+        if path is None or idx is None:
+            return None
+        comet_idx = idx + (game_step - self.step)
+        if 0 <= comet_idx < len(path):
+            return (path[comet_idx][0], path[comet_idx][1])
+        return None
 
 
 BOARD: "Board | None" = None
@@ -318,9 +416,11 @@ if __name__ == "__main__":
     from types import SimpleNamespace
 
     def _make_obs():
+        # Planet 0: r=20, radius=31 → r+radius=51 >= 50 → "fix" (static)
+        # Planet 1 and 2 are "moving" (orbiting)
         planets = [
-            [0, 0, 30.0, 50.0, 5.0, 100, 2],
-            [1, 1, 70.0, 50.0, 5.0,  20, 2],
+            [0, 0, 30.0, 50.0, 31.0, 100, 2],
+            [1, 1, 70.0, 50.0, 5.0,   20, 2],
             [2, -1, 50.0, 20.0, 4.0,   0, 1],
         ]
         return SimpleNamespace(
@@ -335,4 +435,26 @@ if __name__ == "__main__":
         )
 
     obs0 = _make_obs()
-    print("Scaffold OK — Board and agent are stubs.")
+    board = Board(obs0, step=0, num_agents=2, player_id=0)
+
+    # df_planete_nature
+    assert board.df_planete_nature.shape == (3, 4), \
+        f"Expected (3,4), got {board.df_planete_nature.shape}"
+    assert set(board.df_planete_nature.columns) == {"id", "radius", "production", "nature"}
+    natures = dict(zip(
+        board.df_planete_nature["id"].to_list(),
+        board.df_planete_nature["nature"].to_list(),
+    ))
+    assert natures[0] == "fix", f"Planet 0 should be fix, got {natures[0]}"
+
+    # df_planete_pos: 3 planets × 11 steps = 33 rows
+    assert board.df_planete_pos.shape[0] == 33, \
+        f"Expected 33 pos rows, got {board.df_planete_pos.shape[0]}"
+    assert board.df_planete_pos["step"].min() == 0
+    assert board.df_planete_pos["step"].max() == 10
+
+    # _planet_pos_analytical for a static planet returns constant position
+    pos0 = board._planet_pos_analytical(0, 5)
+    assert pos0 == (30.0, 50.0), f"Expected (30.0, 50.0), got {pos0}"
+
+    print("Task 2 PASSED")
