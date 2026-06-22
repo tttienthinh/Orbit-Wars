@@ -302,6 +302,37 @@ class StrategyPipeline:
         )
 
 
+def _combat_step(planet_arrivals: dict, ship_state: dict, owner_state: dict):
+    """Resolve combat for all planets with arriving fleets this step.
+
+    planet_arrivals: {pid: [(owner, ships), ...]}
+    Modifies ship_state and owner_state in place. Same formula as 1_29_3.py.
+    """
+    for planet_id, fleet_list in planet_arrivals.items():
+        player_ships: dict = {}
+        for fowner, fships in fleet_list:
+            player_ships[fowner] = player_ships.get(fowner, 0) + fships
+        if not player_ships:
+            continue
+        sorted_players = sorted(player_ships.items(), key=lambda x: x[1], reverse=True)
+        top_player, top_ships = sorted_players[0]
+        if len(sorted_players) > 1:
+            second_ships = sorted_players[1][1]
+            survivor_ships = 0 if sorted_players[0][1] == sorted_players[1][1] else top_ships - second_ships
+            survivor_owner = top_player if survivor_ships > 0 else -1
+        else:
+            survivor_owner = top_player
+            survivor_ships = top_ships
+        if survivor_ships > 0:
+            if owner_state[planet_id] == survivor_owner:
+                ship_state[planet_id] += survivor_ships
+            else:
+                ship_state[planet_id] -= survivor_ships
+                if ship_state[planet_id] < 0:
+                    owner_state[planet_id] = survivor_owner
+                    ship_state[planet_id] = abs(ship_state[planet_id])
+
+
 class Board:
     def __init__(self, obs, step: int, num_agents: int, player_id: int):
         self.step = step
@@ -501,6 +532,46 @@ class Board:
             ])
 
 
+    def build_base_ships(self, obs):
+        planets    = obs.planets if hasattr(obs, "planets") else obs["planets"]
+        production = dict(zip(
+            self.df_planete_nature["id"].to_list(),
+            self.df_planete_nature["production"].to_list(),
+        ))
+
+        ship_state  = {p[0]: p[5] for p in planets}
+        owner_state = {p[0]: p[1] for p in planets}
+
+        # Build arrivals lookup from df_fleet: step_tgt -> {pid: [(owner, ships)]}
+        arrivals_by_step: dict = {}
+        if self.df_fleet.shape[0] > 0:
+            for row in self.df_fleet.filter(pl.col("step_tgt").is_not_null()).iter_rows(named=True):
+                arrivals_by_step.setdefault(row["step_tgt"], {}).setdefault(row["id_tgt"], []).append(
+                    (row["owner"], row["ships"])
+                )
+
+        rows = []
+        for k in range(GameConfig.NB_STEPS_SIM + 1):
+            game_step = self.step + k
+            for pid in ship_state:
+                rows.append({
+                    "id": pid, "step": game_step,
+                    "ships": ship_state[pid], "owner": owner_state[pid],
+                    "recompute": False,
+                })
+            if k == GameConfig.NB_STEPS_SIM:
+                break
+            # production
+            for pid, owner in owner_state.items():
+                if owner != -1:
+                    ship_state[pid] += production[pid]
+            # combat
+            if game_step in arrivals_by_step:
+                _combat_step(arrivals_by_step[game_step], ship_state, owner_state)
+
+        self.df_planete_ships = pl.DataFrame(rows)
+
+
 BOARD: "Board | None" = None
 
 
@@ -573,3 +644,29 @@ if __name__ == "__main__":
     assert board2.df_fleet.shape[0] == 0, f"Expected 0 fleets, got {board2.df_fleet.shape[0]}"
 
     print("Task 3 PASSED")
+
+    # Task 4: build_base_ships
+    obs_t4 = _make_obs()
+    board4 = Board(obs_t4, step=0, num_agents=2, player_id=0)
+    board4.advance(obs_t4, step=0)   # init df_fleet (no-op for step 0)
+    board4.build_base_ships(obs_t4)
+
+    assert board4.df_planete_ships.shape == (33, 5), \
+        f"Expected (33,5), got {board4.df_planete_ships.shape}"
+
+    # At step 0, ships match obs
+    step0 = board4.df_planete_ships.filter(pl.col("step") == 0).sort("id")
+    assert step0["ships"].to_list() == [100, 20, 0], \
+        f"Step-0 ships wrong: {step0['ships'].to_list()}"
+    assert step0["owner"].to_list() == [0, 1, -1], \
+        f"Step-0 owners wrong: {step0['owner'].to_list()}"
+
+    # At step 1, planets with owner produce ships
+    step1 = board4.df_planete_ships.filter(pl.col("step") == 1).sort("id")
+    assert step1["ships"].to_list() == [102, 22, 0], \
+        f"Step-1 ships wrong: {step1['ships'].to_list()}"
+
+    # No recompute flags set
+    assert not board4.df_planete_ships["recompute"].any(), "recompute should all be False"
+
+    print("Task 4 PASSED")
