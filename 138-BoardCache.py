@@ -689,7 +689,9 @@ class Board:
             ~pl.col("id").is_in(dirty_list) | (pl.col("step") < min_dirty)
         )
 
-        # Seed state from the last kept step for each dirty planet
+        # Seed state directly from df_ships_base at min_dirty.
+        # This row already reflects production and real-fleet combat at min_dirty - 1,
+        # so no pre-tick production loop is needed.
         production = dict(zip(
             self.df_planete_nature["id"].to_list(),
             self.df_planete_nature["production"].to_list(),
@@ -697,30 +699,19 @@ class Board:
         ship_state:  dict = {}
         owner_state: dict = {}
         for pid in dirty_pids:
-            seed_step = min_dirty - 1
             row = df_ships_base.filter(
-                (pl.col("id") == pid) & (pl.col("step") == seed_step)
+                (pl.col("id") == pid) & (pl.col("step") == min_dirty)
             )
             if row.shape[0] > 0:
                 ship_state[pid]  = row["ships"][0]
                 owner_state[pid] = row["owner"][0]
             else:
-                # fallback: step 0 from base
+                # fallback: current step from base
                 row0 = df_ships_base.filter(
                     (pl.col("id") == pid) & (pl.col("step") == self.step)
                 )
                 ship_state[pid]  = row0["ships"][0]
                 owner_state[pid] = row0["owner"][0]
-
-        # Apply production ticks from seed_step up to min_dirty.
-        # build_base_ships emits the row FIRST then adds production, so the seed value
-        # at seed_step is pre-production.  We must advance the state by one production
-        # tick per step between seed_step and min_dirty (inclusive of seed_step itself).
-        seed_step = min_dirty - 1
-        for _ in range(min_dirty - seed_step):
-            for pid in dirty_pids:
-                if pid in owner_state and owner_state[pid] != -1:
-                    ship_state[pid] += production.get(pid, 0)
 
         # Apply the sim fleet departure at step_src: src loses ships_sent at step_src+1
         if id_src in ship_state and min_dirty == step_src + 1:
@@ -738,13 +729,11 @@ class Board:
                     (row["owner"], row["ships"])
                 )
         # sim fleet arrives at id_tgt at step_tgt.
-        # Convention (matching build_base_ships): combat at step k is processed AFTER
-        # emitting step k, so its effect is visible at step k+1.  To be visible at
-        # step_tgt we therefore schedule combat at step_tgt - 1.
+        # Convention (matching build_base_ships): place combat at step_tgt so that
+        # the effect is visible at step_tgt + 1 (same as real df_fleet fleets).
         if id_tgt is not None and step_tgt is not None:
             fleet_owner = self.player_id
-            combat_step = step_tgt - 1
-            arrivals_by_step.setdefault(combat_step, {}).setdefault(id_tgt, []).append(
+            arrivals_by_step.setdefault(step_tgt, {}).setdefault(id_tgt, []).append(
                 (fleet_owner, ships_sent)
             )
 
@@ -950,17 +939,17 @@ if __name__ == "__main__":
     assert c0_src_1 == base_src_1 - 50, \
         f"Src step-1 ships: expected {base_src_1-50}, got {c0_src_1}"
 
-    # Planet 1 at step_tgt=5 should reflect combat (fleet captures since 50 > 20+production)
-    c0_tgt_5_owner = df_c0.filter(
-        (pl.col("id") == 1) & (pl.col("step") == 5)
+    # Planet 1 at step 6 should reflect combat (combat fires at step_tgt=5, visible at 6)
+    c0_tgt_6_owner = df_c0.filter(
+        (pl.col("id") == 1) & (pl.col("step") == 6)
     )["owner"][0]
-    assert c0_tgt_5_owner == 0, \
-        f"Planet 1 at step 5 should be captured by player 0, got {c0_tgt_5_owner}"
+    assert c0_tgt_6_owner == 0, \
+        f"Planet 1 at step 6 should be captured by player 0, got {c0_tgt_6_owner}"
 
     # Base df unchanged
-    base_tgt_5_owner = board6.df_planete_ships.filter(
-        (pl.col("id") == 1) & (pl.col("step") == 5)
+    base_tgt_6_owner = board6.df_planete_ships.filter(
+        (pl.col("id") == 1) & (pl.col("step") == 6)
     )["owner"][0]
-    assert base_tgt_5_owner == 1, "Base df must be immutable"
+    assert base_tgt_6_owner == 1, "Base df must be immutable"
 
     print("Task 6 PASSED")
