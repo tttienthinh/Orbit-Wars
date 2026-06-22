@@ -571,6 +571,96 @@ class Board:
 
         self.df_planete_ships = pl.DataFrame(rows)
 
+    def build_df_s_slice(self, df_ships: pl.DataFrame, step_from: int):
+        """Build df_s and planet_disp for _02_get_all_opportunities."""
+        ships_slice = df_ships.filter(pl.col("step") >= step_from).drop("recompute")
+        pos_slice   = self.df_planete_pos.filter(pl.col("step") >= step_from)
+
+        df_s = (
+            ships_slice
+            .join(pos_slice, on=["id", "step"], how="left")
+            .join(self.df_planete_nature.select(["id", "radius", "production", "nature"]), on="id", how="left")
+            .sort("step")
+        )
+
+        # planet_disp: distance from previous step position
+        prev_pos = (
+            self.df_planete_pos
+            .filter(pl.col("step") >= step_from - 1)
+            .select(["id", "step", "x", "y"])
+            .rename({"x": "x_prev", "y": "y_prev"})
+            .with_columns((pl.col("step") + 1).alias("step"))
+        )
+        planet_disp = (
+            df_s.lazy()
+            .select(["id", "step", "x", "y"])
+            .join(prev_pos.lazy(), on=["id", "step"], how="left")
+            .with_columns(
+                ((pl.col("x") - pl.col("x_prev").fill_null(pl.col("x"))).pow(2) +
+                 (pl.col("y") - pl.col("y_prev").fill_null(pl.col("y"))).pow(2)
+                ).sqrt().alias("planet_disp")
+            )
+            .select(["id", "step", "planet_disp"])
+            .collect()
+        )
+        return df_s, planet_disp
+
+    def extract_horizon_dict(self, df_ships: pl.DataFrame) -> dict:
+        """Return {pid: (ships, owner, production)} at the last step in df_ships."""
+        horizon_step = df_ships["step"].max()
+        prod_map = dict(zip(
+            self.df_planete_nature["id"].to_list(),
+            self.df_planete_nature["production"].to_list(),
+        ))
+        result = {}
+        for row in df_ships.filter(pl.col("step") == horizon_step).iter_rows(named=True):
+            pid = row["id"]
+            result[pid] = (row["ships"], row["owner"], prod_map.get(pid, 0))
+        return result
+
+    @staticmethod
+    def _apply_sim_fleet(horizon: dict, sim_row) -> dict:
+        """Apply one simulated fleet to horizon dict. sim_row=(id_src,id_tgt,step_tgt,ships_sent) or None."""
+        if sim_row is None:
+            return horizon
+        id_src, id_tgt, step_tgt, ships_sent = sim_row
+        d = dict(horizon)  # shallow copy
+
+        # ships leave source
+        if id_src in d:
+            s, o, p = d[id_src]
+            d[id_src] = (s - ships_sent, o, p)
+
+        # combat at target (only if within horizon window)
+        if step_tgt is not None and id_tgt in d:
+            tgt_ships, tgt_owner, tgt_prod = d[id_tgt]
+            fleet_owner = horizon[id_src][1]  # owner unchanged
+            if tgt_owner == fleet_owner:
+                d[id_tgt] = (tgt_ships + ships_sent, tgt_owner, tgt_prod)
+            else:
+                surviving = tgt_ships - ships_sent
+                if surviving < 0:
+                    d[id_tgt] = (-surviving, fleet_owner, tgt_prod)
+                elif surviving == 0:
+                    d[id_tgt] = (0, -1, tgt_prod)
+                # surviving > 0: defender wins, no change needed beyond src deduction
+        return d
+
+    @staticmethod
+    def _evaluate_dict(horizon: dict, player_id: int) -> tuple:
+        """Pure-Python evaluate() equivalent operating on horizon dict."""
+        opponents = {v[1] for v in horizon.values() if v[1] not in (-1, player_id)}
+
+        my_prod  = sum(v[2] for v in horizon.values() if v[1] == player_id)
+        my_ships = sum(v[0] for v in horizon.values() if v[1] == player_id)
+
+        if not opponents:
+            return (my_prod, my_ships)
+
+        opp_prod  = max(sum(v[2] for v in horizon.values() if v[1] == opp) for opp in opponents)
+        opp_ships = max(sum(v[0] for v in horizon.values() if v[1] == opp) for opp in opponents)
+        return (my_prod - opp_prod, my_ships - opp_ships)
+
 
 BOARD: "Board | None" = None
 
@@ -670,3 +760,43 @@ if __name__ == "__main__":
     assert not board4.df_planete_ships["recompute"].any(), "recompute should all be False"
 
     print("Task 4 PASSED")
+
+    # Task 5: evaluation helpers
+    obs_t5 = _make_obs()
+    board5 = Board(obs_t5, step=0, num_agents=2, player_id=0)
+    board5.advance(obs_t5, step=0)
+    board5.build_base_ships(obs_t5)
+
+    # build_df_s_slice returns df_s with correct columns
+    df_s5, pd5 = board5.build_df_s_slice(board5.df_planete_ships, step_from=5)
+    required_cols = {"step", "id", "x", "y", "radius", "ships", "production", "owner", "nature"}
+    assert required_cols.issubset(set(df_s5.columns)), \
+        f"Missing columns: {required_cols - set(df_s5.columns)}"
+    assert df_s5["step"].min() == 5, f"df_s5 should start at step 5"
+    assert "planet_disp" in pd5.columns
+
+    # extract_horizon_dict
+    horizon = board5.extract_horizon_dict(board5.df_planete_ships)
+    assert len(horizon) == 3
+    assert isinstance(horizon[0], tuple) and len(horizon[0]) == 3  # (ships, owner, production)
+    assert horizon[0][1] == 0   # planet 0 owned by player 0
+    assert horizon[1][1] == 1   # planet 1 owned by player 1
+
+    # _evaluate_dict: player 0 has more ships (both players have prod=2, so prod_diff=0)
+    score = board5._evaluate_dict(horizon, player_id=0)
+    assert isinstance(score, tuple) and len(score) == 2
+    assert score[1] > 0, f"Player 0 should have ships advantage, got {score}"
+
+    # _apply_sim_fleet None → unchanged
+    h2 = board5._apply_sim_fleet(horizon, None)
+    assert h2 is horizon  # identity for None
+
+    # _apply_sim_fleet with a fleet that captures planet 1
+    # send 50 ships from planet 0 → planet 1; planet 1 has 20 ships at horizon
+    ships_at_10 = horizon[0][0]
+    h3 = board5._apply_sim_fleet(horizon, (0, 1, 7, 50))
+    assert h3[0][0] == ships_at_10 - 50, f"Src should lose 50 ships, got {h3[0][0]}"
+    # 50 vs 20+at_horizon: attacker wins, planet flips to owner 0
+    assert h3[1][1] == 0, f"Planet 1 should be captured by player 0, got {h3[1][1]}"
+
+    print("Task 5 PASSED")
