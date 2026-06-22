@@ -403,6 +403,103 @@ class Board:
             return (path[comet_idx][0], path[comet_idx][1])
         return None
 
+    def _compute_fleet_arrival(self, fleet, current_step: int):
+        _, owner, fx, fy, angle, src_id, ships = fleet
+        speed = PhysicsEngine.fleet_speed(ships)
+        dx_f = math.cos(angle) * speed
+        dy_f = math.sin(angle) * speed
+
+        non_comet_pids = [pid for pid in self._planet_meta if pid not in self._comet_pid_set]
+        comet_pids     = list(self._comet_pid_set)
+
+        for k in range(GameConfig.NB_STEPS_SIM):
+            f_old = (fx + k * dx_f, fy + k * dy_f)
+            f_new = (fx + (k + 1) * dx_f, fy + (k + 1) * dy_f)
+            game_step = current_step + k
+
+            for pid in non_comet_pids:
+                p_old = self._planet_pos_analytical(pid, game_step)
+                p_new = self._planet_pos_analytical(pid, game_step + 1)
+                if p_old is None or p_new is None:
+                    continue
+                radius = self._planet_meta[pid]["radius"]
+                if PhysicsEngine.swept_pair_hit(f_old, f_new, p_old, p_new, radius):
+                    return (pid, game_step)
+
+            if not (0 <= f_new[0] <= BOARD_SIZE and 0 <= f_new[1] <= BOARD_SIZE):
+                return None
+            if PhysicsEngine.point_to_segment_distance((CENTER, CENTER), f_old, f_new) < SUN_RADIUS:
+                return None
+
+            for pid in comet_pids:
+                c_old = self._planet_pos_analytical(pid, game_step)
+                c_new = self._planet_pos_analytical(pid, game_step + 1)
+                if c_old is None or c_new is None:
+                    continue
+                radius = self._planet_meta[pid]["radius"]
+                if PhysicsEngine.point_to_segment_distance(f_new, c_old, c_new) < radius:
+                    return (pid, game_step)
+
+        return None
+
+    def advance(self, obs, step: int):
+        self.step = step
+
+        # ── Step 1: slide df_planete_pos ─────────────────────────────────
+        # evict old step
+        self.df_planete_pos = self.df_planete_pos.filter(pl.col("step") >= step)
+
+        # sync expired comets
+        cpids = obs.comet_planet_ids if hasattr(obs, "comet_planet_ids") else obs["comet_planet_ids"]
+        current_comet_pids = set(cpids)
+        for pid in list(self._comet_pid_set - current_comet_pids):
+            self._planet_meta.pop(pid, None)
+            self._comet_path_by_pid.pop(pid, None)
+            self._comet_idx_by_pid.pop(pid, None)
+            self.df_planete_pos = self.df_planete_pos.filter(pl.col("id") != pid)
+        self._comet_pid_set = current_comet_pids
+
+        # add new far-end step
+        new_step = step + GameConfig.NB_STEPS_SIM
+        new_rows = []
+        for pid in self._planet_meta:
+            pos = self._planet_pos_analytical(pid, new_step)
+            if pos is not None:
+                new_rows.append({"id": pid, "step": new_step, "x": pos[0], "y": pos[1]})
+        if new_rows:
+            self.df_planete_pos = pl.concat([self.df_planete_pos, pl.DataFrame(new_rows)])
+
+        # ── Step 2: sync df_fleet ─────────────────────────────────────────
+        fleets = obs.fleets if hasattr(obs, "fleets") else obs["fleets"]
+        current_fids = {f[0] for f in fleets}
+
+        # drop departed fleets
+        if self.df_fleet.shape[0] > 0:
+            self.df_fleet = self.df_fleet.filter(pl.col("id").is_in(list(current_fids)))
+
+        # add newly seen fleets
+        tracked_fids = set(self.df_fleet["id"].to_list()) if self.df_fleet.shape[0] > 0 else set()
+        new_fleet_rows = []
+        for fleet in fleets:
+            fid = fleet[0]
+            if fid not in tracked_fids:
+                arrival = self._compute_fleet_arrival(fleet, step)
+                new_fleet_rows.append({
+                    "id":       fid,
+                    "owner":    fleet[1],
+                    "ships":    fleet[6],
+                    "id_tgt":   arrival[0] if arrival else None,
+                    "step_tgt": arrival[1] if arrival else None,
+                })
+        if new_fleet_rows:
+            self.df_fleet = pl.concat([
+                self.df_fleet,
+                pl.DataFrame(new_fleet_rows, schema={
+                    "id": pl.Int64, "owner": pl.Int64, "ships": pl.Int64,
+                    "id_tgt": pl.Int64, "step_tgt": pl.Int64,
+                })
+            ])
+
 
 BOARD: "Board | None" = None
 
@@ -458,3 +555,21 @@ if __name__ == "__main__":
     assert pos0 == (30.0, 50.0), f"Expected (30.0, 50.0), got {pos0}"
 
     print("Task 2 PASSED")
+
+    # Task 3: advance slides the window
+    from types import SimpleNamespace as NS
+    obs1 = _make_obs()
+    board2 = Board(obs1, step=0, num_agents=2, player_id=0)
+    obs1b = _make_obs()  # same state, step 1
+    board2.advance(obs1b, step=1)
+
+    assert board2.step == 1
+    assert board2.df_planete_pos["step"].min() == 1, \
+        f"Min step should be 1, got {board2.df_planete_pos['step'].min()}"
+    assert board2.df_planete_pos["step"].max() == 11, \
+        f"Max step should be 11, got {board2.df_planete_pos['step'].max()}"
+
+    # df_fleet should be empty (no fleets in obs)
+    assert board2.df_fleet.shape[0] == 0, f"Expected 0 fleets, got {board2.df_fleet.shape[0]}"
+
+    print("Task 3 PASSED")
