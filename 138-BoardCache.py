@@ -369,8 +369,10 @@ class StrategyPipeline:
             top3_scored.append((score, c5))
         top3_scored.sort(key=lambda x: x[0], reverse=True)
         top3_c5_base = [c5 for _, c5 in top3_scored[:3]]
-        best_score   = top3_scored[0][0] if top3_scored else None
-        best_c0      = None
+        best_score_base = top3_scored[0][0] if top3_scored else None  # score of the best baseline c5 (or None)
+        best_c5_base    = top3_scored[0][1] if top3_scored else None  # the best c5 candidate from baseline
+        best_score      = best_score_base
+        best_c0         = None
 
         # ── Per c0 candidate ──────────────────────────────────────────────
         for c0_move, c0_tgt_id, c0_step_tgt in step0_candidates[1:]:
@@ -423,10 +425,8 @@ class StrategyPipeline:
                         src, tgt, st, ang, sh = row
                         restricted.append([src, tgt, st, ang, sh])
 
-            for c5 in top3_c5_base:
-                if c5 is not None and c5[0] not in covered_srcs:
-                    restricted.append(c5)
-                    break
+            if best_c5_base is not None and best_c5_base[0] not in covered_srcs:
+                restricted.append(best_c5_base)
 
             horizon_c0  = board.extract_horizon_dict(df_ships_c0)
             best_score5 = None
