@@ -347,9 +347,9 @@ class StrategyPipeline:
                 step0_candidates.append(([src_id, angle, ships], tgt_id, step_tgt))
 
         # ── Baseline: df_ships at step NB_STEPS_5 (do nothing at step 0) ─
-        df_ships_base5 = board.df_planete_ships  # covers step 0..10
+        df_ships_full = board.df_planete_ships  # covers step 0..10
         step5_from = current_step + NB_STEPS_5
-        df_s5_base, pd5_base = board.build_df_s_slice(df_ships_base5, step_from=step5_from)
+        df_s5_base, pd5_base = board.build_df_s_slice(df_ships_full, step_from=step5_from)
         pa5_base   = StrategyPipeline._02_get_all_opportunities(df_s5_base, pd5_base, player_id)
         safe5_base = StrategyPipeline._03_filter_collision(pa5_base).collect()
 
@@ -360,7 +360,7 @@ class StrategyPipeline:
                 src, tgt, st, ang, sh = row
                 c5_candidates_base.append([src, tgt, st, ang, sh])
 
-        horizon_base = board.extract_horizon_dict(df_ships_base5)
+        horizon_base = board.extract_horizon_dict(df_ships_full)
 
         top3_scored: list = []
         for c5 in c5_candidates_base:
@@ -368,7 +368,6 @@ class StrategyPipeline:
             score = board._evaluate_dict(board._apply_sim_fleet(horizon_base, sim), player_id)
             top3_scored.append((score, c5))
         top3_scored.sort(key=lambda x: x[0], reverse=True)
-        top3_c5_base = [c5 for _, c5 in top3_scored[:3]]
         best_score_base = top3_scored[0][0] if top3_scored else None  # score of the best baseline c5 (or None)
         best_c5_base    = top3_scored[0][1] if top3_scored else None  # the best c5 candidate from baseline
         best_score      = best_score_base
@@ -378,13 +377,13 @@ class StrategyPipeline:
         for c0_move, c0_tgt_id, c0_step_tgt in step0_candidates[1:]:
 
             df_ships_c0 = board._recompute_from_sim(
-                df_ships_base5, c0_move, c0_tgt_id, c0_step_tgt
+                df_ships_full, c0_move, c0_tgt_id, c0_step_tgt
             )
 
             # changed-ids shortcut (same as 137)
             base_at5 = {
                 row["id"]: (row["owner"], row["ships"])
-                for row in df_ships_base5.filter(
+                for row in df_ships_full.filter(
                     pl.col("step") == current_step + NB_STEPS_5
                 ).iter_rows(named=True)
             }
@@ -419,7 +418,7 @@ class StrategyPipeline:
 
             restricted: list = [None]
             if not merged5.is_empty():
-                for filt, col in [("id_src", "id_src"), ("id", "id_src")]:
+                for filt, _ in [("id_src", "id_src"), ("id", "id_src")]:
                     sub = merged5.filter(pl.col(filt).is_in(list(covered_srcs)))
                     for row in sub.select(["id_src", "id", "step", "final_angle", "ships_sent"]).iter_rows():
                         src, tgt, st, ang, sh = row
@@ -488,10 +487,6 @@ class Board:
         self.df_fleet = pl.DataFrame(schema={
             "id": pl.Int64, "owner": pl.Int64, "ships": pl.Int64,
             "id_tgt": pl.Int64, "step_tgt": pl.Int64,
-        })
-        self.df_fleet_sim = pl.DataFrame(schema={
-            "id_src": pl.Int64, "step_src": pl.Int64, "ships_sent": pl.Int64,
-            "owner": pl.Int64, "id_tgt": pl.Int64, "step_tgt": pl.Int64,
         })
         self.df_planete_ships = pl.DataFrame(schema={
             "id": pl.Int64, "step": pl.Int64, "ships": pl.Int64,
@@ -816,6 +811,8 @@ class Board:
 
         move = [id_src, angle, ships_sent].  Recomputes only dirty rows.
         """
+        assert step_tgt is None or step_tgt > self.step, \
+            f"step_tgt {step_tgt} must exceed current_step {self.step}"
         id_src, angle, ships_sent = move[0], move[1], move[2]
         step_src = self.step  # fleet launches at current step
 
