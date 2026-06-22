@@ -661,6 +661,130 @@ class Board:
         opp_ships = max(sum(v[0] for v in horizon.values() if v[1] == opp) for opp in opponents)
         return (my_prod - opp_prod, my_ships - opp_ships)
 
+    def _recompute_from_sim(
+        self,
+        df_ships_base: pl.DataFrame,
+        move: list,
+        id_tgt: "int | None",
+        step_tgt: "int | None",
+    ) -> pl.DataFrame:
+        """Return new df_planete_ships with the effect of `move` applied.
+
+        move = [id_src, angle, ships_sent].  Recomputes only dirty rows.
+        """
+        id_src, angle, ships_sent = move[0], move[1], move[2]
+        step_src = self.step  # fleet launches at current step
+
+        # Identify dirty planets and the minimum step to recompute from
+        dirty_pids = {id_src}
+        min_dirty  = step_src + 1
+        if id_tgt is not None and step_tgt is not None:
+            dirty_pids.add(id_tgt)
+            min_dirty = min(min_dirty, step_tgt)
+
+        dirty_list = list(dirty_pids)
+
+        # Rows to keep: not-dirty OR before min_dirty
+        keep = df_ships_base.filter(
+            ~pl.col("id").is_in(dirty_list) | (pl.col("step") < min_dirty)
+        )
+
+        # Seed state from the last kept step for each dirty planet
+        production = dict(zip(
+            self.df_planete_nature["id"].to_list(),
+            self.df_planete_nature["production"].to_list(),
+        ))
+        ship_state:  dict = {}
+        owner_state: dict = {}
+        for pid in dirty_pids:
+            seed_step = min_dirty - 1
+            row = df_ships_base.filter(
+                (pl.col("id") == pid) & (pl.col("step") == seed_step)
+            )
+            if row.shape[0] > 0:
+                ship_state[pid]  = row["ships"][0]
+                owner_state[pid] = row["owner"][0]
+            else:
+                # fallback: step 0 from base
+                row0 = df_ships_base.filter(
+                    (pl.col("id") == pid) & (pl.col("step") == self.step)
+                )
+                ship_state[pid]  = row0["ships"][0]
+                owner_state[pid] = row0["owner"][0]
+
+        # Apply production ticks from seed_step up to min_dirty.
+        # build_base_ships emits the row FIRST then adds production, so the seed value
+        # at seed_step is pre-production.  We must advance the state by one production
+        # tick per step between seed_step and min_dirty (inclusive of seed_step itself).
+        seed_step = min_dirty - 1
+        for _ in range(min_dirty - seed_step):
+            for pid in dirty_pids:
+                if pid in owner_state and owner_state[pid] != -1:
+                    ship_state[pid] += production.get(pid, 0)
+
+        # Apply the sim fleet departure at step_src: src loses ships_sent at step_src+1
+        if id_src in ship_state and min_dirty == step_src + 1:
+            ship_state[id_src] = max(0, ship_state[id_src] - ships_sent)
+
+        # Build arrivals from df_fleet (real fleets) PLUS the sim fleet for dirty planets
+        arrivals_by_step: dict = {}
+        if self.df_fleet.shape[0] > 0:
+            for row in self.df_fleet.filter(
+                pl.col("id_tgt").is_in(dirty_list) &
+                pl.col("step_tgt").is_not_null() &
+                (pl.col("step_tgt") >= min_dirty)
+            ).iter_rows(named=True):
+                arrivals_by_step.setdefault(row["step_tgt"], {}).setdefault(row["id_tgt"], []).append(
+                    (row["owner"], row["ships"])
+                )
+        # sim fleet arrives at id_tgt at step_tgt.
+        # Convention (matching build_base_ships): combat at step k is processed AFTER
+        # emitting step k, so its effect is visible at step k+1.  To be visible at
+        # step_tgt we therefore schedule combat at step_tgt - 1.
+        if id_tgt is not None and step_tgt is not None:
+            fleet_owner = self.player_id
+            combat_step = step_tgt - 1
+            arrivals_by_step.setdefault(combat_step, {}).setdefault(id_tgt, []).append(
+                (fleet_owner, ships_sent)
+            )
+
+        # Recompute rows for dirty planets from min_dirty to step+NB_STEPS_SIM
+        new_rows = []
+        max_step = self.step + GameConfig.NB_STEPS_SIM
+        for k_abs in range(min_dirty, max_step + 1):
+            for pid in dirty_pids:
+                if pid not in ship_state:
+                    continue
+                new_rows.append({
+                    "id": pid, "step": k_abs,
+                    "ships": ship_state[pid], "owner": owner_state[pid],
+                    "recompute": False,
+                })
+            if k_abs == max_step:
+                break
+            # production for this step
+            for pid in dirty_pids:
+                if pid in owner_state and owner_state[pid] != -1:
+                    ship_state[pid] += production.get(pid, 0)
+            # combat
+            if k_abs in arrivals_by_step:
+                dirty_arrivals = {
+                    pid: lst for pid, lst in arrivals_by_step[k_abs].items()
+                    if pid in dirty_pids
+                }
+                if dirty_arrivals:
+                    _combat_step(dirty_arrivals, ship_state, owner_state)
+
+        new_df = pl.DataFrame(new_rows, schema={
+            "id": pl.Int64, "step": pl.Int64, "ships": pl.Int64,
+            "owner": pl.Int64, "recompute": pl.Boolean,
+        }) if new_rows else pl.DataFrame(schema={
+            "id": pl.Int64, "step": pl.Int64, "ships": pl.Int64,
+            "owner": pl.Int64, "recompute": pl.Boolean,
+        })
+
+        return pl.concat([keep, new_df]).sort(["step", "id"])
+
 
 BOARD: "Board | None" = None
 
@@ -800,3 +924,43 @@ if __name__ == "__main__":
     assert h3[1][1] == 0, f"Planet 1 should be captured by player 0, got {h3[1][1]}"
 
     print("Task 5 PASSED")
+
+    # Task 6: _recompute_from_sim
+    obs_t6 = _make_obs()
+    board6 = Board(obs_t6, step=0, num_agents=2, player_id=0)
+    board6.advance(obs_t6, step=0)
+    board6.build_base_ships(obs_t6)
+
+    # Send 50 ships from planet 0 (step_src=0), targeting planet 1 (step_tgt=5)
+    df_c0 = board6._recompute_from_sim(
+        board6.df_planete_ships,
+        move=[0, math.atan2(50.0 - 50.0, 70.0 - 30.0), 50],
+        id_tgt=1, step_tgt=5,
+    )
+
+    assert df_c0.shape == board6.df_planete_ships.shape, "Shape must match base"
+
+    # Source planet at step 1 should have 50 fewer ships than base
+    base_src_1 = board6.df_planete_ships.filter(
+        (pl.col("id") == 0) & (pl.col("step") == 1)
+    )["ships"][0]
+    c0_src_1 = df_c0.filter(
+        (pl.col("id") == 0) & (pl.col("step") == 1)
+    )["ships"][0]
+    assert c0_src_1 == base_src_1 - 50, \
+        f"Src step-1 ships: expected {base_src_1-50}, got {c0_src_1}"
+
+    # Planet 1 at step_tgt=5 should reflect combat (fleet captures since 50 > 20+production)
+    c0_tgt_5_owner = df_c0.filter(
+        (pl.col("id") == 1) & (pl.col("step") == 5)
+    )["owner"][0]
+    assert c0_tgt_5_owner == 0, \
+        f"Planet 1 at step 5 should be captured by player 0, got {c0_tgt_5_owner}"
+
+    # Base df unchanged
+    base_tgt_5_owner = board6.df_planete_ships.filter(
+        (pl.col("id") == 1) & (pl.col("step") == 5)
+    )["owner"][0]
+    assert base_tgt_5_owner == 1, "Base df must be immutable"
+
+    print("Task 6 PASSED")
