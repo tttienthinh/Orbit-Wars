@@ -63,29 +63,6 @@ BOARD_SIZE = 100.0
 MAX_NB_STEP = 500
 
 
-def evaluate(obs, player_id: int) -> tuple:
-    planets = obs.planets if hasattr(obs, "planets") else obs["planets"]
-    fleets  = obs.fleets  if hasattr(obs, "fleets")  else obs["fleets"]
-
-    opponents = {p[1] for p in planets if p[1] not in (-1, player_id)}
-    opponents |= {f[1] for f in fleets  if f[1] not in (-1, player_id)}
-
-    my_prod  = sum(p[6] for p in planets if p[1] == player_id)
-    my_ships = (sum(p[5] for p in planets if p[1] == player_id)
-              + sum(f[6] for f in fleets  if f[1] == player_id))
-
-    if not opponents:
-        return (my_prod, my_ships)
-
-    opp_prod  = max(sum(p[6] for p in planets if p[1] == opp) for opp in opponents)
-    opp_ships = max(
-        sum(p[5] for p in planets if p[1] == opp)
-      + sum(f[6] for f in fleets  if f[1] == opp)
-        for opp in opponents
-    )
-    return (my_prod - opp_prod, my_ships - opp_ships)
-
-
 class StrategyPipeline:
     @staticmethod
     def _02_get_all_opportunities(
@@ -343,7 +320,15 @@ class StrategyPipeline:
         # ── Step-0 candidates: None = "do nothing" ───────────────────────
         step0_candidates: list = [None]
         if not attacks_with_angle.is_empty():
-            for row in attacks_with_angle.select(
+            top_candidates = (
+                attacks_with_angle
+                .sort(["step", "ships_sent"])
+                .group_by(["id_src", "id"], maintain_order=True)
+                .first()
+                .sort(["step", "ships_sent"])
+                .head(10)
+            )
+            for row in top_candidates.select(
                 ["id_src", "id", "step", "final_angle", "ships_sent"]
             ).iter_rows():
                 src_id, tgt_id, step_tgt, angle, ships = row
@@ -693,43 +678,6 @@ class Board:
         )
         return df_s, planet_disp
 
-    def build_df_s_slice_batched(
-        self, df_ships_batched: pl.DataFrame, step_from: int
-    ):
-        """Build batched df_s (with c0_id), planet_disp (from baseline c0_id=0), and pos_slice."""
-        ships_slice = df_ships_batched.filter(pl.col("step") >= step_from).drop("recompute", strict=False)
-        pos_slice   = self.df_planete_pos.filter(pl.col("step") >= step_from)
-
-        df_s = (
-            ships_slice
-            .join(pos_slice, on=["id", "step"], how="left")
-            .join(self.df_planete_nature.select(["id", "radius", "production", "nature"]), on="id", how="left")
-            .sort(["c0_id", "step"])
-        )
-
-        # planet_disp computed from c0_id=0 baseline (positions don't differ across c0_ids)
-        baseline_ds = df_s.filter(pl.col("c0_id") == 0)
-        prev_pos = (
-            self.df_planete_pos
-            .filter(pl.col("step") >= step_from - 1)
-            .select(["id", "step", "x", "y"])
-            .rename({"x": "x_prev", "y": "y_prev"})
-            .with_columns((pl.col("step") + 1).alias("step"))
-        )
-        planet_disp = (
-            baseline_ds.lazy()
-            .select(["id", "step", "x", "y"])
-            .join(prev_pos.lazy(), on=["id", "step"], how="left")
-            .with_columns(
-                ((pl.col("x") - pl.col("x_prev").fill_null(pl.col("x"))).pow(2) +
-                 (pl.col("y") - pl.col("y_prev").fill_null(pl.col("y"))).pow(2)
-                ).sqrt().alias("planet_disp")
-            )
-            .select(["id", "step", "planet_disp"])
-            .collect()
-        )
-        return df_s, planet_disp, pos_slice
-
     def extract_horizon_dict(self, df_ships: pl.DataFrame) -> dict:
         """Return {pid: (ships, owner, production)} at the last step in df_ships."""
         horizon_step = df_ships["step"].max()
@@ -770,21 +718,6 @@ class Board:
                     d[id_tgt] = (0, -1, tgt_prod)
                 # surviving > 0: defender wins, no change needed beyond src deduction
         return d
-
-    @staticmethod
-    def _evaluate_dict(horizon: dict, player_id: int) -> tuple:
-        """Pure-Python evaluate() equivalent operating on horizon dict."""
-        opponents = {v[1] for v in horizon.values() if v[1] not in (-1, player_id)}
-
-        my_prod  = sum(v[2] for v in horizon.values() if v[1] == player_id)
-        my_ships = sum(v[0] for v in horizon.values() if v[1] == player_id)
-
-        if not opponents:
-            return (my_prod, my_ships)
-
-        opp_prod  = max(sum(v[2] for v in horizon.values() if v[1] == opp) for opp in opponents)
-        opp_ships = max(sum(v[0] for v in horizon.values() if v[1] == opp) for opp in opponents)
-        return (my_prod - opp_prod, my_ships - opp_ships)
 
     def _recompute_from_sim(
         self,
