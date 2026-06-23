@@ -1,7 +1,7 @@
 # Design: Restricted Minimax Inner Loop
 
 **Date:** 2026-06-22  
-**File:** `135-Polars_mini_max.py` → `136-Polars_mini_max_fast.py` (or in-place)  
+**File:** `135-Polars_mini_max.py` → `136-Polars_mini_max_fast.py`  
 **Status:** Approved
 
 ---
