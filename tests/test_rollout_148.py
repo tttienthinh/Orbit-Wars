@@ -399,3 +399,57 @@ def test_rollout_search_returns_none_for_none_table():
         player_id=0, A=2, B=10, H=5,
     )
     assert result is None
+
+
+def test_tensor_action_output_format():
+    """tensor_action must return the dict format sparse_action_row_to_moves expects."""
+    obs_t = _obs_tensors()
+    runtime = mod.ProducerLiteRuntime()
+    with torch.no_grad():
+        result = runtime.tensor_action(obs_t)
+    assert "from_planet_id" in result
+    assert "angle" in result
+    assert "num_ships" in result
+    assert "counts" in result
+
+
+def test_agent_end_to_end_no_crash():
+    raw = _raw_obs()
+    raw["player"] = 0
+    moves = mod.agent(raw)
+    assert isinstance(moves, list)
+    for move in moves:
+        assert len(move) == 3   # [from_planet_id, angle, num_ships]
+
+
+def test_agent_returns_valid_planet():
+    """from_planet_id in the move list must be an owned planet."""
+    raw = _raw_obs()
+    raw["player"] = 0
+    moves = mod.agent(raw)
+    owned_ids = {p[0] for p in raw["planets"] if p[1] == 0}
+    for move in moves:
+        assert int(move[0]) in owned_ids, f"Planet {move[0]} not owned by player 0"
+
+
+def test_tensor_action_fallback_on_step0():
+    """On step 0 with no prior movement cache, must not crash."""
+    obs_t = _obs_tensors(step=0)
+    runtime = mod.ProducerLiteRuntime()
+    with torch.no_grad():
+        result = runtime.tensor_action(obs_t)
+    assert int(result["counts"].item()) >= 0
+
+
+def test_greedy_fallback_used_when_rollout_none(monkeypatch):
+    """If rollout_search returns None, the greedy payload is used."""
+    original = mod.rollout_search
+    mod.rollout_search = lambda **kwargs: None  # force fallback
+    try:
+        obs_t = _obs_tensors()
+        runtime = mod.ProducerLiteRuntime()
+        with torch.no_grad():
+            result = runtime.tensor_action(obs_t)
+        assert "counts" in result
+    finally:
+        mod.rollout_search = original

@@ -5127,10 +5127,21 @@ class ProducerLiteRuntime:
         if mem.cached_player_count is None:
             mem.cached_player_count = largest_initial_player_count(obs_tensors)
         config = _config_for(mem.cached_player_count)
-        row, _candidate_table, _movement = run_turn(
+        greedy_payload, candidate_table, movement = run_turn(
             obs_tensors, config=config,
             player_count=int(mem.cached_player_count), memory=mem,
         )
+        player_id = int(obs_tensors["player"].flatten()[0].item())
+        rollout_payload = rollout_search(
+            obs_tensors=obs_tensors,
+            movement=movement,
+            candidate_table=candidate_table,
+            player_id=player_id,
+            A=int(mem.cached_player_count),
+            B=ROLLOUT_B,
+            H=ROLLOUT_H,
+        ) if movement is not None else None
+        row = rollout_payload if rollout_payload is not None else greedy_payload
         mem.last_sparse_action_row = row
         return row
 
