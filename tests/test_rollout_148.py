@@ -172,3 +172,74 @@ def test_init_rollout_state_arrivals_nonnegative():
     _, _, movement = mod.run_turn(obs_t, config=mod._config_for(2), player_count=2, memory=mem)
     state = mod.init_rollout_state(obs_t, movement, B=2, H=mod.ROLLOUT_H, A=2, player_id=0)
     assert (state.arrivals >= 0).all()
+
+
+def _make_state_and_table(B=4):
+    obs_t = _obs_tensors()
+    mem = mod.ProducerLiteMemory()
+    config = mod._config_for(2)
+    _, ct, movement = mod.run_turn(obs_t, config=config, player_count=2, memory=mem)
+    state = mod.init_rollout_state(obs_t, movement, B=B, H=mod.ROLLOUT_H, A=2, player_id=0)
+    return state, ct, obs_t
+
+
+def test_style_score_shape():
+    state, ct, _ = _make_state_and_table(B=5)
+    if ct is None:
+        pytest.skip("no candidates on this obs")
+    ss = mod.build_style_score(ct, B=5, device=state.ships.device)
+    assert ss.shape == (5, ct.C)
+
+
+def test_style_score_varies_across_universes():
+    state, ct, _ = _make_state_and_table(B=20)
+    if ct is None:
+        pytest.skip("no candidates on this obs")
+    ss = mod.build_style_score(ct, B=20, device=state.ships.device)
+    # Different universes should not be identical (noise + w_prod variation)
+    assert not (ss[0] == ss[1]).all()
+
+
+def test_pick_first_actions_returns_shapes():
+    state, ct, _ = _make_state_and_table(B=4)
+    if ct is None:
+        pytest.skip("no candidates on this obs")
+    ss = mod.build_style_score(ct, B=4, device=state.ships.device)
+    idx, ships = mod.pick_first_actions(state, ct, ss)
+    assert idx.shape == (4,)
+    assert ships.shape == (4,)
+
+
+def test_pick_first_actions_ships_nonnegative():
+    state, ct, _ = _make_state_and_table(B=8)
+    if ct is None:
+        pytest.skip("no candidates on this obs")
+    ss = mod.build_style_score(ct, B=8, device=state.ships.device)
+    _, ships = mod.pick_first_actions(state, ct, ss)
+    assert (ships >= 0).all()
+
+
+def test_pick_first_actions_deducts_source():
+    state, ct, obs_t = _make_state_and_table(B=4)
+    if ct is None:
+        pytest.skip("no candidates on this obs")
+    ships_before = state.ships.clone()
+    ss = mod.build_style_score(ct, B=4, device=state.ships.device)
+    _, sent = mod.pick_first_actions(state, ct, ss)
+    # For universes that launched, source ships must decrease
+    diff = (ships_before - state.ships).clamp(min=0)
+    # At least one universe should have deducted something
+    assert diff.sum() > 0
+
+
+def test_pick_first_actions_only_own_source():
+    """No launches from enemy or neutral planets."""
+    state, ct, _ = _make_state_and_table(B=4)
+    if ct is None:
+        pytest.skip("no candidates on this obs")
+    ss = mod.build_style_score(ct, B=4, device=state.ships.device)
+    idx, ships = mod.pick_first_actions(state, ct, ss)
+    for b in range(4):
+        if float(ships[b]) > 0:
+            src = int(ct.source_slots[int(idx[b])].item())
+            assert int(state.owner[b, src].item()) == state.player_id

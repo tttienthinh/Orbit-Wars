@@ -4878,6 +4878,77 @@ def init_rollout_state(
     )
 
 
+def build_style_score(
+    candidate_table: CandidateTable,
+    B: int,
+    device: torch.device,
+) -> Tensor:
+    """Fixed [B, C] score matrix: sampled once, reused for all H rollout steps."""
+    base  = candidate_table.base_score.to(device=device)    # [C]
+    tprod = candidate_table.target_prod.to(device=device)   # [C]
+    w_prod = torch.empty(B, 1, device=device).uniform_(0.5, 2.0)
+    noise_scale = float(base.std().clamp(min=1.0).item()) * NOISE_SCALE
+    noise = torch.randn(B, candidate_table.C, device=device) * noise_scale
+    return base.unsqueeze(0) + w_prod * tprod.unsqueeze(0) + noise   # [B, C]
+
+
+def pick_first_actions(
+    state: RolloutState,
+    candidate_table: CandidateTable,
+    style_score: Tensor,
+) -> tuple[Tensor, Tensor]:
+    """Pick one first action per universe, deduct ships, write to arrivals.
+
+    Returns (first_cand_idx [B], first_ships [B]).
+    """
+    B   = state.B
+    pid = state.player_id
+    dev = state.ships.device
+    P_safe = max(state.P - 1, 0)
+    src_slots = candidate_table.source_slots   # [C]
+
+    src_ships = state.ships[:, src_slots.clamp(0, P_safe)]   # [B, C]
+    src_owner = state.owner[:, src_slots.clamp(0, P_safe)]   # [B, C]
+
+    valid0 = (
+        candidate_table.valid.unsqueeze(0)
+        & (src_owner == pid)
+        & (src_ships >= candidate_table.required_ships.unsqueeze(0))
+    )   # [B, C]
+
+    masked = torch.where(valid0, style_score,
+                         torch.full_like(style_score, float("-inf")))
+    first_cand_idx = masked.argmax(dim=-1)   # [B]
+    has_valid = valid0.any(dim=-1)           # [B]
+
+    src_b  = src_slots[first_cand_idx].clamp(0, P_safe)          # [B]
+    drain  = candidate_table.drain_ships[first_cand_idx]          # [B]
+    avail  = state.ships[torch.arange(B, device=dev), src_b]      # [B]
+    first_ships = torch.where(
+        has_valid,
+        torch.min(drain, avail).floor(),
+        torch.zeros(B, device=dev, dtype=state.ships.dtype),
+    )
+
+    # Deduct from source (scatter_add_ is per-row; no cross-universe collision)
+    state.ships.scatter_add_(
+        1, src_b.unsqueeze(1),
+        (-first_ships).unsqueeze(1),
+    )
+
+    # Write to arrivals
+    arr_step = candidate_table.eta_ceil[first_cand_idx]   # [B]
+    valid_write = has_valid & (arr_step < ARRIVALS_H) & (first_ships >= 1.0)
+    if bool(valid_write.any()):
+        vb  = torch.where(valid_write)[0]
+        vt  = candidate_table.target_slots[first_cand_idx[valid_write]].clamp(0, state.P - 1)
+        vk  = arr_step[valid_write]
+        pid_t = torch.full_like(vb, pid)
+        state.arrivals.index_put_((vb, vt, vk, pid_t), first_ships[valid_write], accumulate=True)
+
+    return first_cand_idx, first_ships
+
+
 class ProducerLiteMemory:
     def __init__(self) -> None:
         self.movement = None
