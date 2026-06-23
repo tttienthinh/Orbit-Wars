@@ -314,7 +314,84 @@ class StrategyPipeline:
 
     @staticmethod
     def _04_first_minimax_then_scoring(safe_lf: pl.LazyFrame, obs, board: "Board") -> list:
-        return []
+        NB_STEPS_5 = 5
+        player_id = board.player_id
+
+        attacks_with_angle = safe_lf.collect()
+        moves_out: list = []
+
+        # ── Comet evasion ────────────────────────────────────────────────
+        if not attacks_with_angle.is_empty():
+            awa_comets = attacks_with_angle.filter(pl.col("nature_src") == "comet")
+            if not awa_comets.is_empty():
+                x_off = (awa_comets["x_src"] - GameConfig.CENTER).abs().max() or 0
+                y_off = (awa_comets["y_src"] - GameConfig.CENTER).abs().max() or 0
+                if max(x_off, y_off) > 45:
+                    moves_out += [list(r) for r in (
+                        awa_comets
+                        .sort(["ships_sent", "step"], descending=[True, False])
+                        .group_by("id_src", maintain_order=True)
+                        .first()
+                        .select(["id_src", "final_angle", "ships_sent"])
+                        .rows()
+                    )]
+                    id_to_avoid = awa_comets["id_src"].unique().to_list()
+                    attacks_with_angle = attacks_with_angle.filter(
+                        ~pl.col("id_src").is_in(id_to_avoid)
+                    )
+
+        # ── Step-0 candidates: None = "do nothing" ───────────────────────
+        step0_candidates: list = [None]
+        if not attacks_with_angle.is_empty():
+            for row in attacks_with_angle.select(
+                ["id_src", "id", "step", "final_angle", "ships_sent"]
+            ).iter_rows():
+                src_id, tgt_id, step_tgt, angle, ships = row
+                step0_candidates.append((src_id, tgt_id, step_tgt, angle, ships))
+
+        df_ships_full = board.df_planete_ships
+        step5_from = board.step + NB_STEPS_5
+
+        best_score: int = -1
+        best_c0 = None
+
+        for c0 in step0_candidates:
+            # Build ship state after this step-0 action
+            if c0 is None:
+                df_ships_c0 = df_ships_full
+            else:
+                src_id, tgt_id, step_tgt, angle, ships = c0
+                df_ships_c0 = board._recompute_from_sim(
+                    df_ships_full, [src_id, angle, ships], tgt_id, step_tgt
+                )
+
+            # Step-5 opportunity search
+            df_s5, pd5 = board.build_df_s_slice(df_ships_c0, step_from=step5_from)
+            pa5_lf = StrategyPipeline._02_get_all_opportunities(df_s5, pd5, player_id)
+            safe5 = StrategyPipeline._03_filter_collision(pa5_lf).collect()
+
+            # Score: max net-production delta across all valid step-5 attacks
+            horizon_c0 = board.extract_horizon_dict(df_ships_c0)
+            baseline_np = StrategyPipeline._net_prod(horizon_c0, player_id)
+
+            score_c0 = 0
+            if not safe5.is_empty():
+                for row5 in safe5.select(["id_src", "id", "step", "ships_sent"]).iter_rows():
+                    h_after = Board._apply_sim_fleet(horizon_c0, row5)
+                    delta = StrategyPipeline._net_prod(h_after, player_id) - baseline_np
+                    if delta > score_c0:
+                        score_c0 = delta
+
+            if score_c0 > best_score:
+                best_score = score_c0
+                best_c0 = c0
+
+        # ── Return ───────────────────────────────────────────────────────
+        if best_c0 is not None:
+            src_id, tgt_id, step_tgt, angle, ships = best_c0
+            moves_out.append([src_id, angle, ships])
+            print(f"142 best move: src={src_id} tgt={tgt_id} step={step_tgt} ships={ships} score={best_score}")
+        return moves_out
 
 
 def _combat_step(planet_arrivals: dict, ship_state: dict, owner_state: dict):
@@ -856,7 +933,7 @@ if __name__ == "__main__":
     import time
     from types import SimpleNamespace
 
-    def _make_obs():
+    def _make_obs(step=0):
         planets = [
             [0, 0, 30.0, 50.0, 31.0, 100, 2],
             [1, 1, 70.0, 50.0, 5.0,   20, 2],
@@ -871,16 +948,39 @@ if __name__ == "__main__":
             angular_velocity=0.01,
             next_fleet_id=0,
             player=0,
-            step=0,
+            step=step,
         )
 
-    BOARD = None
-    obs0 = _make_obs()
+    # ── _net_prod unit test ───────────────────────────────────────────
+    horizon_test = {
+        0: (100, 0, 2),   # player 0 owns, prod=2
+        1: (20,  1, 2),   # player 1 owns, prod=2
+        2: (0,  -1, 1),   # neutral
+    }
+    np0 = StrategyPipeline._net_prod(horizon_test, player_id=0)
+    assert np0 == 0, f"_net_prod: expected 0, got {np0}"  # my_prod=2, opp_prod=2
+
+    # capture planet 2 (neutral, prod=1): my_prod becomes 3, opp stays 2 → delta=+1
+    h_after = Board._apply_sim_fleet(horizon_test, (0, 2, 3, 50))
+    np_after = StrategyPipeline._net_prod(h_after, player_id=0)
+    assert np_after - np0 == 1, f"capture neutral delta: expected +1, got {np_after - np0}"
+
+    # capture planet 1 (opponent, prod=2): my_prod=4, opp_prod=0 → net=4, delta=+4
+    h_after2 = Board._apply_sim_fleet(horizon_test, (0, 1, 5, 50))
+    np_after2 = StrategyPipeline._net_prod(h_after2, player_id=0)
+    assert np_after2 - np0 == 4, f"capture opp delta: expected +4, got {np_after2 - np0}"
+
+    print("_net_prod unit tests PASSED")
+
+    # ── agent() smoke test ────────────────────────────────────────────
+    import __main__
+    __main__.BOARD = None
+    obs0 = _make_obs(step=0)
     t0 = time.time()
     result = agent(obs0)
     elapsed = time.time() - t0
 
-    print(f"agent() -> {result}")
+    print(f"agent() step=0 -> {result}")
     print(f"elapsed: {elapsed:.3f}s")
 
     assert isinstance(result, list), "agent must return a list"
@@ -888,4 +988,13 @@ if __name__ == "__main__":
         assert len(move) == 3, f"move must be [id_src, angle, ships]: {move}"
     assert elapsed < 5.0, f"too slow: {elapsed:.3f}s"
 
-    print("Stub smoke test PASSED.")
+    # ── agent() step=1 (tests advance path) ──────────────────────────
+    obs1 = _make_obs(step=1)
+    t1 = time.time()
+    result1 = agent(obs1)
+    elapsed1 = time.time() - t1
+    print(f"agent() step=1 -> {result1}, elapsed: {elapsed1:.3f}s")
+    assert isinstance(result1, list)
+    assert elapsed1 < 5.0
+
+    print("Smoke test PASSED.")
