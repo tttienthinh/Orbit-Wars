@@ -4811,7 +4811,7 @@ def _config_for(player_count: int) -> ProducerLiteConfig:
 
 ROLLOUT_B:  int   = 30    # parallel universes
 ROLLOUT_H:  int   = 20    # simulation horizon (steps)
-ARRIVALS_H: int   = 40    # ROLLOUT_H + max candidate ETA cap (20); no overflow
+ARRIVALS_H: int   = 40    # = ROLLOUT_H + max(config.horizon) + 2 headroom; max arr_step = 38 < 40
 PROD_WEIGHT: float = 10.0
 NOISE_SCALE: float = 0.15
 

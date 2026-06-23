@@ -453,3 +453,48 @@ def test_greedy_fallback_used_when_rollout_none(monkeypatch):
         assert "counts" in result
     finally:
         mod.rollout_search = original
+
+
+def test_resolve_arrivals_neutral_defends_small_attack():
+    """Player 0 sends 5 ships against neutral with 20 — neutral holds."""
+    B, P, A = 1, 2, 2
+    state = _minimal_state(B=B, P=P, A=A,
+        ships=torch.tensor([[30.0, 20.0]]),
+        owner=torch.tensor([[0, -1]], dtype=torch.long),
+    )
+    state.arrivals[0, 1, 4, 0] = 5.0   # only 5 ships arrive
+    mod.resolve_arrivals(state, 4)
+    # Neutral garrison (20) wins vs 5: neutral should still hold
+    assert int(state.owner[0, 1].item()) == -1
+    assert float(state.ships[0, 1]) == pytest.approx(15.0)  # 20 - 5 = 15
+
+
+def test_resolve_arrivals_two_players_same_step():
+    """Player 0 (30) and player 1 (10) both arrive at neutral planet (ships=5) same step."""
+    B, P, A = 1, 2, 2
+    state = _minimal_state(B=B, P=P, A=A,
+        ships=torch.tensor([[0.0, 5.0]]),
+        owner=torch.tensor([[-1, -1]], dtype=torch.long),
+    )
+    state.arrivals[0, 1, 2, 0] = 30.0  # player 0: 30 ships
+    state.arrivals[0, 1, 2, 1] = 10.0  # player 1: 10 ships
+    mod.resolve_arrivals(state, 2)
+    # Top combatants: player0=30+0=30, player1=10, neutral=5
+    # Winner: player 0 with 30-10=20 ships remaining
+    assert int(state.owner[0, 1].item()) == 0
+    assert float(state.ships[0, 1]) == pytest.approx(20.0)
+
+
+def test_resolve_arrivals_tie_becomes_neutral():
+    """Equal fleets from two players both arrive — tie gives 0 ships, owner=-1."""
+    B, P, A = 1, 2, 2
+    state = _minimal_state(B=B, P=P, A=A,
+        ships=torch.tensor([[0.0, 0.0]]),
+        owner=torch.tensor([[-1, -1]], dtype=torch.long),
+    )
+    state.arrivals[0, 1, 5, 0] = 25.0  # player 0: 25 ships
+    state.arrivals[0, 1, 5, 1] = 25.0  # player 1: 25 ships (exact tie)
+    mod.resolve_arrivals(state, 5)
+    # top1 - top2 = 25 - 25 = 0 → no winner, becomes neutral with 0 ships
+    assert float(state.ships[0, 1]) == pytest.approx(0.0)
+    assert int(state.owner[0, 1].item()) == -1
