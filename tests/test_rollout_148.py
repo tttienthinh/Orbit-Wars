@@ -118,3 +118,11 @@ def test_run_turn_returns_triple():
     assert "counts" in payload
     # movement must be a PlanetMovement
     assert hasattr(movement, "fleet_buckets")
+
+
+def test_run_turn_movement_not_none():
+    obs_t = _obs_tensors()
+    mem = mod.ProducerLiteMemory()
+    _, _, movement = mod.run_turn(obs_t, config=mod._config_for(2), player_count=2, memory=mem)
+    assert movement is not None
+    assert hasattr(movement, "fleet_buckets")

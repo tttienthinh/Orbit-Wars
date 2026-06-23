@@ -4727,7 +4727,7 @@ def _plan_comet_escape(obs, obs_tensors: dict) -> LaunchEntries | None:
     )
 
 
-def run_turn(obs_tensors: dict, *, config: ProducerLiteConfig, player_count: int, memory) -> tuple[dict, "CandidateTable | None", "PlanetMovement"]:
+def run_turn(obs_tensors: dict, *, config: ProducerLiteConfig, player_count: int, memory) -> tuple[dict, "CandidateTable | None", "PlanetMovement | None"]:
     """Full per-turn pipeline: build movement → plan single-size waves + regroup → emit.
 
     ``memory`` must expose a mutable ``movement`` attribute (the rolling cache).
