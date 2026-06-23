@@ -4995,6 +4995,112 @@ def resolve_arrivals(state: RolloutState, k: int) -> None:
     )
 
 
+def apply_best_launch(
+    state: RolloutState,
+    candidate_table: CandidateTable,
+    style_score: Tensor,
+    k: int,
+) -> None:
+    """Pick one launch per universe using pre-computed style_score, apply it."""
+    B   = state.B
+    pid = state.player_id
+    dev = state.ships.device
+    P_safe = max(state.P - 1, 0)
+    src_slots = candidate_table.source_slots   # [C]
+
+    src_ships = state.ships[:, src_slots.clamp(0, P_safe)]   # [B, C]
+    src_owner = state.owner[:, src_slots.clamp(0, P_safe)]   # [B, C]
+
+    valid_now = (
+        candidate_table.valid.unsqueeze(0)
+        & (src_owner == pid)
+        & (src_ships >= candidate_table.required_ships.unsqueeze(0))
+    )   # [B, C]
+
+    masked = torch.where(valid_now, style_score,
+                         torch.full_like(style_score, float("-inf")))
+    best_c    = masked.argmax(dim=-1)         # [B]
+    has_valid = valid_now.any(dim=-1)          # [B]
+
+    src_b  = src_slots[best_c].clamp(0, P_safe)              # [B]
+    avail  = state.ships[torch.arange(B, device=dev), src_b]  # [B]
+    drain  = candidate_table.drain_ships[best_c]              # [B]
+    send = torch.where(
+        has_valid,
+        torch.min(drain, avail).floor(),
+        torch.zeros(B, device=dev, dtype=state.ships.dtype),
+    )
+
+    arr_step    = k + candidate_table.eta_ceil[best_c]        # [B]
+    valid_write = has_valid & (arr_step < ARRIVALS_H) & (send >= 1.0)
+
+    send_deduct = torch.where(valid_write, send, torch.zeros_like(send))
+    state.ships.scatter_add_(1, src_b.unsqueeze(1), (-send_deduct).unsqueeze(1))
+
+    if bool(valid_write.any()):
+        vb  = torch.where(valid_write)[0]
+        vt  = candidate_table.target_slots[best_c[valid_write]].clamp(0, state.P - 1)
+        vk  = arr_step[valid_write]
+        pid_t = torch.full_like(vb, pid)
+        state.arrivals.index_put_((vb, vt, vk, pid_t), send[valid_write], accumulate=True)
+
+
+def terminal_score(state: RolloutState, prod_weight: float = PROD_WEIGHT) -> Tensor:
+    """Economic score for each universe at the end of the rollout. [B]"""
+    own   = (state.owner == state.player_id) & state.alive   # [B, P]
+    own_f = own.to(state.ships.dtype)
+    return (state.ships * own_f).sum(-1) + (state.prod * own_f).sum(-1) * prod_weight
+
+
+def rollout_search(
+    obs_tensors: dict,
+    movement: PlanetMovement,
+    candidate_table: "CandidateTable | None",
+    player_id: int,
+    A: int,
+    B: int = ROLLOUT_B,
+    H: int = ROLLOUT_H,
+) -> "dict | None":
+    """Run B-universe H-step rollout; return step-0 action of best universe.
+
+    Returns None when no valid first action exists (caller uses greedy fallback).
+    """
+    if candidate_table is None or candidate_table.C == 0:
+        return None
+
+    device = obs_tensors["planets"].device
+    state  = init_rollout_state(obs_tensors, movement, B=B, H=H, A=A, player_id=player_id)
+    style_score = build_style_score(candidate_table, B=B, device=device)
+
+    first_cand_idx, first_ships = pick_first_actions(state, candidate_table, style_score)
+
+    for k in range(1, H + 1):
+        credit_production(state)
+        resolve_arrivals(state, k)
+        apply_best_launch(state, candidate_table, style_score, k)
+
+    scores = terminal_score(state)   # [B]
+
+    # Only select universes where a valid first action was taken
+    valid_b = first_ships >= 1.0     # [B]
+    if not bool(valid_b.any()):
+        return None
+    scores_masked = torch.where(valid_b, scores,
+                                torch.full_like(scores, float("-inf")))
+    best_b = int(scores_masked.argmax().item())
+
+    c   = int(first_cand_idx[best_b].item())
+    src = int(candidate_table.source_slots[c].item())
+    ships_val = float(first_ships[best_b].item())
+
+    return {
+        "from_planet_id": candidate_table.planet_ids[src].unsqueeze(0).to(torch.int32),
+        "angle":          candidate_table.angle[c].unsqueeze(0).to(torch.float32),
+        "num_ships":      torch.tensor([round(ships_val)], dtype=torch.float32, device=device),
+        "counts":         torch.tensor(1, dtype=torch.int32, device=device),
+    }
+
+
 class ProducerLiteMemory:
     def __init__(self) -> None:
         self.movement = None

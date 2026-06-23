@@ -320,3 +320,82 @@ def test_resolve_arrivals_no_activity_no_change():
     before = state.ships.clone()
     mod.resolve_arrivals(state, 5)
     assert (state.ships == before).all()
+
+
+def test_apply_best_launch_no_launch_from_enemy():
+    """When player 0 owns no planets, apply_best_launch must not deduct any ships."""
+    state, ct, _ = _make_state_and_table(B=4)
+    if ct is None:
+        pytest.skip("no candidates")
+    # Override: player 0 owns nothing
+    state.owner[:] = 1
+    ships_before = state.ships.clone()
+    ss = mod.build_style_score(ct, B=4, device=state.ships.device)
+    mod.apply_best_launch(state, ct, ss, k=1)
+    # Ships must be unchanged (or only decrease — never negative)
+    assert (state.ships >= 0).all()
+    assert (state.ships == ships_before).all()
+
+
+def test_apply_best_launch_no_overflow():
+    """Arrival step must never exceed ARRIVALS_H - 1."""
+    state, ct, _ = _make_state_and_table(B=4)
+    if ct is None:
+        pytest.skip("no candidates")
+    ss = mod.build_style_score(ct, B=4, device=state.ships.device)
+    # Use k = ARRIVALS_H - 1 (would overflow if unchecked)
+    k = mod.ARRIVALS_H - 1
+    mod.apply_best_launch(state, ct, ss, k=k)
+    # If it didn't crash, the overflow guard worked
+    assert (state.ships >= 0).all()
+
+
+def test_terminal_score_shape():
+    state, ct, _ = _make_state_and_table(B=6)
+    scores = mod.terminal_score(state)
+    assert scores.shape == (6,)
+
+
+def test_terminal_score_only_counts_own_planets():
+    state = _minimal_state(
+        B=1, P=3, A=2,
+        ships=torch.tensor([[100.0, 50.0, 80.0]]),
+        owner=torch.tensor([[0, 1, -1]], dtype=torch.long),
+        prod=torch.tensor([[3.0, 2.0, 1.0]]),
+    )
+    score = mod.terminal_score(state, prod_weight=10.0)
+    # Only planet 0 (owned by player 0): ships=100 + prod=3*10 = 130
+    assert float(score[0]) == pytest.approx(130.0)
+
+
+def test_rollout_search_returns_valid_payload_or_none():
+    obs_t = _obs_tensors()
+    mem = mod.ProducerLiteMemory()
+    config = mod._config_for(2)
+    greedy, ct, movement = mod.run_turn(obs_t, config=config, player_count=2, memory=mem)
+    result = mod.rollout_search(
+        obs_tensors=obs_t, movement=movement, candidate_table=ct,
+        player_id=0, A=2, B=mod.ROLLOUT_B, H=mod.ROLLOUT_H,
+    )
+    if result is None:
+        # None is valid (no valid first action found)
+        return
+    assert "from_planet_id" in result
+    assert "angle" in result
+    assert "num_ships" in result
+    assert "counts" in result
+    # counts must be 1
+    assert int(result["counts"].item()) == 1
+    # num_ships must be >= 1
+    assert float(result["num_ships"][0].item()) >= 1.0
+
+
+def test_rollout_search_returns_none_for_none_table():
+    obs_t = _obs_tensors()
+    mem = mod.ProducerLiteMemory()
+    _, _, movement = mod.run_turn(obs_t, config=mod._config_for(2), player_count=2, memory=mem)
+    result = mod.rollout_search(
+        obs_tensors=obs_t, movement=movement, candidate_table=None,
+        player_id=0, A=2, B=10, H=5,
+    )
+    assert result is None
