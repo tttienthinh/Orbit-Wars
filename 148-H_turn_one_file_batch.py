@@ -4805,6 +4805,79 @@ def _config_for(player_count: int) -> ProducerLiteConfig:
     return CONFIG_4P if int(player_count) >= 4 else ProducerLiteConfig()
 
 
+# ---------------------------------------------------------------------------
+# Rollout search — constants and state
+# ---------------------------------------------------------------------------
+
+ROLLOUT_B:  int   = 30    # parallel universes
+ROLLOUT_H:  int   = 20    # simulation horizon (steps)
+ARRIVALS_H: int   = 40    # ROLLOUT_H + max candidate ETA cap (20); no overflow
+PROD_WEIGHT: float = 10.0
+NOISE_SCALE: float = 0.15
+
+
+@dataclass
+class RolloutState:
+    """Mutable batched game state for B parallel universes."""
+    ships:    Tensor   # [B, P] float — ships per planet
+    owner:    Tensor   # [B, P] long  — owner (-1=neutral, 0..A-1=players)
+    prod:     Tensor   # [B, P] float — production rate (static after init)
+    alive:    Tensor   # [B, P] bool  — alive mask (static after init)
+    arrivals: Tensor   # [B, P, ARRIVALS_H, A] float — player arrival buckets
+    player_id: int
+    A: int
+    B: int
+    P: int
+
+
+def init_rollout_state(
+    obs_tensors: dict,
+    movement: "PlanetMovement",
+    B: int,
+    H: int,
+    A: int,
+    player_id: int,
+) -> RolloutState:
+    planets = obs_tensors["planets"]          # [P, 7]
+    P = int(planets.shape[0])
+    device = planets.device
+    dtype = torch.float32
+
+    ships = planets[:, 5].to(dtype)
+    owner = planets[:, 1].long()
+    prod  = planets[:, 6].to(dtype)
+    alive = (planets[:, 0] >= 0)
+
+    state_ships = ships.unsqueeze(0).expand(B, P).clone()
+    state_owner = owner.unsqueeze(0).expand(B, P).clone()
+    state_prod  = prod.unsqueeze(0).expand(B, P)
+    state_alive = alive.unsqueeze(0).expand(B, P)
+
+    arrivals = torch.zeros(B, P, ARRIVALS_H, A, dtype=dtype, device=device)
+
+    if movement.fleet_buckets is not None:
+        fb = movement.fleet_buckets                # [P, H_mov, A_mov]
+        H_mov  = int(fb.shape[1])
+        A_mov  = int(fb.shape[2])
+        H_copy = min(H_mov, ARRIVALS_H)
+        A_copy = min(A_mov, A)
+        arrivals[:, :, :H_copy, :A_copy] = (
+            fb[:, :H_copy, :A_copy].to(dtype=dtype, device=device).unsqueeze(0)
+        )
+
+    return RolloutState(
+        ships=state_ships,
+        owner=state_owner,
+        prod=state_prod,
+        alive=state_alive,
+        arrivals=arrivals,
+        player_id=player_id,
+        A=A,
+        B=B,
+        P=P,
+    )
+
+
 class ProducerLiteMemory:
     def __init__(self) -> None:
         self.movement = None

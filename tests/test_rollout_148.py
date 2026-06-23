@@ -126,3 +126,49 @@ def test_run_turn_movement_not_none():
     _, _, movement = mod.run_turn(obs_t, config=mod._config_for(2), player_count=2, memory=mem)
     assert movement is not None
     assert hasattr(movement, "fleet_buckets")
+
+
+def test_rollout_constants():
+    assert mod.ROLLOUT_B == 30
+    assert mod.ROLLOUT_H == 20
+    assert mod.ARRIVALS_H == 40
+    assert mod.PROD_WEIGHT == 10.0
+    assert mod.NOISE_SCALE == 0.15
+
+
+def test_init_rollout_state_shapes():
+    obs_t = _obs_tensors()
+    mem = mod.ProducerLiteMemory()
+    config = mod._config_for(2)
+    _, _, movement = mod.run_turn(obs_t, config=config, player_count=2, memory=mem)
+    B, H, A = 4, mod.ROLLOUT_H, 2
+    state = mod.init_rollout_state(obs_t, movement, B=B, H=H, A=A, player_id=0)
+    P = state.P
+    assert state.ships.shape  == (B, P)
+    assert state.owner.shape  == (B, P)
+    assert state.prod.shape   == (B, P)
+    assert state.alive.shape  == (B, P)
+    assert state.arrivals.shape == (B, P, mod.ARRIVALS_H, A)
+    assert state.A == A
+    assert state.B == B
+
+
+def test_init_rollout_state_ships_match_obs():
+    obs_t = _obs_tensors()
+    mem = mod.ProducerLiteMemory()
+    _, _, movement = mod.run_turn(obs_t, config=mod._config_for(2), player_count=2, memory=mem)
+    state = mod.init_rollout_state(obs_t, movement, B=3, H=mod.ROLLOUT_H, A=2, player_id=0)
+    # All B copies start with identical ship counts from the observation
+    assert (state.ships[0] == state.ships[1]).all()
+    assert (state.ships[0] == state.ships[2]).all()
+    # Ships for planet 0 should match obs (planet 0 has 100 ships)
+    planet_ships = obs_t["planets"][:, 5]
+    assert (state.ships[0] - planet_ships).abs().max() < 1e-3
+
+
+def test_init_rollout_state_arrivals_nonnegative():
+    obs_t = _obs_tensors()
+    mem = mod.ProducerLiteMemory()
+    _, _, movement = mod.run_turn(obs_t, config=mod._config_for(2), player_count=2, memory=mem)
+    state = mod.init_rollout_state(obs_t, movement, B=2, H=mod.ROLLOUT_H, A=2, player_id=0)
+    assert (state.arrivals >= 0).all()
