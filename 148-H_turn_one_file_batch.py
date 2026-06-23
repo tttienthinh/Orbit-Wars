@@ -4949,6 +4949,52 @@ def pick_first_actions(
     return first_cand_idx, first_ships
 
 
+def credit_production(state: RolloutState) -> None:
+    """Credit production to all owned planets (all players, for simulation accuracy)."""
+    own_any = (state.owner >= 0) & state.alive   # [B, P]
+    state.ships = state.ships + state.prod * own_any.to(state.prod.dtype)
+
+
+def resolve_arrivals(state: RolloutState, k: int) -> None:
+    """Apply top1−top2 combat for all fleets arriving at absolute step k."""
+    A   = state.A
+    arriving = state.arrivals[:, :, k, :]         # [B, P, A]
+    has_activity = arriving.sum(dim=-1) > 0        # [B, P]
+    if not bool(has_activity.any()):
+        return
+
+    # Fold owned garrison into the owner's player slot
+    owned_mask = (state.owner >= 0) & state.alive  # [B, P]
+    owner_safe = state.owner.clamp(min=0)           # [B, P] — neutral clamped to 0 temporarily
+    garrison   = state.ships * owned_mask.to(state.ships.dtype)
+
+    combatants = arriving.clone()
+    combatants.scatter_add_(2, owner_safe.unsqueeze(-1), garrison.unsqueeze(-1))
+    # Undo the false neutral-as-slot-0 contribution
+    combatants[:, :, 0] = combatants[:, :, 0] - garrison * (~owned_mask).to(garrison.dtype)
+
+    # Append neutral garrison as slot A (not stored in arrivals; derived from state.ships)
+    neutral_garrison = state.ships * (state.owner == -1).to(state.ships.dtype)
+    combatants = torch.cat([combatants, neutral_garrison.unsqueeze(-1)], dim=-1)  # [B, P, A+1]
+
+    sorted_ships, sorted_owners = combatants.sort(dim=-1, descending=True)
+    winner_ships = (sorted_ships[:, :, 0] - sorted_ships[:, :, 1]).clamp(min=0)
+    winner_owner_raw = sorted_owners[:, :, 0]
+    winner_owner = torch.where(
+        winner_owner_raw == A,
+        torch.full_like(winner_owner_raw, -1),
+        winner_owner_raw,
+    ).long()   # remap neutral slot A back to -1
+
+    update = has_activity & state.alive
+    state.ships = torch.where(update, winner_ships, state.ships)
+    state.owner = torch.where(update & (winner_ships > 0), winner_owner, state.owner)
+    state.owner = torch.where(
+        update & (winner_ships == 0),
+        torch.full_like(state.owner, -1), state.owner,
+    )
+
+
 class ProducerLiteMemory:
     def __init__(self) -> None:
         self.movement = None

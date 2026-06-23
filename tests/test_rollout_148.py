@@ -243,3 +243,80 @@ def test_pick_first_actions_only_own_source():
         if float(ships[b]) > 0:
             src = int(ct.source_slots[int(idx[b])].item())
             assert int(state.owner[b, src].item()) == state.player_id
+
+
+def _minimal_state(B=2, P=3, A=2, player_id=0, ships=None, owner=None, prod=None):
+    """Build a RolloutState directly without going through init_rollout_state."""
+    dtype = torch.float32
+    s = ships if ships is not None else torch.zeros(B, P, dtype=dtype)
+    o = owner if owner is not None else torch.full((B, P), -1, dtype=torch.long)
+    pr = prod if prod is not None else torch.zeros(B, P, dtype=dtype)
+    # Infer B and P from the actual tensors in case caller passed different shapes
+    actual_B, actual_P = s.shape
+    alive = torch.ones(actual_B, actual_P, dtype=torch.bool)
+    arrivals = torch.zeros(actual_B, actual_P, mod.ARRIVALS_H, A, dtype=dtype)
+    return mod.RolloutState(
+        ships=s, owner=o, prod=pr, alive=alive,
+        arrivals=arrivals, player_id=player_id, A=A, B=actual_B, P=actual_P,
+    )
+
+
+def test_credit_production_adds_to_owned():
+    state = _minimal_state(
+        ships=torch.tensor([[10.0, 5.0, 20.0], [10.0, 5.0, 20.0]]),
+        owner=torch.tensor([[0, -1, 1], [0, -1, 1]], dtype=torch.long),
+        prod=torch.tensor([[3.0, 2.0, 4.0], [3.0, 2.0, 4.0]]),
+    )
+    mod.credit_production(state)
+    # planet 0 (owned by player 0): +3
+    assert float(state.ships[0, 0]) == pytest.approx(13.0)
+    # planet 1 (neutral): unchanged
+    assert float(state.ships[0, 1]) == pytest.approx(5.0)
+    # planet 2 (enemy, owner=1): +4 (enemy planets also grow — accurate simulation)
+    assert float(state.ships[0, 2]) == pytest.approx(24.0)
+
+
+def test_credit_production_all_universes():
+    state = _minimal_state(
+        ships=torch.zeros(3, 3),
+        owner=torch.zeros(3, 3, dtype=torch.long),
+        prod=torch.ones(3, 3),
+    )
+    mod.credit_production(state)
+    assert (state.ships == 1.0).all()
+
+
+def test_resolve_arrivals_player_beats_neutral():
+    """Player 0 fleet of 25 arrives at neutral planet with 20 ships."""
+    B, P, A = 1, 2, 2
+    state = _minimal_state(B=B, P=P, A=A,
+        ships=torch.tensor([[30.0, 20.0]]),
+        owner=torch.tensor([[0, -1]], dtype=torch.long),
+    )
+    state.arrivals[0, 1, 3, 0] = 25.0   # 25 ships of player 0 arrive at planet 1, step 3
+    mod.resolve_arrivals(state, 3)
+    assert int(state.owner[0, 1].item()) == 0     # player 0 now owns it
+    assert float(state.ships[0, 1]) == pytest.approx(5.0)   # 25 - 20 = 5
+
+
+def test_resolve_arrivals_player_loses_to_garrison():
+    """Player 0 fleet of 15 arrives at enemy planet with 30 ships."""
+    B, P, A = 1, 2, 2
+    state = _minimal_state(B=B, P=P, A=A,
+        ships=torch.tensor([[10.0, 30.0]]),
+        owner=torch.tensor([[0, 1]], dtype=torch.long),
+    )
+    state.arrivals[0, 1, 2, 0] = 15.0   # player 0 attacks with 15, step 2
+    mod.resolve_arrivals(state, 2)
+    assert int(state.owner[0, 1].item()) == 1          # player 1 still owns it
+    assert float(state.ships[0, 1]) == pytest.approx(15.0)  # 30 - 15 = 15
+
+
+def test_resolve_arrivals_no_activity_no_change():
+    state = _minimal_state(
+        ships=torch.tensor([[50.0, 30.0]]),
+        owner=torch.tensor([[0, 1]], dtype=torch.long),
+    )
+    before = state.ships.clone()
+    mod.resolve_arrivals(state, 5)
+    assert (state.ships == before).all()
